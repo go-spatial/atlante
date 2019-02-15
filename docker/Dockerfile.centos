@@ -1,0 +1,28 @@
+FROM centos:latest
+
+USER root
+
+RUN yum -y update
+
+# dev tools
+RUN yum group install -y "Development Tools"
+
+# 
+RUN curl -o go.tar.gz https://dl.google.com/go/go1.11.5.linux-amd64.tar.gz
+RUN tar -xzf go.tar.gz
+RUN rm go.tar.gz
+RUN mv go /usr/local
+RUN mkdir -p /go/bin
+
+ENV GOROOT=/usr/local/go
+ENV GOPATH=/go
+ENV PATH="/go/bin:/usr/local/go/bin:${PATH}"
+
+RUN yum install -y cairo-devel librsvg2-devel
+# deps for building rsvg
+RUN yum install -y gdk-pixbuf2-devel \
+	pango-devel \
+	libxml2-devel \
+	libcroco-devel \
+	gtk3-devel
+
