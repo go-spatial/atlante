@@ -7,7 +7,7 @@ use the `-f` flag like so:
 Run this from the root of the project.
 ```console
 
- $ docker build -f docker/Dockerfile.debian -t maptoolkit .
+ $ docker build -f docker/Dockerfile.centos -t maptoolkit .
 
 ```
 
