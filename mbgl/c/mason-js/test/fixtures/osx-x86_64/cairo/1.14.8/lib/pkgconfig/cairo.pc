@@ -1,0 +1,13 @@
+prefix=/Users/travis/build/mapbox/mason/mason_packages/osx-x86_64/cairo/1.14.8
+exec_prefix=${prefix}
+libdir=${exec_prefix}/lib
+includedir=${prefix}/include
+
+Name: cairo
+Description: Multi-platform 2D graphics library
+Version: 1.14.8
+
+@PKGCONFIG_REQUIRES@:            
+Libs: -L${libdir} -lcairo
+Libs.private:        -lz -lz -L/opt/X11/lib -lfreetype  
+Cflags: -I${includedir}/cairo

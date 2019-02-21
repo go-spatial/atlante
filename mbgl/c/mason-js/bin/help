@@ -1,0 +1,19 @@
+Usage:
+  mason-js install 
+
+  or 
+
+  mason-js install <package> <package type>
+
+Description:
+  mason-js is a JS client for mason that installs c++ packages locally (both header-only and compiled). mason-js can install all packages declared in a mason-versions.ini file or it can install a single package. 
+
+Example:
+  mason-js install  
+
+  OR
+
+  mason-js install protozero=1.5.1 --type=header 
+
+Options:
+  --type [header or compiled]

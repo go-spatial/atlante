@@ -1,0 +1,12 @@
+prefix=/Users/travis/build/mapbox/mason/mason_packages/osx-x86_64/cairo/1.14.8
+exec_prefix=${prefix}
+libdir=${exec_prefix}/lib
+includedir=${prefix}/include
+
+Name: cairo-ft
+Description: FreeType font backend for cairo graphics library
+Version: 1.14.8
+
+Requires: cairo 
+Libs: -L/opt/X11/lib -lfreetype 
+Cflags: -I${includedir}/cairo -I/opt/X11/include/freetype2

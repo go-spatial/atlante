@@ -1,0 +1,8 @@
+*.a filter=lfs diff=lfs merge=lfs -text
+libnunicode.a filter=lfs diff=lfs merge=lfs -text
+libsqlite.a filter=lfs diff=lfs merge=lfs -text
+libuv.a filter=lfs diff=lfs merge=lfs -text
+libicu.a filter=lfs diff=lfs merge=lfs -text
+libmbgl-core.a filter=lfs diff=lfs merge=lfs -text
+libmbgl-filesource.a filter=lfs diff=lfs merge=lfs -text
+libmbgl-loop-uv.a filter=lfs diff=lfs merge=lfs -text

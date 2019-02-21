@@ -1,0 +1,10 @@
+.DS_Store
+node_modules
+npm-debug.log
+mason-versions.ini
+.nyc_output
+coverage
+*tgz
+mason_packages
+notes.txt
+*diff

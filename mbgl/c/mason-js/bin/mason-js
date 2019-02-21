@@ -1,0 +1,117 @@
+#!/usr/bin/env node
+var loader = require('../lib/retrieve_package.js');
+var reader = require('../lib/file_handler.js');
+var index = require('../');
+var sym = require('../lib/symlink.js');
+var log = require('npmlog');
+var fse = require('fs-extra');
+var fs = require('fs');
+var path = require('path');
+var args = require('minimist')(process.argv.slice(2));
+
+var masonPath = path.join(process.cwd(), '/mason-versions.ini');
+
+function run(args, masonPath, callback){
+  var command = args['_'][0]; 
+  var singlePackage = args['_'][1];
+  var type = args.type; 
+
+  if (!command) {
+    var err = new Error('missing mason-js args');
+    process.stdout.write(fs.readFileSync(__dirname + '/help', 'utf8'));
+    return callback(err);
+  }
+
+  if (command !== 'link' && command !== 'install'){
+    var err = new Error('invalid command');
+    process.stdout.write(fs.readFileSync(__dirname + '/help', 'utf8'));
+    return callback(err);
+  }
+
+  if (singlePackage && !args.type) {
+    var err = new Error('include package type with package info: example protozero=1.5.1 --type=header');
+    process.stdout.write(fs.readFileSync(__dirname + '/help', 'utf8'));
+    return callback(err);
+  }
+
+  if (command === 'link' && !singlePackage){
+    index.link(masonPath, function(err, result){
+      if (err) return callback(err);
+      return callback(null); 
+    });
+  }
+
+  if (command === 'link' && singlePackage){
+    var params = reader.generatePackageObject(singlePackage);
+
+    var package = reader.buildParams(params, type);
+
+    var paths = sym.buildLinkPaths([package], path.join(process.cwd(), '/mason_packages/.link'));
+
+    sym.symLink(paths, function(err, result){
+      if (err) return callback(err);
+      return callback(null);
+    });
+  }
+
+  if (command === 'install' && !singlePackage){
+    reader.fileReader(masonPath, function(err, packages){
+      if (err) return callback(err);
+      log.info('Mason Package Install Starting');
+      index.install(packages, function(err){
+        if (err) return callback(err);
+        log.info('Finished downloading packages'); 
+        return callback(null, true); 
+      });
+    });
+  }
+  
+  if (command === 'install' && singlePackage && args.type){
+    if (args.type !== 'header' && args.type !=='compiled'){
+      var err = new Error('invalid package type');
+      process.stdout.write(fs.readFileSync(__dirname + '/help', 'utf8'));
+      return callback(err);
+    }
+    
+    var params = reader.generatePackageObject(singlePackage);
+    var package = reader.buildParams(params, args.type);
+
+    if (args.save){
+      reader.fileWriter(masonPath, singlePackage, args.type, function(err, result){
+        if (err) return callback(err);
+        if (result){
+          log.info(`${singlePackage} added to mason-versions.ini`);
+        }
+        index.install([package], function(err){
+          if (err) return callback(err);
+          log.info('Finished downloading packages');
+          return callback(null, true);
+        });
+      });
+    }else{
+      index.install([package], function(err){
+        if (err) return callback(err);
+        log.info('Finished downloading packages');
+        return callback(null, true);
+      });
+    }
+  }
+}
+
+if (require.main === module) {
+var masonIni = path.join(process.cwd(), '/mason-versions.ini');
+   
+if (require.main === module) {
+  run(args, masonIni, function(err){
+    if (err)  {
+      log.error(err);
+      process.exit(1);
+    }else{
+      log.info('Completed');
+      process.exit(0);
+    }
+  });
+}
+}
+
+module.exports = {run:run}

@@ -14,26 +14,25 @@ int svg2pdf_file(const char * inFile, const char * outFile,
 	GInputStream * stream;
 	RsvgHandleFlags flags;
 
-#if DEBUG 
 
+#if DEBUG
 	printf("%s\n", "start");
 
 	printf("%p\n", cairo_pdf_surface_create);
 	printf("%d\n", CAIRO_HAS_PDF_SURFACE);
 
 	printf("creating handle to %s\n", inFile);
-
 #endif
 
 	file = g_file_new_for_path(inFile);
 	stream = (GInputStream *) g_file_read(file, NULL, &error);
 	if (stream == NULL){
 
+
 #if DEBUG
-
 		printf("%s\n", "could not create read stream");
-
 #endif
+
 		return 1;
 	}
 
@@ -43,9 +42,7 @@ int svg2pdf_file(const char * inFile, const char * outFile,
 		&error);
 	if (handle == NULL) {
 
-#if DEBUG
 		printf("error (%d) %s\n", error->code, error->message);
-#endif
 
 		return 1;
 	}
@@ -92,15 +89,11 @@ int svg2pdf_file(const char * inFile, const char * outFile,
 		return 1;
 	}
 
-	// TODO(gdey): is this needed?
-	cairo_surface_write_to_png(surface, "example.png");
-#if DEBUG
-	printf("handle rendered\n");
-#endif
-
 	cairo_surface_destroy(surface);
 	cairo_destroy(cr);
 	rsvg_handle_close(handle, &error);
-
+#if DEBUG
+	printf("Done!\n");
+#endif
 	return 0;
 }

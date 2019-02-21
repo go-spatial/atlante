@@ -15,7 +15,7 @@ To run the container from the root of the project.
 
 ```console
 
- $ docker run -it --rm -v "$(pwd)":/go/src/github.com/go-spatial/maptoolkit
+ $ docker run --rm -v "$(pwd)":/go/src/github.com/go-spatial/maptoolkit -it maptoolkit
 
 ```
 

@@ -1,0 +1,43 @@
+{
+  "name": "@mapbox/mason-js",
+  "version": "0.1.5",
+  "description": "js client for mason",
+  "main": "index.js",
+  "bin": {
+    "mason-js": "bin/mason-js"
+  },
+  "scripts": {
+    "test": "npm run lint && tape test/*.test.js",
+    "lint": "eslint .",
+    "report-coverage": "nyc --all tape test/*.test.js && nyc report --reporter=text-lcov > coverage.lcov && codecov"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mapbox/mason-js.git"
+  },
+  "author": "Mapbox",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/mapbox/mason-js/issues"
+  },
+  "homepage": "https://github.com/mapbox/mason-js#readme",
+  "devDependencies": {
+    "eslint": "^4.18.0",
+    "eslint-config-google": "^0.9.1",
+    "mapbox-error": "^2.2.0",
+    "codecov": "^3.0.0",
+    "nyc": "^11.4.1",
+    "sinon": "^4.1.2",
+    "rimraf": "^2.6.2",
+    "tape": "^4.8.0"
+  },
+  "dependencies": {
+    "d3-queue": "^3.0.7",
+    "fs-extra": "^4.0.2",
+    "minimist": "^1.2.0",
+    "mkdirp": "^0.5.1",
+    "needle": "^2.2.0",
+    "npmlog": "^4.1.2",
+    "tar": "^4.0.2"
+  }
+}

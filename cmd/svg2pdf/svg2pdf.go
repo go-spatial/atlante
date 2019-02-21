@@ -23,7 +23,7 @@ func main() {
 	}
 
 	fmt.Println(flag.Args())
-	err := svg2pdf.Svg2pdf(flag.Arg(0), flag.Arg(1), width, height)
+	err := svg2pdf.GeneratePDF(flag.Arg(0), flag.Arg(1), height, width)
 	if err != nil {
 		panic(err)
 	}

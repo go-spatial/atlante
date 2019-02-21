@@ -1,0 +1,13 @@
+diff --git a/platform/default/src/mbgl/storage/http_file_source.cpp b/platform/default/src/mbgl/storage/http_file_source.cpp
+index 213b53d..009eb9b 100644
+--- a/platform/default/src/mbgl/storage/http_file_source.cpp
++++ b/platform/default/src/mbgl/storage/http_file_source.cpp
+@@ -325,7 +325,7 @@ HTTPRequest::HTTPRequest(HTTPFileSource::Impl* context_, Resource resource_, Fil
+ 
+     handleError(curl::easy_setopt(handle, CURLOPT_PRIVATE, this));
+     handleError(curl::easy_setopt(handle, CURLOPT_ERRORBUFFER, error));
+-    handleError(curl::easy_setopt(handle, CURLOPT_CAINFO, "ca-bundle.crt"));
++    //handleError(curl::easy_setopt(handle, CURLOPT_CAINFO, "ca-bundle.crt"));
+     handleError(curl::easy_setopt(handle, CURLOPT_FOLLOWLOCATION, 1));
+     handleError(curl::easy_setopt(handle, CURLOPT_URL, resource.url.c_str()));
+     handleError(curl::easy_setopt(handle, CURLOPT_WRITEFUNCTION, writeCallback));
