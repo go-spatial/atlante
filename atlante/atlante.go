@@ -9,13 +9,16 @@ import (
 	"io"
 	"io/ioutil"
 	"log"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
 	"sync"
 	"text/template"
+	"time"
 
 	"github.com/go-spatial/maptoolkit/atlante/grids"
+	"github.com/go-spatial/maptoolkit/atlante/internal/urlutil"
 	"github.com/go-spatial/maptoolkit/mbgl/bounds"
 	"github.com/go-spatial/maptoolkit/mbgl/image"
 	"github.com/go-spatial/maptoolkit/svg2pdf"
@@ -50,8 +53,8 @@ func (img ImgStruct) Base64Image() string {
 }
 
 type GridTemplateContext struct {
-	Image  ImgStruct
-	Grid grids.Grid
+	Image ImgStruct
+	Grid  grids.Grid
 }
 
 type Sheet struct {
@@ -68,22 +71,27 @@ var funcMap = template.FuncMap{
 	"ToUpper": strings.ToUpper,
 	"ToLower": strings.ToLower,
 	"Format": func(format string, data interface{}) string {
+		// Allow Format to be used for time's as well.
+		if d, ok := data.(time.Time); ok {
+			return d.Format(format)
+		}
 		return fmt.Sprintf(format, data)
 	},
+	"Now": time.Now,
 }
 
-func NewSheet(name string, provider grids.Provider, zoom float64, style, svgTemplateFilename string) (*Sheet, error) {
+func NewSheet(name string, provider grids.Provider, zoom float64, style string, svgTemplateFilename *url.URL) (*Sheet, error) {
 	var (
 		err error
 		t   *template.Template
 	)
 
-	tpl, err := ioutil.ReadFile(svgTemplateFilename)
+	tpl, err := urlutil.ReadAll(svgTemplateFilename)
 	if err != nil {
 		return nil, err
 	}
 
-	t, err = template.New(svgTemplateFilename).
+	t, err = template.New(svgTemplateFilename.String()).
 		Funcs(funcMap).
 		Option("missingkey=error").
 		Parse(string(tpl))
@@ -96,7 +104,7 @@ func NewSheet(name string, provider grids.Provider, zoom float64, style, svgTemp
 		Provider:            provider,
 		Zoom:                zoom,
 		Style:               style,
-		SvgTemplateFilename: svgTemplateFilename,
+		SvgTemplateFilename: svgTemplateFilename.String(),
 		svgTemplate:         t,
 	}, nil
 }
@@ -161,7 +169,7 @@ func (ft filenameTemplate) Filename(sheetName string, grid grids.Grid, wd string
 	return str.String()
 }
 
-func generatePDF(ctx context.Context, sheet *Sheet, grid *grids.Grid, filenames *GeneratedFiles) error {
+func GeneratePDF(ctx context.Context, sheet *Sheet, grid *grids.Grid, filenames *GeneratedFiles) error {
 	if grid == nil {
 		return errors.New("grid is nil")
 	}
@@ -296,7 +304,7 @@ func (a *Atlante) GeneratePDFLatLng(ctx context.Context, sheetName string, lat, 
 		return nil, err
 	}
 
-	err = generatePDF(ctx, provider, grid, filenames)
+	err = GeneratePDF(ctx, provider, grid, filenames)
 	return filenames, err
 
 }
@@ -327,6 +335,6 @@ func (a *Atlante) GeneratePDFMDGID(ctx context.Context, sheetName string, mdgID 
 		return nil, err
 	}
 
-	err = generatePDF(ctx, provider, grid, filenames)
+	err = GeneratePDF(ctx, provider, grid, filenames)
 	return filenames, err
 }

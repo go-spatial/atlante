@@ -9,7 +9,7 @@ import (
 
 	"github.com/go-spatial/geom"
 	"github.com/go-spatial/geom/spherical"
-	"github.com/go-spatial/go-mbgl/bounds"
+	"github.com/go-spatial/maptoolkit/mbgl/bounds"
 )
 
 type MDGID struct {

@@ -22,13 +22,23 @@ func (err ErrProviderNotRegistered) Error() string {
 	return "provider (" + string(err) + ") not registered"
 }
 
+type ProviderConfig interface {
+	dict.Dicter
+	// Returns the Grid Provider for the key
+	// if the a Provider does not exist ErrKeyMissingProvider will be returned
+	// if the key does not exist ErrNoProvidersRegistered will be returned
+	// if the key value is not a string ErrKeyType will be returned
+	NameGridProvider(Key string)(Provider, error)
+	
+}
+
 /******************************************************************************/
 
 // InitFunc initilizes a grid Provider fiven a config map.
 // The InitFunc should validate the config map, and report any
 // errors.
 // this is called by the For function.
-type InitFunc func(dict.Dicter) (Provider, error)
+type InitFunc func(ProviderConfig) (Provider, error)
 
 // CleanupFunc is called when the system is shuting down;
 // allowing the provider to do any needed cleanup.
@@ -90,7 +100,7 @@ func Registered() (p []string) {
 }
 
 // For function returns a configured provider of the given type, provided the correct config.
-func For(providerType string, config dict.Dicter) (Provider, error) {
+func For(providerType string, config ProviderConfig) (Provider, error) {
 	providersLock.RLock()
 	defer providersLock.RUnlock()
 	if providers == nil {

@@ -3,50 +3,9 @@ FROM centos:latest
 USER root
 
 RUN yum -y update
+RUN yum install -y mesa-libOSMesa.x86_64 libpng libjpeg-turbo librsvg2
 
-# dev tools
-RUN yum group install -y "Development Tools"
-
-# Install go 1.11
-RUN curl -SL https://dl.google.com/go/go1.11.5.linux-amd64.tar.gz | tar -xzC /usr/local && mkdir -p /go/bin
-
-ENV GOROOT=/usr/local/go
-ENV GOPATH=/go
-ENV PATH="/go/bin:/usr/local/go/bin:${PATH}"
-
-# Install bastet
-RUN go get github.com/gdey/bastet/cmd/bastet && mkdir -p /etc/templates
-
-RUN curl -s https://packagecloud.io/install/repositories/github/git-lfs/script.rpm.sh | bash && yum install -y git-lfs vim
-
-COPY docker/files/templates /etc/templates
-
-RUN curl -s https://packagecloud.io/install/repositories/github/git-lfs/script.rpm.sh | bash && yum install -y git-lfs vim
-
-RUN yum install -y centos-release-scl
-RUN yum install -y devtoolset-7-gcc* && /go/bin/bastet -o /etc/profile.d/devtoolset-7.sh /etc/templates/scl_profile.tpl "package=devtoolset-7"
-RUN yum install -y nodejs010-npm.noarch && /go/bin/bastet -o /etc/profile.d/nodejs010.sh /etc/templates/scl_profile.tpl "package=nodejs010"
-
-# install cmake
-RUN cd /usr/local;    curl -SL https://github.com/Kitware/CMake/releases/download/v3.13.4/cmake-3.13.4-Linux-x86_64.tar.gz |  tar -xzC /usr/local && ln -s cmake-3.13.4-Linux-x86_64 cmake; echo 'PATH=$PATH:/usr/local/cmake/bin' > /etc/profile.d/cmake.sh
-ENV PATH="${PATH}:/usr/local/cmake/bin"
-
-RUN yum install -y cairo-devel librsvg2-devel
-
-# deps for building rsvg
-RUN yum install -y gdk-pixbuf2-devel \
-	pango-devel \
-	libxml2-devel \
-	libcroco-devel \
-	libpng-devel \
-	libjpeg-turbo-devel \
-	gtk3-devel
-
-RUN yum install -y sqlite-devel.x86_64  mesa-libOSMesa-devel.x86_64  libcurl-devel.x86_64
-
-RUN go get github.com/dimfeld/httptreemux
-RUN go get github.com/spf13/cobra 
-RUN go get github.com/go-spatial/tegola
-RUN go get github.com/go-spatial/geom
-RUN go get github.com/jackc/pgx
+# Install Fonts needed by the system
+COPY docker/files/fonts/* /usr/share/fonts/default/TrueType/
+RUN fc-cache
 

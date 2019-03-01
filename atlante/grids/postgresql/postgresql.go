@@ -6,11 +6,12 @@ import (
 	"database/sql"
 	"fmt"
 	"io/ioutil"
+	"log"
 	"sync"
+	"time"
 
 	"github.com/go-spatial/maptoolkit/atlante/grids"
 	"github.com/go-spatial/tegola"
-	"github.com/go-spatial/tegola/dict"
 	"github.com/jackc/pgx"
 )
 
@@ -19,32 +20,38 @@ const Name = "postgresql"
 var AppName = "atlante"
 
 type Provider struct {
-	config pgx.ConnPoolConfig
-	pool   *pgx.ConnPool
-	srid   uint
+	config           pgx.ConnPoolConfig
+	pool             *pgx.ConnPool
+	srid             uint
+	editedBy         string
+	editedDateFormat string
 }
 
 const (
-	DefaultSRID    = tegola.WebMercator
-	DefaultPort    = 5432
-	DefaultMaxConn = 100
-	DefaultSSLMode = "disable"
-	DefaultSSLKey  = ""
-	DefaultSSLCert = ""
+	DefaultSRID           = tegola.WebMercator
+	DefaultPort           = 5432
+	DefaultMaxConn        = 100
+	DefaultSSLMode        = "disable"
+	DefaultSSLKey         = ""
+	DefaultSSLCert        = ""
+	DefaultEditDateFromat = time.RFC3339
+	DefaultEditBy         = ""
 )
 
 const (
-	ConfigKeyHost        = "host"
-	ConfigKeyPort        = "port"
-	ConfigKeyDB          = "database"
-	ConfigKeyUser        = "user"
-	ConfigKeyPassword    = "password"
-	ConfigKeySSLMode     = "ssl_mode"
-	ConfigKeySSLKey      = "ssl_key"
-	ConfigKeySSLCert     = "ssl_cert"
-	ConfigKeySSLRootCert = "ssl_root_cert"
-	ConfigKeyMaxConn     = "max_connections"
-	ConfigKeySRID        = "srid"
+	ConfigKeyHost           = "host"
+	ConfigKeyPort           = "port"
+	ConfigKeyDB             = "database"
+	ConfigKeyUser           = "user"
+	ConfigKeyPassword       = "password"
+	ConfigKeySSLMode        = "ssl_mode"
+	ConfigKeySSLKey         = "ssl_key"
+	ConfigKeySSLCert        = "ssl_cert"
+	ConfigKeySSLRootCert    = "ssl_root_cert"
+	ConfigKeyMaxConn        = "max_connections"
+	ConfigKeySRID           = "srid"
+	ConfigKeyEditDateFormat = "edit_date_format"
+	ConfigKeyEditBy         = "edit_by"
 )
 
 type ErrInvalidSSLMode string
@@ -57,7 +64,7 @@ func init() {
 	grids.Register(Name, NewGridProvider, Cleanup)
 }
 
-func NewGridProvider(config dict.Dicter) (grids.Provider, error) {
+func NewGridProvider(config grids.ProviderConfig) (grids.Provider, error) {
 	host, err := config.String(ConfigKeyHost, nil)
 	if err != nil {
 		return nil, err
@@ -114,6 +121,16 @@ func NewGridProvider(config dict.Dicter) (grids.Provider, error) {
 		return nil, err
 	}
 
+	editedBy := DefaultEditBy
+	if editedBy, err = config.String(ConfigKeyEditBy, &editedBy); err != nil {
+		return nil, err
+	}
+
+	editedDateFormat := DefaultEditDateFromat
+	if editedDateFormat, err = config.String(ConfigKeyEditBy, &editedDateFormat); err != nil {
+		return nil, err
+	}
+
 	connConfig := pgx.ConnConfig{
 		Host:     host,
 		Port:     uint16(port),
@@ -137,7 +154,9 @@ func NewGridProvider(config dict.Dicter) (grids.Provider, error) {
 			ConnConfig:     connConfig,
 			MaxConnections: int(maxcon),
 		},
-		srid: uint(srid),
+		srid:             uint(srid),
+		editedBy:         editedBy,
+		editedDateFormat: editedDateFormat,
 	}
 	if p.pool, err = pgx.NewConnPool(p.config); err != nil {
 		return nil, fmt.Errorf("Failed while creating connection pool: %v", err)
@@ -206,6 +225,26 @@ func ConfigTLS(sslMode string, sslKey string, sslCert string, sslRootCert string
 	return nil
 }
 
+func (p *Provider) newEditInfo(by, date sql.NullString) (*grids.EditInfo, error) {
+	var err error
+	strBy := p.editedBy
+	if by.Valid {
+		strBy = by.String
+	}
+	ei := grids.EditInfo{
+		By: strBy,
+	}
+	// Try and parse the date
+	if date.Valid {
+		ei.Date, err = time.Parse(p.editedDateFormat, date.String)
+		if err != nil {
+			log.Printf("Got an error trying to parse %v -- %v", p.editedDateFormat, date)
+			return nil, err
+		}
+	}
+	return &ei, nil
+}
+
 func (p *Provider) GridForLatLng(lat, lng float64, srid uint) (*grids.Grid, error) {
 	const selectQuery = `
 SELECT 
@@ -269,6 +308,10 @@ LIMIT 1;
 	}
 	latlen, lnglen := grids.CalculateSecLengths(nelng.Float64)
 	mdgid := grids.NewMDGID(mdgID.String)
+	ei, err := p.newEditInfo(edited_by, edited_at)
+	if err != nil {
+		return nil, err
+	}
 	return &grids.Grid{
 		MdgID:  mdgid,
 		SRID:   3875,
@@ -283,7 +326,9 @@ LIMIT 1;
 		LatLen: latlen,
 		LngLen: lnglen,
 
-		Country: country.String,
+		PublicationDate: time.Now(),
+		Country:         country.String,
+		Edited:          ei,
 	}, nil
 }
 func (p *Provider) GridForMDGID(mdgid grids.MDGID) (*grids.Grid, error) {
@@ -335,6 +380,10 @@ LIMIT 1;
 		return nil, err
 	}
 	latlen, lnglen := grids.CalculateSecLengths(nelng.Float64)
+	ei, err := p.newEditInfo(edited_by, edited_at)
+	if err != nil {
+		return nil, err
+	}
 	return &grids.Grid{
 		MdgID:  mdgid,
 		SRID:   3875,
@@ -349,7 +398,9 @@ LIMIT 1;
 		LatLen: latlen,
 		LngLen: lnglen,
 
-		Country: country.String,
+		PublicationDate: time.Now(),
+		Country:         country.String,
+		Edited:          ei,
 	}, nil
 }
 
