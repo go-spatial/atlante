@@ -61,6 +61,8 @@ type Sheet struct {
 	Name string
 	grids.Provider
 	Zoom                float64
+	DPI                 uint
+	Scale               uint
 	Style               string
 	SvgTemplateFilename string
 
@@ -70,17 +72,17 @@ type Sheet struct {
 var funcMap = template.FuncMap{
 	"ToUpper": strings.ToUpper,
 	"ToLower": strings.ToLower,
-	"Format": func(format string, data interface{}) string {
-		// Allow Format to be used for time's as well.
-		if d, ok := data.(time.Time); ok {
-			return d.Format(format)
-		}
-		return fmt.Sprintf(format, data)
-	},
-	"Now": time.Now,
+	"Format":  tplFormat,
+	"Now":     time.Now,
+	"Div":     tplMathDiv,
+	"Add":     tplMathAdd,
+	"Sub":     tplMathSub,
+	"Mul":     tplMathMul,
+	"Neg":     tplMathNeg,
+	"Abs":     tplMathAbs,
 }
 
-func NewSheet(name string, provider grids.Provider, zoom float64, style string, svgTemplateFilename *url.URL) (*Sheet, error) {
+func NewSheet(name string, provider grids.Provider, zoom float64, dpi uint, scale uint, style string, svgTemplateFilename *url.URL) (*Sheet, error) {
 	var (
 		err error
 		t   *template.Template
@@ -103,6 +105,8 @@ func NewSheet(name string, provider grids.Provider, zoom float64, style string, 
 		Name:                name,
 		Provider:            provider,
 		Zoom:                zoom,
+		DPI:                 dpi,
+		Scale:               scale,
 		Style:               style,
 		SvgTemplateFilename: svgTemplateFilename.String(),
 		svgTemplate:         t,
@@ -178,19 +182,29 @@ func GeneratePDF(ctx context.Context, sheet *Sheet, grid *grids.Grid, filenames 
 
 	const tilesize = 4096 / 2
 
+	// To calculate ppi_ratio we use 96 as the default ppi.
+	ppiRatio := float64(sheet.DPI) / 96.0
+	_ = ppiRatio
+
+	 zoom := grid.ZoomForScaleDPI(sheet.Scale, sheet.DPI)
+	// zoom := sheet.Zoom
+
+	log.Println("zoom", zoom, "Scale", sheet.Scale, "dpi", sheet.DPI)
+
 	// Generate the PNG
 	prj := bounds.ESPG3857
-	latLngCenterPt := grid.CenterPtForZoom(sheet.Zoom)
-	width, height := grid.WidthHeightForZoom(sheet.Zoom)
-	centerPt := bounds.LatLngToPoint(prj, latLngCenterPt[0], latLngCenterPt[1], sheet.Zoom, tilesize)
+	latLngCenterPt := grid.CenterPtForZoom(zoom)
+	width, height := grid.WidthHeightForZoom(zoom)
+	log.Println("width", width, "height", height)
+	centerPt := bounds.LatLngToPoint(prj, latLngCenterPt[0], latLngCenterPt[1], zoom, tilesize)
 	dstimg, err := image.New(
 		prj,
 		int(width), int(height),
 		centerPt,
-		sheet.Zoom,
-		1.0,
-		0.0,
-		0.0,
+		zoom,
+		1.0, //ppiRatio,
+		0.0, // Bearing
+		0.0, // Pitch
 		sheet.Style,
 		"", "",
 	)

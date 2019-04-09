@@ -24,6 +24,7 @@ var (
 	mdgid      string
 	configFile string
 	sheetName  string
+	dpi        int
 )
 
 func init() {
@@ -31,6 +32,9 @@ func init() {
 	flag.StringVar(&mdgid, "mdgid", "V795G25492", "mdgid of the grid")
 	flag.StringVar(&configFile, "config", "config.toml", "The config file to use")
 	flag.StringVar(&sheetName, "sheet", "50k", "The configured sheet to use")
+	flag.IntVar(&dpi, "dpi", 96, "The dpi to use")
+
+	log.SetFlags(log.LstdFlags | log.Lshortfile)
 }
 
 type ProviderConfig struct {
@@ -103,14 +107,14 @@ func LoadConfig(location string) error {
 			return fmt.Errorf("for sheet %v (#%v),  requested provider (%v) not registered", sheet.Name, i, providerName)
 		}
 		/*
-		styleURL, err := url.Parse(string(sheet.Style))
-		if err != nil {
-			return fmt.Errorf("for sheet %v (#%v),  failed to parse style url (%v) ",
-				sheet.Name,
-				i,
-				string(sheet.Style),
-			)
-		}
+			styleURL, err := url.Parse(string(sheet.Style))
+			if err != nil {
+				return fmt.Errorf("for sheet %v (#%v),  failed to parse style url (%v) ",
+					sheet.Name,
+					i,
+					string(sheet.Style),
+				)
+			}
 		*/
 		templateURL, err := url.Parse(string(sheet.Template))
 		if err != nil {
@@ -121,11 +125,14 @@ func LoadConfig(location string) error {
 			)
 		}
 		name := strings.ToLower(string(sheet.Name))
+		log.Println("Scale", sheet.Scale, "dpi", dpi)
 
 		sht, err := atlante.NewSheet(
 			name,
 			prv,
 			float64(sheet.Zoom),
+			uint(dpi),
+			uint(sheet.Scale),
 			string(sheet.Style),
 			templateURL,
 		)

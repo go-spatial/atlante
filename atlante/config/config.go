@@ -27,6 +27,8 @@ type Sheet struct {
 	Name         env.String `toml:"name"`
 	ProviderGrid env.String `toml:"provider_grid"`
 	Zoom         env.Float  `toml:"zoom"`
+	Scale        env.Int    `toml:"scale"`
+	DPI          env.Int    `toml:"dpi"`
 	Template     env.String `toml:"template"`
 	Style        env.String `toml:"style"`
 }

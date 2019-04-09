@@ -9,6 +9,7 @@ import (
 
 	"github.com/go-spatial/geom"
 	"github.com/go-spatial/geom/spherical"
+	"github.com/go-spatial/maptoolkit/atlante/internal/resolution"
 	"github.com/go-spatial/maptoolkit/mbgl/bounds"
 )
 
@@ -122,6 +123,10 @@ func (g Grid) CenterPtForZoom(zoom float64) [2]float64 {
 }
 func (g Grid) WidthHeightForZoom(zoom float64) (width, height float64) {
 	return bounds.WidthHeightTile(g.Hull(), zoom, 4096/8)
+}
+
+func (g Grid) ZoomForScaleDPI(scale uint, dpi uint) float64 {
+	return resolution.Zoom(resolution.MercatorEarthCircumference, scale, dpi, g.SWLat)
 }
 
 func CalculateSecLengths(latitude float64) (latLen, lngLen float64) {

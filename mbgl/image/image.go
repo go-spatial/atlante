@@ -46,6 +46,7 @@ type Image struct {
 
 	// PPIRatio
 	ppiratio float64
+
 	// Style to use to generate the tile
 	style string
 	// The zoom level
@@ -150,6 +151,8 @@ func New(
 		)/tilesize + 1) / 2,
 		),
 	)
+	log.Println("desiredWidth", desiredWidth)
+	log.Println("desiredHeight", desiredHeight)
 	centerTileLength := int(math.Ceil((tilesize - 1) * ppi))
 
 	tmpDir := "."
@@ -165,6 +168,8 @@ func New(
 	if err != nil {
 		return nil, fmt.Errorf("Failed to setup backing store: %v", err)
 	}
+
+	log.Println("numbTilesNeeded", numTilesNeeded)
 
 	img := Image{
 		prj:          prj,
