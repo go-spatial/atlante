@@ -54,4 +54,6 @@ RUN go get github.com/spf13/cobra
 RUN go get github.com/go-spatial/tegola
 RUN go get github.com/go-spatial/geom
 RUN go get github.com/jackc/pgx
+RUN go get github.com/arolek/p
+RUN go get github.com/BurntSushi/toml
 
