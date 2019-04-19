@@ -128,3 +128,61 @@ func tplMathAbs(av interface{}) (float64, error) {
 	}
 	return math.Abs(a), nil
 }
+
+func tplSeq(start float64, num uint, inc float64) []float64 {
+	if num == 0 {
+		return []float64{}
+	}
+	is := make([]float64, 0, int(num))
+	last := start
+	for i := 0; i < int(num); i++ {
+		is = append(is, last)
+		last += inc
+	}
+	return is
+}
+
+type tplToggle struct {
+	idx  int
+	strs []string
+}
+
+func (t *tplToggle) Value() string {
+	if t == nil || len(t.strs) == 0 {
+		return ""
+	}
+
+	if t.idx >= len(t.strs) {
+		t.idx = 0
+	}
+	s := t.strs[t.idx]
+	t.idx++
+	return s
+}
+
+func (t *tplToggle) Reset() {
+	t.idx = 0
+}
+
+func (t *tplToggle) First() string {
+	if t == nil || len(t.strs) == 0 {
+		return ""
+	}
+	t.idx = 1
+	return t.strs[0]
+}
+
+func tplNewToggle(strs ...string) *tplToggle {
+	return &tplToggle{
+		strs: strs,
+	}
+}
+
+func tplRound(x float64, unit float64) float64 {
+	return math.Round(x/unit) * unit
+}
+
+func tplRound3(x float64) float64 { return tplRound(x, 0.001) }
+func tplRoundTo(unit float64) func(float64) float64 {
+	return func(x float64) float64 { return tplRound(x, unit) }
+}

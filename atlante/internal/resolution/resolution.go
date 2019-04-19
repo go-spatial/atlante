@@ -1,6 +1,9 @@
 package resolution
 
-import "math"
+import (
+	"log"
+	"math"
+)
 
 const (
 	MercatorEarthRadius        = 6378137
@@ -16,6 +19,7 @@ func Zoom(earthCircumference float64, scale uint, dpi uint, lat float64) float64
 	//
 	width := math.Cos(lat * Rad)
 	ground := float64(scale) * MeterPerInch / float64(dpi)
+	log.Println("ground (meter/pixel):", ground)
 	mapWidth := (width * earthCircumference) / ground
 	return math.Log2(mapWidth / TileSize)
 
@@ -33,4 +37,10 @@ func Ground(earthCircumfrence float64, zoom float64, lat float64) float64 {
 // Formula from https://docs.microsoft.com/en-us/bingmaps/articles/bing-maps-tile-system
 func Scale(dpi uint, ground float64) float64 {
 	return ground * (float64(dpi) / MeterPerInch)
+}
+
+// ZoomForGround returns the zoom for the given ground resolution
+func ZoomForGround(earthCircumfrence float64, ground float64, lat float64) float64 {
+	width := math.Cos(lat * Rad)
+	return math.Log2((width * earthCircumfrence) / (ground * TileSize))
 }

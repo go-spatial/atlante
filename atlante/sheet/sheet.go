@@ -1,7 +1,7 @@
 package sheet
 
 import (
-	"html/template"
+	"text/template"
 
 	"github.com/go-spatial/maptoolkit/atlante/grids"
 )

@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"github.com/go-spatial/maptoolkit/atlante/grids"
+	"github.com/go-spatial/maptoolkit/atlante/internal/resolution"
 	"github.com/go-spatial/maptoolkit/atlante/internal/urlutil"
 	"github.com/go-spatial/maptoolkit/mbgl/bounds"
 	"github.com/go-spatial/maptoolkit/mbgl/image"
@@ -53,8 +54,9 @@ func (img ImgStruct) Base64Image() string {
 }
 
 type GridTemplateContext struct {
-	Image ImgStruct
-	Grid  grids.Grid
+	Image         ImgStruct
+	GroundMeasure float64
+	Grid          grids.Grid
 }
 
 type Sheet struct {
@@ -70,16 +72,20 @@ type Sheet struct {
 }
 
 var funcMap = template.FuncMap{
-	"ToUpper": strings.ToUpper,
-	"ToLower": strings.ToLower,
-	"Format":  tplFormat,
-	"Now":     time.Now,
-	"Div":     tplMathDiv,
-	"Add":     tplMathAdd,
-	"Sub":     tplMathSub,
-	"Mul":     tplMathMul,
-	"Neg":     tplMathNeg,
-	"Abs":     tplMathAbs,
+	"ToUpper":    strings.ToUpper,
+	"ToLower":    strings.ToLower,
+	"Format":     tplFormat,
+	"Now":        time.Now,
+	"Div":        tplMathDiv,
+	"Add":        tplMathAdd,
+	"Sub":        tplMathSub,
+	"Mul":        tplMathMul,
+	"Neg":        tplMathNeg,
+	"Abs":        tplMathAbs,
+	"Seq":        tplSeq,
+	"NewToggler": tplNewToggle,
+	"RounderFor": tplRoundTo,
+	"Rounder3":   tplRound3,
 }
 
 func NewSheet(name string, provider grids.Provider, zoom float64, dpi uint, scale uint, style string, svgTemplateFilename *url.URL) (*Sheet, error) {
@@ -186,15 +192,32 @@ func GeneratePDF(ctx context.Context, sheet *Sheet, grid *grids.Grid, filenames 
 	ppiRatio := float64(sheet.DPI) / 96.0
 	_ = ppiRatio
 
-	 zoom := grid.ZoomForScaleDPI(sheet.Scale, sheet.DPI)
+	zoom := grid.ZoomForScaleDPI(sheet.Scale, sheet.DPI)
 	// zoom := sheet.Zoom
 
 	log.Println("zoom", zoom, "Scale", sheet.Scale, "dpi", sheet.DPI)
+	nground := resolution.Ground(
+		resolution.MercatorEarthCircumference,
+		zoom,
+		grid.SWLat,
+	)
+
+	//nground = math.RoundToEven(nground)
+	log.Println("zoom", zoom, "ground measure", nground)
+
+	width, height := grid.WidthHeightForZoom(zoom)
+	log.Println("z, width", width, "z, height", height)
+	zoom = resolution.ZoomForGround(
+		resolution.MercatorEarthCircumference,
+		nground,
+		grid.SWLat,
+	)
+	log.Println("zoom", zoom)
 
 	// Generate the PNG
 	prj := bounds.ESPG3857
 	latLngCenterPt := grid.CenterPtForZoom(zoom)
-	width, height := grid.WidthHeightForZoom(zoom)
+	width, height = grid.WidthHeightForZoom(zoom)
 	log.Println("width", width, "height", height)
 	centerPt := bounds.LatLngToPoint(prj, latLngCenterPt[0], latLngCenterPt[1], zoom, tilesize)
 	dstimg, err := image.New(
@@ -234,7 +257,8 @@ func GeneratePDF(ctx context.Context, sheet *Sheet, grid *grids.Grid, filenames 
 			Width:    imgBounds.Dx(),
 			Height:   imgBounds.Dy(),
 		},
-		Grid: *grid,
+		GroundMeasure: nground,
+		Grid:          *grid,
 	})
 	if err != nil {
 		log.Printf("Got an error trying to fillout sheet template")
@@ -243,7 +267,9 @@ func GeneratePDF(ctx context.Context, sheet *Sheet, grid *grids.Grid, filenames 
 	}
 	_ = file.Close()
 	// svg2pdf
-	err = svg2pdf.GeneratePDF(filenames.SVG, filenames.PDF, 2500, 3000)
+	//err = svg2pdf.GeneratePDF(filenames.SVG, filenames.PDF, 2500, 3000)
+	//	err = svg2pdf.GeneratePDF(filenames.SVG, filenames.PDF, 10419, 12501)
+	err = svg2pdf.GeneratePDF(filenames.SVG, filenames.PDF, 2028, 2607)
 	if err != nil {
 		panic(err)
 	}
@@ -332,8 +358,12 @@ func (a *Atlante) GeneratePDFMDGID(ctx context.Context, sheetName string, mdgID 
 	}
 
 	a.sLock.RLock()
-	provider, ok := a.sheets[sheetName]
+	provider, ok := a.sheets[strings.ToLower(sheetName)]
 	if !ok || provider == nil {
+		log.Println("Known Sheets are")
+		for k, _ := range a.sheets {
+			log.Println("\t", k)
+		}
 		a.sLock.RUnlock()
 		return nil, fmt.Errorf("atlante sheet (%v) not found", sheetName)
 	}
