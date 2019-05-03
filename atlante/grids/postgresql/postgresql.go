@@ -247,7 +247,7 @@ func (p *Provider) newEditInfo(by, date sql.NullString) (*grids.EditInfo, error)
 
 func (p *Provider) GridForLatLng(lat, lng float64, srid uint) (*grids.Grid, error) {
 	const selectQuery = `
-SELECT 
+SELECT
   mdg_id,
   sheet,
   series,
@@ -265,7 +265,7 @@ WHERE
   ST_Intersects(
     geom,
     ST_Transform(
-      ST_SetSRID( 
+      ST_SetSRID(
         ST_MakePoint($1,$2),
         $3
       ),
@@ -333,7 +333,7 @@ LIMIT 1;
 }
 func (p *Provider) GridForMDGID(mdgid grids.MDGID) (*grids.Grid, error) {
 	const selectQuery = `
-SELECT 
+SELECT
   sheet,
   series,
   nrn,

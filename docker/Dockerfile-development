@@ -22,8 +22,6 @@ RUN curl -s https://packagecloud.io/install/repositories/github/git-lfs/script.r
 
 COPY docker/files/templates /etc/templates
 
-RUN curl -s https://packagecloud.io/install/repositories/github/git-lfs/script.rpm.sh | bash && yum install -y git-lfs vim
-
 RUN yum install -y centos-release-scl
 RUN yum install -y devtoolset-7-gcc* && /go/bin/bastet -o /etc/profile.d/devtoolset-7.sh /etc/templates/scl_profile.tpl "package=devtoolset-7"
 RUN yum install -y nodejs010-npm.noarch && /go/bin/bastet -o /etc/profile.d/nodejs010.sh /etc/templates/scl_profile.tpl "package=nodejs010"
@@ -32,7 +30,6 @@ RUN yum install -y nodejs010-npm.noarch && /go/bin/bastet -o /etc/profile.d/node
 RUN cd /usr/local;    curl -SL https://github.com/Kitware/CMake/releases/download/v3.13.4/cmake-3.13.4-Linux-x86_64.tar.gz |  tar -xzC /usr/local && ln -s cmake-3.13.4-Linux-x86_64 cmake; echo 'PATH=$PATH:/usr/local/cmake/bin' > /etc/profile.d/cmake.sh
 ENV PATH="${PATH}:/usr/local/cmake/bin"
 
-RUN yum install -y cairo-devel librsvg2-devel
 
 # deps for building rsvg
 RUN yum install -y gdk-pixbuf2-devel \
@@ -43,7 +40,18 @@ RUN yum install -y gdk-pixbuf2-devel \
 	libjpeg-turbo-devel \
 	gtk3-devel
 
+RUN yum install -y cairo-devel librsvg2-devel
+
 RUN yum install -y sqlite-devel.x86_64  mesa-libOSMesa-devel.x86_64  libcurl-devel.x86_64
+
+
+# Install protobuf3 dependencies
+ENV PROTOC_ZIP=protoc-3.7.1-linux-x86_64.zip
+WORKDIR /usr/local
+RUN curl -OL https://github.com/google/protobuf/releases/download/v3.7.1/$PROTOC_ZIP
+RUN unzip $PROTOC_ZIP
+RUN rm $PROTOC_ZIP
+
 
 # Install Fonts needed by the system
 COPY docker/files/fonts/* /usr/share/fonts/

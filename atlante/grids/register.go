@@ -27,14 +27,13 @@ type ProviderConfig interface {
 	// Returns the Grid Provider for the key
 	// if the a Provider does not exist ErrKeyMissingProvider will be returned
 	// if the key does not exist ErrNoProvidersRegistered will be returned
-	// if the key value is not a string ErrKeyType will be returned
 	NameGridProvider(Key string)(Provider, error)
 	
 }
 
 /******************************************************************************/
 
-// InitFunc initilizes a grid Provider fiven a config map.
+// InitFunc initilizes a grid Provider given a config map.
 // The InitFunc should validate the config map, and report any
 // errors.
 // this is called by the For function.

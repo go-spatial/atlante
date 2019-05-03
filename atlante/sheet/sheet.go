@@ -10,7 +10,6 @@ type Provider struct {
 	p grids.Provider
 
 	name             string
-	zoom             float64
 	style            string
 	templateFilename string
 	template         *template.Template
@@ -21,11 +20,4 @@ func (p *Provider) Name() string {
 		return ""
 	}
 	return p.Name
-}
-
-func (p *Provider) Zoom() float64 {
-	if p == nil {
-		return 0
-	}
-	return p.zoom
 }
