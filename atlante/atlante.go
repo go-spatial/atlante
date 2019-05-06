@@ -57,6 +57,9 @@ type GridTemplateContext struct {
 	Image         ImgStruct
 	GroundMeasure float64
 	Grid          grids.Grid
+	DPI           uint
+	Scale         uint
+	Zoom          float64
 }
 
 type Sheet struct {
@@ -72,20 +75,21 @@ type Sheet struct {
 }
 
 var funcMap = template.FuncMap{
-	"ToUpper":    strings.ToUpper,
-	"ToLower":    strings.ToLower,
-	"Format":     tplFormat,
-	"Now":        time.Now,
-	"Div":        tplMathDiv,
-	"Add":        tplMathAdd,
-	"Sub":        tplMathSub,
-	"Mul":        tplMathMul,
-	"Neg":        tplMathNeg,
-	"Abs":        tplMathAbs,
-	"Seq":        tplSeq,
-	"NewToggler": tplNewToggle,
-	"RounderFor": tplRoundTo,
-	"Rounder3":   tplRound3,
+	"to_upper":    strings.ToUpper,
+	"to_lower":    strings.ToLower,
+	"format":      tplFormat,
+	"now":         time.Now,
+	"div":         tplMathDiv,
+	"add":         tplMathAdd,
+	"sub":         tplMathSub,
+	"mul":         tplMathMul,
+	"neg":         tplMathNeg,
+	"abs":         tplMathAbs,
+	"seq":         tplSeq,
+	"new_toggler": tplNewToggle,
+	"rounder_for": tplRoundTo,
+	"rounder3":    tplRound3,
+	"first":       tplFirstNonZero,
 }
 
 func NewSheet(name string, provider grids.Provider, zoom float64, dpi uint, scale uint, style string, svgTemplateFilename *url.URL) (*Sheet, error) {
@@ -257,6 +261,9 @@ func GeneratePDF(ctx context.Context, sheet *Sheet, grid *grids.Grid, filenames 
 			Width:    imgBounds.Dx(),
 			Height:   imgBounds.Dy(),
 		},
+		DPI:           sheet.DPI,
+		Scale:         sheet.Scale,
+		Zoom:          zoom,
 		GroundMeasure: nground,
 		Grid:          *grid,
 	})

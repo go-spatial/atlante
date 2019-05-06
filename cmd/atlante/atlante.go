@@ -32,7 +32,7 @@ func init() {
 	flag.StringVar(&mdgid, "mdgid", "V795G25492", "mdgid of the grid")
 	flag.StringVar(&configFile, "config", "config.toml", "The config file to use")
 	flag.StringVar(&sheetName, "sheet", "50k", "The configured sheet to use")
-	flag.IntVar(&dpi, "dpi", 96, "The dpi to use")
+	flag.IntVar(&dpi, "dpi", 72, "The dpi to use")
 
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
 }
@@ -100,22 +100,12 @@ func LoadConfig(location string) error {
 	// Establish sheets
 	for i, sheet := range conf.Sheets {
 
-		providerName := strings.ToLower(string(sheet.ProviderGrid))
+		providerName := strings.TrimSpace(strings.ToLower(string(sheet.ProviderGrid)))
 
 		prv, ok := Providers[providerName]
 		if !ok {
 			return fmt.Errorf("for sheet %v (#%v),  requested provider (%v) not registered", sheet.Name, i, providerName)
 		}
-		/*
-			styleURL, err := url.Parse(string(sheet.Style))
-			if err != nil {
-				return fmt.Errorf("for sheet %v (#%v),  failed to parse style url (%v) ",
-					sheet.Name,
-					i,
-					string(sheet.Style),
-				)
-			}
-		*/
 		templateURL, err := url.Parse(string(sheet.Template))
 		if err != nil {
 			return fmt.Errorf("for sheet %v (#%v),  failed to parse template url (%v) ",
