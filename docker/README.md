@@ -7,9 +7,10 @@ Fonts placed into the _file/fonts_ folter will be copied to the _/usr/share/font
 
 
 Run this from the root of the project.
+
 ```console
 
- $ docker build -f docker/Dockerfile.centos -t maptoolkit .
+$ docker build -f docker/Dockerfile.centos -t maptoolkit .
 
 ```
 
@@ -17,9 +18,9 @@ To run the container from the root of the project.
 
 ```console
 
- $ docker run --rm -v "$(pwd)":/go/src/github.com/go-spatial/maptoolkit -it maptoolkit
+$ docker run --rm -v "$(pwd)":/go/src/github.com/go-spatial/maptoolkit -it maptoolkit
 
-``` 
+```
 
 
 # Dockerfile.centos
