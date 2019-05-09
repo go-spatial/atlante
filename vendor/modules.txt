@@ -4,6 +4,8 @@ github.com/BurntSushi/toml
 github.com/arolek/p
 # github.com/dimfeld/httptreemux v5.0.1+incompatible
 github.com/dimfeld/httptreemux
+# github.com/gdey/errors v0.0.0-20190426172550-8ebd5bc891fb
+github.com/gdey/errors
 # github.com/go-spatial/geom v0.0.0-20190319224731-c03a62f3a74a
 github.com/go-spatial/geom
 github.com/go-spatial/geom/spherical
@@ -15,6 +17,14 @@ github.com/go-spatial/tegola
 github.com/go-spatial/tegola/maths/webmercator
 github.com/go-spatial/tegola/internal/env
 github.com/go-spatial/tegola/internal/p
+# github.com/gogo/protobuf v1.2.1
+github.com/gogo/protobuf/proto
+# github.com/golang/protobuf v1.3.1
+github.com/golang/protobuf/proto
+github.com/golang/protobuf/ptypes
+github.com/golang/protobuf/ptypes/timestamp
+github.com/golang/protobuf/ptypes/any
+github.com/golang/protobuf/ptypes/duration
 # github.com/inconshreveable/mousetrap v1.0.0
 github.com/inconshreveable/mousetrap
 # github.com/jackc/pgx v3.4.0+incompatible
