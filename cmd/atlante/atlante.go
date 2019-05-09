@@ -4,8 +4,10 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"io"
 	"log"
 	"net/url"
+	"os"
 	"strings"
 
 	"github.com/go-spatial/maptoolkit/atlante"
@@ -25,6 +27,7 @@ var (
 	configFile string
 	sheetName  string
 	dpi        int
+	outputDir  string
 )
 
 func init() {
@@ -33,6 +36,7 @@ func init() {
 	flag.StringVar(&configFile, "config", "config.toml", "The config file to use")
 	flag.StringVar(&sheetName, "sheet", "50k", "The configured sheet to use")
 	flag.IntVar(&dpi, "dpi", 72, "The dpi to use")
+	flag.StringVar(&outputDir, "o", "", "output location")
 
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
 }
@@ -149,10 +153,57 @@ func main() {
 	defer cancel() // cancel when we are finished consuming integers
 	mbgl.StartSnapshotManager(ctx)
 
+	// TODO(arolek): remove. this is a hack
+	if outputDir != "" {
+		os.Chdir(outputDir)
+	}
+
 	// San Diego : V795G25492
 	filenames, err := a.GeneratePDFMDGID(ctx, sheetName, grids.NewMDGID(mdgid), "")
 	if err != nil {
 		panic(err)
 	}
 	log.Println("Filenames: ", filenames)
+
+	/*
+		if outputDir != "" {
+			// filenames are relative to the binary so we don't need to pre process the path
+			log.Printf("moving %v to %v\n", filenames.PDF, filepath.Join(outputDir, filenames.PDF))
+			if err := copyFile(filenames.PDF, filepath.Join(outputDir, filenames.PDF)); err != nil {
+				log.Fatal(err)
+			}
+
+			log.Printf("moving %v to %v\n", filenames.SVG, filepath.Join(outputDir, filenames.SVG))
+			if err = copyFile(filenames.SVG, filepath.Join(outputDir, filenames.SVG)); err != nil {
+				log.Fatal(err)
+			}
+
+			log.Printf("moving %v to %v\n", filenames.IMG, filepath.Join(outputDir, filenames.IMG))
+			if err = copyFile(filenames.IMG, filepath.Join(outputDir, filenames.IMG)); err != nil {
+				log.Fatal(err)
+			}
+		}
+	*/
+}
+
+// copy the src file to dst. Any existing file will be overwritten and will not
+// copy file attributes.
+func copyFile(src, dst string) error {
+	in, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer in.Close()
+
+	out, err := os.Create(dst)
+	if err != nil {
+		return err
+	}
+	defer out.Close()
+
+	_, err = io.Copy(out, in)
+	if err != nil {
+		return err
+	}
+	return out.Close()
 }
