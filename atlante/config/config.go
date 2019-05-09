@@ -26,11 +26,10 @@ type Config struct {
 type Sheet struct {
 	Name         env.String `toml:"name"`
 	ProviderGrid env.String `toml:"provider_grid"`
-	Zoom         env.Float  `toml:"zoom"`
 	Scale        env.Int    `toml:"scale"`
-	DPI          env.Int    `toml:"dpi"`
 	Template     env.String `toml:"template"`
 	Style        env.String `toml:"style"`
+	Notifier     env.String `toml:"notifier"`
 }
 
 func (c *Config) Validate() error {
@@ -51,7 +50,6 @@ func Parse(reader io.Reader, fileLocation *url.URL) (conf Config, err error) {
 
 // Load will load and parse the config file from the given location.
 func Load(location *url.URL) (conf Config, err error) {
-
 	err = urlutil.VisitReader(location, func(r io.Reader) error {
 		var e error
 		conf, e = Parse(r, location)

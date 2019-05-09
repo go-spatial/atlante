@@ -3,23 +3,18 @@ package atlante
 import (
 	"context"
 	"encoding/base64"
-	"errors"
 	"fmt"
 	"image/png"
-	"io"
 	"io/ioutil"
 	"log"
-	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
 	"sync"
 	"text/template"
-	"time"
 
 	"github.com/go-spatial/maptoolkit/atlante/grids"
 	"github.com/go-spatial/maptoolkit/atlante/internal/resolution"
-	"github.com/go-spatial/maptoolkit/atlante/internal/urlutil"
 	"github.com/go-spatial/maptoolkit/mbgl/bounds"
 	"github.com/go-spatial/maptoolkit/mbgl/image"
 	"github.com/go-spatial/maptoolkit/svg2pdf"
@@ -60,71 +55,6 @@ type GridTemplateContext struct {
 	DPI           uint
 	Scale         uint
 	Zoom          float64
-}
-
-type Sheet struct {
-	Name string
-	grids.Provider
-	Zoom                float64
-	DPI                 uint
-	Scale               uint
-	Style               string
-	SvgTemplateFilename string
-
-	svgTemplate *template.Template
-}
-
-var funcMap = template.FuncMap{
-	"to_upper":    strings.ToUpper,
-	"to_lower":    strings.ToLower,
-	"format":      tplFormat,
-	"now":         time.Now,
-	"div":         tplMathDiv,
-	"add":         tplMathAdd,
-	"sub":         tplMathSub,
-	"mul":         tplMathMul,
-	"neg":         tplMathNeg,
-	"abs":         tplMathAbs,
-	"seq":         tplSeq,
-	"new_toggler": tplNewToggle,
-	"rounder_for": tplRoundTo,
-	"rounder3":    tplRound3,
-	"first":       tplFirstNonZero,
-}
-
-func NewSheet(name string, provider grids.Provider, zoom float64, dpi uint, scale uint, style string, svgTemplateFilename *url.URL) (*Sheet, error) {
-	var (
-		err error
-		t   *template.Template
-	)
-
-	tpl, err := urlutil.ReadAll(svgTemplateFilename)
-	if err != nil {
-		return nil, err
-	}
-
-	t, err = template.New(svgTemplateFilename.String()).
-		Funcs(funcMap).
-		Option("missingkey=error").
-		Parse(string(tpl))
-	if err != nil {
-		return nil, err
-	}
-
-	return &Sheet{
-		Name:                name,
-		Provider:            provider,
-		Zoom:                zoom,
-		DPI:                 dpi,
-		Scale:               scale,
-		Style:               style,
-		SvgTemplateFilename: svgTemplateFilename.String(),
-		svgTemplate:         t,
-	}, nil
-}
-
-func (sheet *Sheet) Execute(wr io.Writer, tplContext GridTemplateContext) error {
-	return sheet.svgTemplate.Execute(wr, tplContext)
 }
 
 type GeneratedFiles struct {
@@ -185,7 +115,7 @@ func (ft filenameTemplate) Filename(sheetName string, grid grids.Grid, wd string
 
 func GeneratePDF(ctx context.Context, sheet *Sheet, grid *grids.Grid, filenames *GeneratedFiles) error {
 	if grid == nil {
-		return errors.New("grid is nil")
+		return ErrNilGrid
 	}
 
 	log.Println("filenames: ", filenames.IMG, filenames.SVG, filenames.PDF)
@@ -195,6 +125,7 @@ func GeneratePDF(ctx context.Context, sheet *Sheet, grid *grids.Grid, filenames 
 	// To calculate ppi_ratio we use 96 as the default ppi.
 	ppiRatio := float64(sheet.DPI) / 96.0
 	_ = ppiRatio
+	log.Println("PPI:", ppiRatio)
 
 	zoom := grid.ZoomForScaleDPI(sheet.Scale, sheet.DPI)
 	// zoom := sheet.Zoom
@@ -229,9 +160,9 @@ func GeneratePDF(ctx context.Context, sheet *Sheet, grid *grids.Grid, filenames 
 		int(width), int(height),
 		centerPt,
 		zoom,
-		1.0, //ppiRatio,
-		0.0, // Bearing
-		0.0, // Pitch
+		ppiRatio, //1.0, //ppiRatio,
+		0.0,      // Bearing
+		0.0,      // Pitch
 		sheet.Style,
 		"", "",
 	)
@@ -273,6 +204,12 @@ func GeneratePDF(ctx context.Context, sheet *Sheet, grid *grids.Grid, filenames 
 		return err
 	}
 	_ = file.Close()
+
+	//TODO(gdey): here we should change directories to the working directory.
+	// This is needed to generate the PDF. It might make sense to do this
+	// as the first thing we do when entering this function. Atlante object
+	// does have a working directory parameter for this.
+
 	// svg2pdf
 	//err = svg2pdf.GeneratePDF(filenames.SVG, filenames.PDF, 2500, 3000)
 	//	err = svg2pdf.GeneratePDF(filenames.SVG, filenames.PDF, 10419, 12501)
@@ -290,27 +227,6 @@ type Atlante struct {
 }
 
 func (a *Atlante) Shutdown() {}
-func (a *Atlante) AddSheet(s *Sheet) error {
-	if s == nil {
-		return errors.New("nil sheet")
-	}
-	name := strings.TrimSpace(s.Name)
-	if name == "" {
-		return errors.New("blank sheet name")
-	}
-	a.sLock.Lock()
-	defer a.sLock.Unlock()
-	if a.sheets == nil {
-		a.sheets = make(map[string]*Sheet)
-		a.sheets[name] = s
-		return nil
-	}
-	if _, ok := a.sheets[name]; ok {
-		return errors.New("duplicate sheet name")
-	}
-	a.sheets[name] = s
-	return nil
-}
 
 func (a *Atlante) filenamesForGrid(sheetName string, grid *grids.Grid, fname string) (*GeneratedFiles, error) {
 	if fname == "" {
@@ -327,10 +243,11 @@ func (a *Atlante) filenamesForGrid(sheetName string, grid *grids.Grid, fname str
 
 func (a *Atlante) GeneratePDFLatLng(ctx context.Context, sheetName string, lat, lng float64, srid uint64, filenameTemplate string) (*GeneratedFiles, error) {
 	if a == nil {
-		return nil, errors.New("atlante object is nil")
+		return nil, ErrNilAtlanteObject
 	}
+
 	if len(a.sheets) == 0 {
-		return nil, errors.New("atlante no sheets configured")
+		return nil, ErrNoSheets
 	}
 
 	a.sLock.RLock()
@@ -356,36 +273,34 @@ func (a *Atlante) GeneratePDFLatLng(ctx context.Context, sheetName string, lat, 
 
 }
 
-func (a *Atlante) GeneratePDFMDGID(ctx context.Context, sheetName string, mdgID grids.MDGID, filenameTemplate string) (*GeneratedFiles, error) {
-	if a == nil {
-		return nil, errors.New("atlante object is nil")
-	}
-	if len(a.sheets) == 0 {
-		return nil, errors.New("atlante no sheets configured")
-	}
-
-	a.sLock.RLock()
-	provider, ok := a.sheets[strings.ToLower(sheetName)]
-	if !ok || provider == nil {
-		log.Println("Known Sheets are")
-		for k, _ := range a.sheets {
-			log.Println("\t", k)
-		}
-		a.sLock.RUnlock()
-		return nil, fmt.Errorf("atlante sheet (%v) not found", sheetName)
-	}
-	a.sLock.RUnlock()
-
-	grid, err := provider.GridForMDGID(mdgID)
+func (a *Atlante) generatePDF(ctx context.Context, sheet *Sheet, grid *grids.Grid, filenameTemplate string) (*GeneratedFiles, error) {
+	filenames, err := a.filenamesForGrid(sheet.Name, grid, filenameTemplate)
 	if err != nil {
 		return nil, err
 	}
-
-	filenames, err := a.filenamesForGrid(sheetName, grid, filenameTemplate)
-	if err != nil {
-		return nil, err
-	}
-
-	err = GeneratePDF(ctx, provider, grid, filenames)
+	err = GeneratePDF(ctx, sheet, grid, filenames)
 	return filenames, err
+}
+
+func (a *Atlante) GeneratePDFJob(ctx context.Context, job Job, filenameTemplate string) (*GeneratedFiles, error) {
+	grid := job.GridsGrid()
+	sheet, err := a.SheetFor(job.SheetName)
+	if err != nil {
+		return nil, err
+	}
+	return a.generatePDF(ctx, sheet, grid, filenameTemplate)
+}
+
+func (a *Atlante) GeneratePDFMDGID(ctx context.Context, sheetName string, mdgID grids.MDGID, filenameTemplate string) (*GeneratedFiles, error) {
+
+	sheet, err := a.SheetFor(sheetName)
+	if err != nil {
+		return nil, err
+	}
+
+	grid, err := sheet.GridForMDGID(mdgID)
+	if err != nil {
+		return nil, err
+	}
+	return a.generatePDF(ctx, sheet, grid, filenameTemplate)
 }
