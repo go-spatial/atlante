@@ -160,9 +160,12 @@ func GeneratePDF(ctx context.Context, sheet *Sheet, grid *grids.Grid, filenames 
 		int(width), int(height),
 		centerPt,
 		zoom,
-		ppiRatio, //1.0, //ppiRatio,
-		0.0,      // Bearing
-		0.0,      // Pitch
+		// TODO(gdey): Need to remove this hack and figure out how to used the
+		// ppi value as well as set the correct scale on the svg/pdf document
+		// that is produced later on. (https://github.com/go-spatial/maptoolkit/issues/13)
+		1.0, //ppiRatio,
+		0.0, // Bearing
+		0.0, // Pitch
 		sheet.Style,
 		"", "",
 	)
