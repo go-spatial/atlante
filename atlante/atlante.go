@@ -2,10 +2,8 @@ package atlante
 
 import (
 	"context"
-	"encoding/base64"
 	"fmt"
 	"image/png"
-	"io/ioutil"
 	"log"
 	"os"
 	"path/filepath"
@@ -13,6 +11,7 @@ import (
 	"sync"
 	"text/template"
 
+	"github.com/go-spatial/maptoolkit/atlante/filestore"
 	"github.com/go-spatial/maptoolkit/atlante/grids"
 	"github.com/go-spatial/maptoolkit/atlante/internal/resolution"
 	"github.com/go-spatial/maptoolkit/mbgl/bounds"
@@ -21,31 +20,50 @@ import (
 )
 
 type ImgStruct struct {
-	Filename string
-	Width    int
-	Height   int
+	filename string
+	// Have we generated the file?
+	// This will allow us to generate the file only when requested
+	generated bool
+	image     *image.Image
+	filestore filestore.FileWriter
+	Width     int
+	Height    int
 }
 
-func (img ImgStruct) ImageTagBase64() string {
-
-	return fmt.Sprintf(
-		`<image width="%d" height="%d" xlink:href="data:%s;base64,%s" />`,
-		img.Width,
-		img.Height,
-		img.MimeType(),
-		img.Base64Image(),
-	)
-}
-
-func (img ImgStruct) MimeType() string { return "image/png" }
-
-func (img ImgStruct) Base64Image() string {
-	filebytes, err := ioutil.ReadFile(img.Filename)
-	if err != nil {
-		log.Printf("got error reading file %v: %v\n", img.Filename, err)
-		return ""
+// Filename returns the file name of the image
+func (img ImgStruct) Filename() (string, error) {
+	if img.generated {
+		return img.filename, nil
 	}
-	return base64.StdEncoding.EncodeToString(filebytes)
+	// We need to generate the file and then return the filename
+	return img.generateImage()
+}
+
+// generateIamge is use to create the image into the filestore
+func (img ImgStruct) generateImage() (string, error) {
+	/*
+		if img.filestore == nil {
+			img.generated = true
+			return img.filename, nil
+		}
+		file, err := img.filestore.Writer(img.filename, true)
+	*/
+	log.Println("Generating image" + img.filename)
+	err := img.image.GenerateImage()
+	if err != nil {
+		return "", err
+	}
+	file, err := os.Create(img.filename)
+	if err != nil {
+		return "", err
+	}
+	if err := png.Encode(file, img.image); err != nil {
+		file.Close()
+		return "", err
+	}
+	file.Close()
+	img.generated = true
+	return img.filename, nil
 }
 
 type GridTemplateContext struct {
@@ -172,18 +190,9 @@ func GeneratePDF(ctx context.Context, sheet *Sheet, grid *grids.Grid, filenames 
 	if err != nil {
 		return err
 	}
-	file, err := os.Create(filenames.IMG)
-	if err != nil {
-		return err
-	}
-	if err := png.Encode(file, dstimg); err != nil {
-		file.Close()
-		return err
-	}
-	_ = file.Close()
 	imgBounds := dstimg.Bounds()
 
-	file, err = os.Create(filenames.SVG)
+	file, err := os.Create(filenames.SVG)
 	if err != nil {
 		return err
 	}
@@ -191,9 +200,11 @@ func GeneratePDF(ctx context.Context, sheet *Sheet, grid *grids.Grid, filenames 
 	// Fill out template
 	err = sheet.Execute(file, GridTemplateContext{
 		Image: ImgStruct{
-			Filename: filenames.IMG,
-			Width:    imgBounds.Dx(),
-			Height:   imgBounds.Dy(),
+			filename: filenames.IMG,
+			image:    dstimg,
+			//filestore:
+			Width:  imgBounds.Dx(),
+			Height: imgBounds.Dy(),
 		},
 		DPI:           sheet.DPI,
 		Scale:         sheet.Scale,
@@ -240,7 +251,6 @@ func (a *Atlante) filenamesForGrid(sheetName string, grid *grids.Grid, fname str
 	if err != nil {
 		return nil, err
 	}
-
 	return NewGeneratedFilesFromTpl(filenameGenerator, sheetName, *grid, a.workDirectory), nil
 }
 

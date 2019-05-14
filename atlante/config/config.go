@@ -10,6 +10,7 @@ import (
 	"github.com/go-spatial/maptoolkit/atlante/internal/urlutil"
 )
 
+// Config models the config file that can be passed into the application
 type Config struct {
 	// FileLocation is the location that the config file was
 	// read from. If this value is nil, then the Parse() function
@@ -18,11 +19,19 @@ type Config struct {
 	Providers    []env.Dict `toml:"providers"`
 	Sheets       []Sheet    `toml:"sheets"`
 
+	// Workdirectory is the directory where the system should do it's work.
+	Workdirectory string `toml:"work_directory"`
+
+	// FileStores are used to move the generated files to locations
+	// that the user wants
+	FileStores []env.Dict `toml:"filestores"`
+
 	// metadata holds the metadata from parsing the toml
 	// file
 	metadata toml.MetaData `toml:"-"`
 }
 
+// Sheet models a sheet in the config file
 type Sheet struct {
 	Name         env.String `toml:"name"`
 	ProviderGrid env.String `toml:"provider_grid"`
@@ -32,14 +41,16 @@ type Sheet struct {
 	Notifier     env.String `toml:"notifier"`
 }
 
+// Validate will validate the config and make sure the is valid
 func (c *Config) Validate() error {
 	// TODO(gdey): Actually do the validation
 	if c == nil {
-		return errors.New("Config not initialized.")
+		return errors.New("error config not initialized")
 	}
 	return nil
 }
 
+// Parse will parse a config file in the io.Reader
 func Parse(reader io.Reader, fileLocation *url.URL) (conf Config, err error) {
 	// decode conf file, don't care about the meta data.
 	_, err = toml.DecodeReader(reader, &conf)
@@ -58,6 +69,7 @@ func Load(location *url.URL) (conf Config, err error) {
 	return conf, err
 }
 
+// LoadAndValidate is helper function that just calls load and then validate
 func LoadAndValidate(location *url.URL) (cfg Config, err error) {
 	cfg, err = Load(location)
 	if err != nil {

@@ -9,6 +9,7 @@ import (
 
 	"github.com/go-spatial/maptoolkit/atlante"
 	"github.com/go-spatial/maptoolkit/atlante/config"
+	"github.com/go-spatial/maptoolkit/atlante/filestore"
 	"github.com/go-spatial/maptoolkit/atlante/grids"
 	"github.com/go-spatial/maptoolkit/mbgl"
 	"github.com/go-spatial/tegola/dict"
@@ -17,12 +18,14 @@ import (
 )
 
 const (
+	// DefaultDPI is the dpi we should render the images at.
 	DefaultDPI = 144
 )
 
 var (
-	Providers = make(map[string]grids.Provider)
-	a         atlante.Atlante
+	Providers  = make(map[string]grids.Provider)
+	FileStores = make(map[string]filestore.Provider)
+	a          atlante.Atlante
 
 	// Flags
 	mdgid      string
@@ -69,6 +72,15 @@ func (pcfg ProviderConfig) NameGridProvider(key string) (grids.Provider, error) 
 		return nil, grids.ErrProviderNotRegistered(skey)
 	}
 	return p, nil
+
+}
+
+type FilestoreConfig struct {
+	dict.Dicter
+}
+
+func (fscfg FilestoreConfig) FileStoreFor(key string) (filestore.Provider, error) {
+	skey, err := pcfg.Dicter.String(key, nil)
 
 }
 
