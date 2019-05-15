@@ -61,12 +61,18 @@ type EditInfo struct {
 
 type Grid struct {
 	MdgID MDGID
-	SRID  uint
 
 	Sheet  string
 	Series string
 	NRN    string
 
+	// Degree, Minute, Seconds representatino
+	SWLatDMS string
+	SWLngDMS string
+	NELatDMS string
+	NELngDMS string
+
+	// Decimal representation
 	SWLat float64
 	SWLng float64
 	NELat float64

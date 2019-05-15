@@ -22,12 +22,17 @@ message Job {
       float lat = 1;
       float lng = 2;
     }
+    message LatLngDMS {
+      string lat = 1;
+      string lng = 2;
+    }
     message EditInfo {
       string by = 1;
       google.protobuf.Timestamp date = 2;
     }
 
     MDGID mdgid = 1;
+
     LatLng sw = 2;
     LatLng ne = 3;
     LatLng len = 4;
@@ -36,11 +41,13 @@ message Job {
 
     UTMInfo utm = 7;
     EditInfo edited = 8;
-    uint32 srid = 9;
     google.protobuf.Timestamp published_at = 10;
     map<string, string> meta_data = 11;
     string nrn = 12;
     string sheet = 13;
+
+    LatLngDMS sw_dms = 14;
+    LatLngDMS ne_dms = 15;
   }
 
   string sheet_name = 1;
