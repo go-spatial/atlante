@@ -31,5 +31,5 @@ Use this container in interactive mode with a volume mount so `atlante` can be b
 
 
 ```console
-$ docker run --rm -v $(pwd):/go/src/github.com/go-spatial/maptoolkit -it atlante /bin/bash
+$ docker run --rm -v $(pwd):/go/src/github.com/go-spatial/maptoolkit -it atlante-dev /bin/bash
 ``` 

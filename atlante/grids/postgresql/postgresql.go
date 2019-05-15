@@ -252,10 +252,17 @@ SELECT
   sheet,
   series,
   nrn,
+
+  swlat_dms,
+  swlon_dms AS swlng_dms,
+  nelat_dms,
+  nelon_dms AS nelng_dms,
+
   swlat,
   swlon AS swlng,
   nelat,
   nelon AS nelng,
+
   country,
   last_edite AS edited_by,
   last_edi_1 AS edited_at
@@ -275,99 +282,75 @@ WHERE
 LIMIT 1;
 `
 
-	var (
-		mdgID  sql.NullString
-		sheet  sql.NullString
-		series sql.NullString
-		nrn    sql.NullString
+	row := p.pool.QueryRow(selectQuery, lat, lng, srid)
 
-		swlat     sql.NullFloat64
-		swlng     sql.NullFloat64
-		nelat     sql.NullFloat64
-		nelng     sql.NullFloat64
-		country   sql.NullString
-		edited_by sql.NullString
-		edited_at sql.NullString
-	)
-
-	err := p.pool.QueryRow(selectQuery, lat, lng, srid).Scan(
-		&mdgID,
-		&sheet,
-		&series,
-		&nrn,
-		&swlat,
-		&swlng,
-		&nelat,
-		&nelng,
-		&country,
-		&edited_by,
-		&edited_at,
-	)
-	if err != nil {
-		return nil, err
-	}
-	latlen, lnglen := grids.CalculateSecLengths(nelng.Float64)
-	mdgid := grids.NewMDGID(mdgID.String)
-	ei, err := p.newEditInfo(edited_by, edited_at)
-	if err != nil {
-		return nil, err
-	}
-	return &grids.Grid{
-		MdgID:  mdgid,
-		SRID:   3875,
-		Sheet:  sheet.String,
-		Series: series.String,
-		NRN:    nrn.String,
-		SWLat:  swlat.Float64,
-		SWLng:  swlng.Float64,
-		NELat:  nelat.Float64,
-		NELng:  nelng.Float64,
-
-		LatLen: latlen,
-		LngLen: lnglen,
-
-		PublicationDate: time.Now(),
-		Country:         country.String,
-		Edited:          ei,
-	}, nil
+	return p.gridFromRow(row)
 }
 func (p *Provider) GridForMDGID(mdgid grids.MDGID) (*grids.Grid, error) {
 	const selectQuery = `
 SELECT
+  mdg_id,
   sheet,
   series,
   nrn,
+
+  swlat_dms,
+  swlon_dms AS swlng_dms,
+  nelat_dms,
+  nelon_dms AS nelng_dms,
+
   swlat,
   swlon AS swlng,
   nelat,
   nelon AS nelng,
+
   country,
   last_edite AS edited_by,
   last_edi_1 AS edited_at
 FROM
   grids.grid50K
 WHERE
-mdg_id = $1
+	mdg_id = $1
 LIMIT 1;
 `
 
+	row := p.pool.QueryRow(selectQuery, mdgid.ID)
+
+	return p.gridFromRow(row)
+}
+
+// gridFromRow parses grid attributes into a girds.Grid struct
+func (p *Provider) gridFromRow(row *pgx.Row) (*grids.Grid, error) {
 	var (
+		mdgid  sql.NullString
 		sheet  sql.NullString
 		series sql.NullString
 		nrn    sql.NullString
 
-		swlat     sql.NullFloat64
-		swlng     sql.NullFloat64
-		nelat     sql.NullFloat64
-		nelng     sql.NullFloat64
+		swlatdms sql.NullString
+		swlngdms sql.NullString
+		nelatdms sql.NullString
+		nelngdms sql.NullString
+
+		swlat sql.NullFloat64
+		swlng sql.NullFloat64
+		nelat sql.NullFloat64
+		nelng sql.NullFloat64
+
 		country   sql.NullString
 		edited_by sql.NullString
 		edited_at sql.NullString
 	)
-	err := p.pool.QueryRow(selectQuery, mdgid.ID).Scan(
+
+	err := row.Scan(
+		&mdgid,
 		&sheet,
 		&series,
 		&nrn,
+		&swlatdms,
+		&swlngdms,
+		&nelatdms,
+		&nelngdms,
 		&swlat,
 		&swlng,
 		&nelat,
@@ -379,21 +362,29 @@ LIMIT 1;
 	if err != nil {
 		return nil, err
 	}
+
 	latlen, lnglen := grids.CalculateSecLengths(nelng.Float64)
+
 	ei, err := p.newEditInfo(edited_by, edited_at)
 	if err != nil {
 		return nil, err
 	}
+
 	return &grids.Grid{
-		MdgID:  mdgid,
-		SRID:   3875,
+		MdgID:  grids.NewMDGID(mdgid.String),
 		Sheet:  sheet.String,
 		Series: series.String,
 		NRN:    nrn.String,
-		SWLat:  swlat.Float64,
-		SWLng:  swlng.Float64,
-		NELat:  nelat.Float64,
-		NELng:  nelng.Float64,
+
+		SWLatDMS: swlatdms.String,
+		SWLngDMS: swlngdms.String,
+		NELatDMS: nelatdms.String,
+		NELngDMS: nelngdms.String,
+
+		SWLat: swlat.Float64,
+		SWLng: swlng.Float64,
+		NELat: nelat.Float64,
+		NELng: nelng.Float64,
 
 		LatLen: latlen,
 		LngLen: lnglen,

@@ -14,28 +14,7 @@ type Notifier interface {
 	Notify(map[string]string) error
 }
 
-func job_grid_mdgid_for_mdgid(mdgid grids.MDGID) *Job_Grid_MDGID {
-	return &Job_Grid_MDGID{
-		Id:   mdgid.ID,
-		Part: uint32(mdgid.Part),
-	}
-}
-
-func (jgln *Job_Grid_LatLng) LatLng() (float64, float64) {
-	if jgln == nil {
-		return 0, 0
-	}
-	return float64(jgln.Lat), float64(jgln.Lng)
-}
-
-func job_grid_latlng_for_lat_lng(lat, lng float64) *Job_Grid_LatLng {
-	return &Job_Grid_LatLng{
-		Lat: float32(lat),
-		Lng: float32(lng),
-	}
-}
-
-func job_grid_editinfo_for_editinfo(ei *grids.EditInfo) *Job_Grid_EditInfo {
+func toJobEditInfo(ei *grids.EditInfo) *Job_Grid_EditInfo {
 	ts, _ := ptypes.TimestampProto(ei.Date)
 	return &Job_Grid_EditInfo{
 		By:   ei.By,
@@ -43,7 +22,7 @@ func job_grid_editinfo_for_editinfo(ei *grids.EditInfo) *Job_Grid_EditInfo {
 	}
 }
 
-func job_grid_for_grid(grid *grids.Grid) *Job_Grid {
+func toJobGrid(grid *grids.Grid) *Job_Grid {
 	if grid == nil {
 		return nil
 	}
@@ -55,20 +34,35 @@ func job_grid_for_grid(grid *grids.Grid) *Job_Grid {
 			Id:   grid.MdgID.ID,
 			Part: uint32(grid.MdgID.Part),
 		},
-		Sw:  job_grid_latlng_for_lat_lng(grid.SWLat, grid.SWLng),
-		Ne:  job_grid_latlng_for_lat_lng(grid.NELat, grid.NELng),
-		Len: job_grid_latlng_for_lat_lng(grid.LatLen, grid.LngLen),
-
+		SwDms: &Job_Grid_LatLngDMS{
+			Lat: grid.SWLatDMS,
+			Lng: grid.SWLngDMS,
+		},
+		NeDms: &Job_Grid_LatLngDMS{
+			Lat: grid.NELatDMS,
+			Lng: grid.NELatDMS,
+		},
+		Sw: &Job_Grid_LatLng{
+			Lat: float32(grid.SWLat),
+			Lng: float32(grid.SWLat),
+		},
+		Ne: &Job_Grid_LatLng{
+			Lat: float32(grid.NELat),
+			Lng: float32(grid.NELat),
+		},
+		Len: &Job_Grid_LatLng{
+			Lat: float32(grid.LatLen),
+			Lng: float32(grid.LngLen),
+		},
 		Nrn:     grid.NRN,
 		Country: grid.Country,
 		City:    grid.City,
 		Sheet:   grid.Sheet,
 
-		Srid:        uint32(grid.SRID),
 		MetaData:    grid.Metadata,
 		PublishedAt: ts,
 
-		Edited: job_grid_editinfo_for_editinfo(grid.Edited),
+		Edited: toJobEditInfo(grid.Edited),
 	}
 }
 
@@ -76,7 +70,7 @@ func job_grid_for_grid(grid *grids.Grid) *Job_Grid {
 func NewJob(sheet string, grid *grids.Grid, metadata map[string]string) *Job {
 	return &Job{
 		SheetName: sheet,
-		Grid:      job_grid_for_grid(grid),
+		Grid:      toJobGrid(grid),
 		MetaData:  metadata,
 	}
 }
@@ -103,18 +97,24 @@ func (j *Job) GridsGrid() *grids.Grid {
 
 	return &grids.Grid{
 		MdgID:   g.MdgID(),
-		SRID:    uint(g.GetSrid()),
 		Country: g.GetCountry(),
 		City:    g.GetCity(),
 		NRN:     g.GetNrn(),
 
-		SWLat:  float64(g.GetSw().GetLat()),
-		SWLng:  float64(g.GetSw().GetLng()),
-		NELat:  float64(g.GetNe().GetLat()),
-		NELng:  float64(g.GetNe().GetLng()),
+		SWLatDMS: g.GetSwDms().GetLat(),
+		SWLngDMS: g.GetSwDms().GetLng(),
+		NELatDMS: g.GetNeDms().GetLat(),
+		NELngDMS: g.GetNeDms().GetLng(),
+
+		SWLat: float64(g.GetSw().GetLat()),
+		SWLng: float64(g.GetSw().GetLng()),
+		NELat: float64(g.GetNe().GetLat()),
+		NELng: float64(g.GetNe().GetLng()),
+
 		LatLen: float64(g.GetLen().GetLat()),
 		LngLen: float64(g.GetLen().GetLng()),
-		Sheet:  g.GetSheet(),
+
+		Sheet: g.GetSheet(),
 
 		Metadata:        g.GetMetaData(),
 		PublicationDate: publishedAt,
@@ -132,6 +132,7 @@ func (j *Job) Base64Marshal() (string, error) {
 	if err != nil {
 		return "", errors.Wrap(err, "failed to marshal")
 	}
+
 	// Now marshal the []byte to base64
 	return base64.StdEncoding.EncodeToString(data), nil
 }
@@ -142,9 +143,11 @@ func Base64UnmarshalJob(str string) (*Job, error) {
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to base64 decode")
 	}
+
 	var jb Job
 	if err := proto.Unmarshal(data, &jb); err != nil {
 		return nil, errors.Wrap(err, "failed to unmarshal protobuf")
 	}
+
 	return &jb, nil
 }

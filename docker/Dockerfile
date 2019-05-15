@@ -46,15 +46,6 @@ RUN yum install -y gdk-pixbuf2-devel \
 
 RUN yum install -y sqlite-devel.x86_64  mesa-libOSMesa-devel.x86_64  libcurl-devel.x86_64
 
-# remove once we vendor
-#RUN go get github.com/dimfeld/httptreemux
-#RUN go get github.com/spf13/cobra 
-#RUN go get github.com/go-spatial/tegola
-#RUN go get github.com/go-spatial/geom
-#RUN go get github.com/jackc/pgx
-#RUN go get github.com/arolek/p
-#RUN go get github.com/BurntSushi/toml
-
 # copy source code to container
 COPY . $GOPATH/src/github.com/go-spatial/maptoolkit/
 
