@@ -24,7 +24,7 @@ type Config struct {
 
 	// FileStores are used to move the generated files to locations
 	// that the user wants
-	FileStores []env.Dict `toml:"filestores"`
+	FileStores []env.Dict `toml:"file_stores"`
 
 	// metadata holds the metadata from parsing the toml
 	// file
@@ -35,6 +35,7 @@ type Config struct {
 type Sheet struct {
 	Name         env.String `toml:"name"`
 	ProviderGrid env.String `toml:"provider_grid"`
+	Filestore    env.String `toml:"file_store"`
 	Scale        env.Int    `toml:"scale"`
 	Template     env.String `toml:"template"`
 	Style        env.String `toml:"style"`

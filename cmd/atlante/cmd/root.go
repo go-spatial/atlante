@@ -3,6 +3,7 @@ package cmd
 import (
 	"context"
 	"fmt"
+	"log"
 	"net/url"
 	"os"
 	"strings"
@@ -23,7 +24,9 @@ const (
 )
 
 var (
-	Providers  = make(map[string]grids.Provider)
+	// Providers provides the grid providers
+	Providers = make(map[string]grids.Provider)
+	// FileStores are the files store providers
 	FileStores = make(map[string]filestore.Provider)
 	a          atlante.Atlante
 
@@ -31,7 +34,7 @@ var (
 	mdgid      string
 	configFile string
 	sheetName  string
-	dpi        int = DefaultDPI
+	dpi        = DefaultDPI
 	job        string
 	showJob    bool
 	workDir    string
@@ -47,6 +50,7 @@ func init() {
 	Root.Flags().StringVarP(&workDir, "workdir", "o", "", "workdir to find the assets and leave the output")
 }
 
+// Root is the main cobra command
 var Root = &cobra.Command{
 	Use:   "atlante",
 	Short: "Atlante is a flexable server to build static print maps",
@@ -56,10 +60,12 @@ http://github.com/go-spatial/maptoolkit`,
 	Run: rootCmdRun,
 }
 
+// ProviderConfig is a config structure for Grid Providers
 type ProviderConfig struct {
 	dict.Dicter
 }
 
+// NameGridProvider implements grids.Config interface
 func (pcfg ProviderConfig) NameGridProvider(key string) (grids.Provider, error) {
 
 	skey, err := pcfg.Dicter.String(key, nil)
@@ -75,16 +81,24 @@ func (pcfg ProviderConfig) NameGridProvider(key string) (grids.Provider, error) 
 
 }
 
+// FilestoreConfig is a config for file stores
 type FilestoreConfig struct {
 	dict.Dicter
 }
 
-func (fscfg FilestoreConfig) FileStoreFor(key string) (filestore.Provider, error) {
-	skey, err := pcfg.Dicter.String(key, nil)
-
+// FileStoreFor implements the filestore.Config interface
+func (fscfg FilestoreConfig) FileStoreFor(name string) (filestore.Provider, error) {
+	name = strings.ToLower(name)
+	p, ok := FileStores[name]
+	if !ok {
+		return nil, filestore.ErrUnknownProvider(name)
+	}
+	return p, nil
 }
 
+// LoadConfig will attempt to load and validate a config at the given location
 func LoadConfig(location string) error {
+	var ok bool
 
 	aURL, err := url.Parse(location)
 	if err != nil {
@@ -97,7 +111,7 @@ func LoadConfig(location string) error {
 	// Loop through providers creating a provider type mapping.
 	for i, p := range conf.Providers {
 		// type is required
-		type_, err := p.String("type", nil)
+		typ, err := p.String("type", nil)
 		if err != nil {
 			return fmt.Errorf("error provider (%v) missing type : %v", i, err)
 		}
@@ -109,12 +123,35 @@ func LoadConfig(location string) error {
 		if _, ok := Providers[name]; ok {
 			return fmt.Errorf("error provider with name (%v) is already registered", name)
 		}
-		prv, err := grids.For(type_, ProviderConfig{p})
+		prv, err := grids.For(typ, ProviderConfig{p})
 		if err != nil {
-			return fmt.Errorf("error registering provider #%v: err", i, err)
+			return fmt.Errorf("error registering provider #%v: %v", i, err)
 		}
 
 		Providers[name] = prv
+	}
+
+	log.Println(conf.FileStores)
+	// filestores
+	for i, fstore := range conf.FileStores {
+		// type is required
+		typ, err := fstore.String("type", nil)
+		if err != nil {
+			return fmt.Errorf("error filestore (%v) missing type : %v", i, err)
+		}
+		name, err := fstore.String("name", nil)
+		if err != nil {
+			return fmt.Errorf("error filestore (%v) missing name: %v", i, err)
+		}
+		name = strings.ToLower(name)
+		if _, ok = FileStores[name]; ok {
+			return fmt.Errorf("error provider(%v) with name (%v) is already registered", i, name)
+		}
+		prv, err := filestore.For(typ, FilestoreConfig{fstore})
+		if err != nil {
+			return fmt.Errorf("error registering filestore %v:%v", i, err)
+		}
+		FileStores[name] = prv
 	}
 
 	if len(conf.Sheets) == 0 {
@@ -140,6 +177,19 @@ func LoadConfig(location string) error {
 		name := strings.ToLower(string(sheet.Name))
 		//log.Println("Scale", sheet.Scale, "dpi", dpi)
 
+		filestoreName := strings.TrimSpace(strings.ToLower(string(sheet.Filestore)))
+		var fsprv filestore.Provider
+		if filestoreName != "" {
+			fsprv, ok = FileStores[filestoreName]
+			if !ok {
+				log.Println("Known file stores are:")
+				for k := range FileStores {
+					log.Println("\t", k)
+				}
+				return fmt.Errorf("error locating filestore (%v) for sheet %v (#%v)", filestoreName, sheet.Name, i)
+			}
+		}
+
 		sht, err := atlante.NewSheet(
 			name,
 			prv,
@@ -147,6 +197,7 @@ func LoadConfig(location string) error {
 			uint(sheet.Scale),
 			string(sheet.Style),
 			templateURL,
+			fsprv,
 		)
 		if err != nil {
 			return fmt.Errorf("error trying to create sheet %v: %v", i, err)

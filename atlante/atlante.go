@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"image/png"
+	"io"
 	"log"
 	"os"
 	"path/filepath"
@@ -12,6 +13,8 @@ import (
 	"text/template"
 
 	"github.com/go-spatial/maptoolkit/atlante/filestore"
+	fsfile "github.com/go-spatial/maptoolkit/atlante/filestore/file"
+	fsmulti "github.com/go-spatial/maptoolkit/atlante/filestore/multi"
 	"github.com/go-spatial/maptoolkit/atlante/grids"
 	"github.com/go-spatial/maptoolkit/atlante/internal/resolution"
 	"github.com/go-spatial/maptoolkit/mbgl/bounds"
@@ -21,6 +24,7 @@ import (
 
 type ImgStruct struct {
 	filename string
+	lck      sync.Mutex
 	// Have we generated the file?
 	// This will allow us to generate the file only when requested
 	generated bool
@@ -40,29 +44,40 @@ func (img ImgStruct) Filename() (string, error) {
 }
 
 // generateIamge is use to create the image into the filestore
-func (img ImgStruct) generateImage() (string, error) {
-	/*
-		if img.filestore == nil {
+func (img *ImgStruct) generateImage() (fn string, err error) {
+	// Make sure generateImage is only called one at a time.
+	defer func() {
+		if err == nil {
 			img.generated = true
+		}
+	}()
+	if img.generated {
+		return img.filename, nil
+	}
+	if img.filestore == nil {
+		return img.filename, nil
+	}
+	file, err := img.filestore.Writer(img.filename, true)
+	if err != nil {
+		if err == filestore.ErrSkipWrite {
+			err = nil
 			return img.filename, nil
 		}
-		file, err := img.filestore.Writer(img.filename, true)
-	*/
-	log.Println("Generating image" + img.filename)
-	err := img.image.GenerateImage()
-	if err != nil {
 		return "", err
 	}
-	file, err := os.Create(img.filename)
-	if err != nil {
+	if file == nil {
+		return img.filename, nil
+	}
+	img.lck.Lock()
+	defer img.lck.Unlock()
+	defer file.Close()
+	log.Println("Generating image " + img.filename)
+	if err = img.image.GenerateImage(); err != nil {
 		return "", err
 	}
 	if err := png.Encode(file, img.image); err != nil {
-		file.Close()
 		return "", err
 	}
-	file.Close()
-	img.generated = true
 	return img.filename, nil
 }
 
@@ -135,6 +150,29 @@ func GeneratePDF(ctx context.Context, sheet *Sheet, grid *grids.Grid, filenames 
 	if grid == nil {
 		return ErrNilGrid
 	}
+	// TODO(gdey): use MdgID once we move to partial templates system
+	// grp := grid.MdgID.String()
+	grp := ""
+
+	// TODO(gdey): We want group to be true once we have the partial tempaltes (#13) in place
+	// For now we want to generate the files in the current directory.
+	assetsWriter, err := fsfile.Provider{Group: false, Intermediate: true}.FileWriter(grp)
+	if err != nil {
+		return fmt.Errorf("failed to create assets writer: %v", err)
+	}
+
+	multiWriter := fsmulti.FileWriter{
+		Writers: []filestore.FileWriter{assetsWriter},
+	}
+
+	if sheet.Filestore != nil {
+		shWriter, err := sheet.Filestore.FileWriter(grp)
+		if err == nil && shWriter != nil {
+			multiWriter.Writers = append(multiWriter.Writers, shWriter)
+		} else if err != filestore.ErrSkipWrite {
+			return fmt.Errorf("failed to create sheed filestore writer: %v", err)
+		}
+	}
 
 	log.Println("filenames: ", filenames.IMG, filenames.SVG, filenames.PDF)
 
@@ -192,20 +230,18 @@ func GeneratePDF(ctx context.Context, sheet *Sheet, grid *grids.Grid, filenames 
 	}
 	imgBounds := dstimg.Bounds()
 
-	file, err := os.Create(filenames.SVG)
-	if err != nil {
-		return err
+	file, err := multiWriter.Writer(filenames.SVG, true)
+	img := ImgStruct{
+		filename:  filenames.IMG,
+		image:     dstimg,
+		filestore: multiWriter,
+		Width:     imgBounds.Dx(),
+		Height:    imgBounds.Dy(),
 	}
 
 	// Fill out template
 	err = sheet.Execute(file, GridTemplateContext{
-		Image: ImgStruct{
-			filename: filenames.IMG,
-			image:    dstimg,
-			//filestore:
-			Width:  imgBounds.Dx(),
-			Height: imgBounds.Dy(),
-		},
+		Image:         img,
 		DPI:           sheet.DPI,
 		Scale:         sheet.Scale,
 		Zoom:          zoom,
@@ -227,9 +263,30 @@ func GeneratePDF(ctx context.Context, sheet *Sheet, grid *grids.Grid, filenames 
 	// svg2pdf
 	//err = svg2pdf.GeneratePDF(filenames.SVG, filenames.PDF, 2500, 3000)
 	//	err = svg2pdf.GeneratePDF(filenames.SVG, filenames.PDF, 10419, 12501)
-	err = svg2pdf.GeneratePDF(filenames.SVG, filenames.PDF, 2028, 2607)
-	if err != nil {
-		panic(err)
+
+	pdffn := filepath.Clean(filepath.Join(grp, filenames.PDF))
+	svgfn := filepath.Clean(filepath.Join(grp, filenames.SVG))
+	if err = svg2pdf.GeneratePDF(svgfn, pdffn, 2028, 2607); err != nil {
+		return err
+	}
+	if len(multiWriter.Writers) > 1 {
+		// Don't want the assets writer
+		wrts, err := multiWriter.Writers[1].Writer(filenames.PDF, false)
+		if err != nil {
+			if err == filestore.ErrSkipWrite {
+				return nil
+			}
+			return err
+		}
+		// Copy the pdf over
+		pdffile, err := os.Open(pdffn)
+		if err != nil {
+			return err
+		}
+
+		io.Copy(wrts, pdffile)
+		file.Close()
+		wrts.Close()
 	}
 	return err
 }

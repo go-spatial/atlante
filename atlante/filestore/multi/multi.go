@@ -13,7 +13,7 @@ const (
 	TYPE = "multi"
 
 	// ConfigKeyFileStore is a config list of previously declared file stores
-	ConfigKeyFileStore = "filestore"
+	ConfigKeyFileStore = "file_stores"
 )
 
 // ErrUnknownFileStore is returned when a unknown file store is referenced
@@ -33,7 +33,7 @@ func initFunc(cfg filestore.Config) (filestore.Provider, error) {
 
 	// Go through each of the filestores and get them from the config.
 	for _, fs := range filestores {
-		p, err := cfg.ProviderFor(fs)
+		p, err := cfg.FileStoreFor(fs)
 		if err != nil {
 			return nil, ErrUnknownFileStore(fs)
 		}
@@ -129,9 +129,9 @@ func (t Provider) FileWriter(grp string) (filestore.FileWriter, error) {
 			}
 			return nil, err
 		}
-		filewriter.writers = append(filewriter.writers, fw)
+		filewriter.Writers = append(filewriter.Writers, fw)
 	}
-	if len(filewriter.writers) == 0 {
+	if len(filewriter.Writers) == 0 {
 		return nil, filestore.ErrSkipWrite
 	}
 	return filewriter, nil
@@ -139,13 +139,13 @@ func (t Provider) FileWriter(grp string) (filestore.FileWriter, error) {
 
 // FileWriter returns writers that can write files to various locations
 type FileWriter struct {
-	writers []filestore.FileWriter
+	Writers []filestore.FileWriter
 }
 
 //Writer implements the filestore.FileWriter interface
 func (t FileWriter) Writer(fpath string, isIntermediate bool) (io.WriteCloser, error) {
 	var writer Writer
-	for _, fw := range t.writers {
+	for _, fw := range t.Writers {
 		w, err := fw.Writer(fpath, isIntermediate)
 		if err != nil {
 			if err == filestore.ErrSkipWrite {

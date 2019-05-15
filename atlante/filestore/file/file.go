@@ -14,7 +14,7 @@ const (
 	TYPE = "file"
 
 	// ConfigKeyBasepath is the base directory where the file will be placed.
-	ConfigKeyBasepath = "basepath"
+	ConfigKeyBasepath = "base_path"
 	// ConfigKeyGroup indicates weather we should group assets in a subdirectory
 	// based on the group name (This is will be the mgdid)
 	ConfigKeyGroup = "group"
@@ -31,12 +31,14 @@ func intiFunc(cfg filestore.Config) (filestore.Provider, error) {
 	if err != nil {
 		return nil, errors.Wrapf(err, "error invalid for config key: %v", ConfigKeyBasepath)
 	}
-	if basepath != "" {
+	if basepath == "" {
 		return nil, ErrMissingBasePath
 	}
 	basepath = filepath.Clean(basepath)
-	if err = os.MkdirAll(basepath, os.ModePerm); err != nil {
-		return nil, errors.Wrapf(err, "error failed to write to %v", basepath)
+	if basepath != "." {
+		if err = os.MkdirAll(basepath, os.ModePerm); err != nil {
+			return nil, errors.Wrapf(err, "error failed to write to %v", basepath)
+		}
 	}
 
 	grp, _ := cfg.Bool(ConfigKeyGroup, nil)
