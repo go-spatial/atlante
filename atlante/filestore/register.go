@@ -1,6 +1,7 @@
 package filestore
 
 import (
+	"fmt"
 	"sort"
 	"sync"
 
@@ -24,7 +25,7 @@ const ErrNoProvidersRegistered = errors.String("no providers registered")
 type ErrUnknownProvider string
 
 func (err ErrUnknownProvider) Error() string {
-	return "unknown filestore provider (" + string(err) + ")"
+	return fmt.Sprintf("error unknown filestore provider %v", string(err))
 }
 
 // Config is the interface that is passed to filestore providers to configure them

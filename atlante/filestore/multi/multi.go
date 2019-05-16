@@ -1,7 +1,6 @@
 package multi
 
 import (
-	"fmt"
 	"io"
 
 	"github.com/gdey/errors"
@@ -14,15 +13,11 @@ const (
 
 	// ConfigKeyFileStore is a config list of previously declared file stores
 	ConfigKeyFileStore = "file_stores"
+
+	// ErrZeroFilestoresConfigured is returned when a multi filestore does not have
+	// any filestore configured.
+	ErrZeroFilestoresConfigured = errors.String("zero filestores configured")
 )
-
-// ErrUnknownFileStore is returned when a unknown file store is referenced
-type ErrUnknownFileStore string
-
-func (err ErrUnknownFileStore) Error() string {
-	return fmt.Sprintf("error unknown filestore %v", string(err))
-
-}
 
 func initFunc(cfg filestore.Config) (filestore.Provider, error) {
 	filestores, err := cfg.StringSlice(ConfigKeyFileStore)
@@ -35,7 +30,7 @@ func initFunc(cfg filestore.Config) (filestore.Provider, error) {
 	for _, fs := range filestores {
 		p, err := cfg.FileStoreFor(fs)
 		if err != nil {
-			return nil, ErrUnknownFileStore(fs)
+			return nil, filestore.ErrUnknownProvider(fs)
 		}
 		if p == nil {
 			continue
@@ -47,7 +42,19 @@ func initFunc(cfg filestore.Config) (filestore.Provider, error) {
 		}
 		provider.providers = append(provider.providers, p)
 	}
-	return provider, nil
+	switch len(provider.providers) {
+	case 0:
+		// There are two ways this can happen.
+		// 1. filestores is zero (most common)
+		// 2. we have a bunch of nil's in the FileStoreFor()
+		return nil, ErrZeroFilestoresConfigured
+	case 1:
+		// If there is only one provider just return that provider,
+		// no need to run through the multi provider.
+		return provider.providers[0], nil
+	default:
+		return provider, nil
+	}
 }
 
 // New returns a new multi provider
@@ -88,10 +95,6 @@ func (t *Writer) Write(p []byte) (n int, err error) {
 	for _, w := range t.writers {
 		n, err = w.Write(p)
 		if err != nil {
-
-			if err == filestore.ErrSkipWrite {
-				continue
-			}
 			return n, err
 		}
 		if n != len(p) {
@@ -124,15 +127,15 @@ func (t Provider) FileWriter(grp string) (filestore.FileWriter, error) {
 	for _, p := range t.providers {
 		fw, err := p.FileWriter(grp)
 		if err != nil {
-			if err == filestore.ErrSkipWrite {
-				continue
-			}
 			return nil, err
+		}
+		if fw == nil {
+			continue
 		}
 		filewriter.Writers = append(filewriter.Writers, fw)
 	}
 	if len(filewriter.Writers) == 0 {
-		return nil, filestore.ErrSkipWrite
+		return nil, nil
 	}
 	return filewriter, nil
 }
@@ -148,18 +151,18 @@ func (t FileWriter) Writer(fpath string, isIntermediate bool) (io.WriteCloser, e
 	for _, fw := range t.Writers {
 		w, err := fw.Writer(fpath, isIntermediate)
 		if err != nil {
-			if err == filestore.ErrSkipWrite {
-				continue
-			}
 			return nil, err
+		}
+		if w == nil {
+			continue
 		}
 		writer.writers = append(writer.writers, w)
 	}
 	// No writers, no need to write this file.
 	if len(writer.writers) == 0 {
-		return nil, filestore.ErrSkipWrite
+		return nil, nil
 	}
 	return &writer, nil
 }
 
-var _ io.WriteCloser = (*Writer)(nil)
+var _ filestore.Provider = Provider{}

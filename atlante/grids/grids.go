@@ -2,7 +2,6 @@ package grids
 
 import (
 	"fmt"
-	"log"
 	"math"
 	"strconv"
 	"strings"
@@ -129,12 +128,10 @@ func (g Grid) CenterPtForZoom(zoom float64) [2]float64 {
 	return bounds.Center(g.Hull(), zoom)
 }
 func (g Grid) WidthHeightForZoom(zoom float64) (width, height float64) {
-	log.Println("Hull", g.Hull())
 	return bounds.WidthHeightTile(g.Hull(), zoom, 4096/8)
 }
 
 func (g Grid) ZoomForScaleDPI(scale uint, dpi uint) float64 {
-	log.Println("SWLat", g.SWLat)
 	return resolution.Zoom(resolution.MercatorEarthCircumference, scale, dpi, g.SWLat)
 }
 

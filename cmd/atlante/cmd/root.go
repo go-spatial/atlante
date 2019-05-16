@@ -11,6 +11,7 @@ import (
 	"github.com/go-spatial/maptoolkit/atlante"
 	"github.com/go-spatial/maptoolkit/atlante/config"
 	"github.com/go-spatial/maptoolkit/atlante/filestore"
+	fsmulti "github.com/go-spatial/maptoolkit/atlante/filestore/multi"
 	"github.com/go-spatial/maptoolkit/atlante/grids"
 	"github.com/go-spatial/maptoolkit/mbgl"
 	"github.com/go-spatial/tegola/dict"
@@ -175,19 +176,31 @@ func LoadConfig(location string) error {
 			)
 		}
 		name := strings.ToLower(string(sheet.Name))
-		//log.Println("Scale", sheet.Scale, "dpi", dpi)
-
-		filestoreName := strings.TrimSpace(strings.ToLower(string(sheet.Filestore)))
-		var fsprv filestore.Provider
-		if filestoreName != "" {
+		var fstores []filestore.Provider
+		for _, filestoreString := range sheet.Filestores {
+			filestoreName := strings.TrimSpace(strings.ToLower(string(filestoreString)))
+			var fsprv filestore.Provider
+			if filestoreName == "" {
+				continue
+			}
 			fsprv, ok = FileStores[filestoreName]
 			if !ok {
 				log.Println("Known file stores are:")
 				for k := range FileStores {
 					log.Println("\t", k)
 				}
-				return fmt.Errorf("error locating filestore (%v) for sheet %v (#%v)", filestoreName, sheet.Name, i)
+				return filestore.ErrUnknownProvider(filestoreName)
 			}
+			fstores = append(fstores, fsprv)
+		}
+		var fsprv filestore.Provider
+		switch len(fstores) {
+		case 0:
+			fsprv = nil
+		case 1:
+			fsprv = fstores[0]
+		default:
+			fsprv = fsmulti.New(fstores...)
 		}
 
 		sht, err := atlante.NewSheet(

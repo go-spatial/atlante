@@ -22,17 +22,24 @@ import (
 	"github.com/go-spatial/maptoolkit/svg2pdf"
 )
 
+// ImgStruct is a wrapper around an image that makes the image available to the
+// the template, and allows for the image to be encoded only if it's requested.
 type ImgStruct struct {
-	filename string
-	lck      sync.Mutex
+	filename     string
+	filestore    filestore.FileWriter
+	intermediate bool
 	// Have we generated the file?
 	// This will allow us to generate the file only when requested
 	generated bool
+	lck       sync.Mutex
 	image     *image.Image
-	filestore filestore.FileWriter
-	Width     int
-	Height    int
 }
+
+// Height returns the height of the image
+func (img ImgStruct) Height() int { return img.image.Bounds().Dy() }
+
+// Width returns the width of the image
+func (img ImgStruct) Width() int { return img.image.Bounds().Dx() }
 
 // Filename returns the file name of the image
 func (img ImgStruct) Filename() (string, error) {
@@ -45,39 +52,47 @@ func (img ImgStruct) Filename() (string, error) {
 
 // generateIamge is use to create the image into the filestore
 func (img *ImgStruct) generateImage() (fn string, err error) {
-	// Make sure generateImage is only called one at a time.
-	defer func() {
-		if err == nil {
-			img.generated = true
-		}
-	}()
 	if img.generated {
 		return img.filename, nil
 	}
+
+	if img.image == nil {
+		img.generated = true
+		return img.filename, nil
+	}
+
 	if img.filestore == nil {
+		img.generated = true
 		return img.filename, nil
 	}
-	file, err := img.filestore.Writer(img.filename, true)
-	if err != nil {
-		if err == filestore.ErrSkipWrite {
-			err = nil
-			return img.filename, nil
-		}
-		return "", err
-	}
-	if file == nil {
-		return img.filename, nil
-	}
+
+	// generateIamge is use to create the image into the filestore
 	img.lck.Lock()
 	defer img.lck.Unlock()
+	if img.generated {
+		return img.filename, nil
+	}
+
+	file, err := img.filestore.Writer(img.filename, img.intermediate)
+	if err != nil {
+		return "", err
+	}
+
+	if file == nil {
+		img.generated = true
+		return img.filename, nil
+	}
 	defer file.Close()
-	log.Println("Generating image " + img.filename)
+
 	if err = img.image.GenerateImage(); err != nil {
 		return "", err
 	}
 	if err := png.Encode(file, img.image); err != nil {
 		return "", err
 	}
+	// Clean up the backing store.
+	img.generated = true
+	img.image.Close()
 	return img.filename, nil
 }
 
@@ -151,15 +166,10 @@ func GeneratePDF(ctx context.Context, sheet *Sheet, grid *grids.Grid, filenames 
 		return ErrNilGrid
 	}
 	// TODO(gdey): use MdgID once we move to partial templates system
-	// grp := grid.MdgID.String()
+	// grp := grid.MdgID.String(), an empty group is current directory
 	grp := ""
 
-	// TODO(gdey): We want group to be true once we have the partial tempaltes (#13) in place
-	// For now we want to generate the files in the current directory.
-	assetsWriter, err := fsfile.Provider{Group: false, Intermediate: true}.FileWriter(grp)
-	if err != nil {
-		return fmt.Errorf("failed to create assets writer: %v", err)
-	}
+	assetsWriter := fsfile.Writer{Base: grp, Intermediate: true}
 
 	multiWriter := fsmulti.FileWriter{
 		Writers: []filestore.FileWriter{assetsWriter},
@@ -167,10 +177,11 @@ func GeneratePDF(ctx context.Context, sheet *Sheet, grid *grids.Grid, filenames 
 
 	if sheet.Filestore != nil {
 		shWriter, err := sheet.Filestore.FileWriter(grp)
-		if err == nil && shWriter != nil {
-			multiWriter.Writers = append(multiWriter.Writers, shWriter)
-		} else if err != filestore.ErrSkipWrite {
+		if err != nil {
 			return fmt.Errorf("failed to create sheed filestore writer: %v", err)
+		}
+		if shWriter != nil {
+			multiWriter.Writers = append(multiWriter.Writers, shWriter)
 		}
 	}
 
@@ -178,38 +189,29 @@ func GeneratePDF(ctx context.Context, sheet *Sheet, grid *grids.Grid, filenames 
 
 	const tilesize = 4096 / 2
 
-	// To calculate ppi_ratio we use 96 as the default ppi.
-	ppiRatio := float64(sheet.DPI) / 96.0
-	_ = ppiRatio
-	log.Println("PPI:", ppiRatio)
+	/*
+		TODO(gdey): Keeping this for now. Not sure if we need this, or if the
+					zoom calculation taking dpi into considertion is all that's
+					needed
+		// To calculate ppi_ratio we use 96 as the default ppi.
+		ppiRatio := float64(sheet.DPI) / 96.0
+	*/
 
 	zoom := grid.ZoomForScaleDPI(sheet.Scale, sheet.DPI)
-	// zoom := sheet.Zoom
 
-	log.Println("zoom", zoom, "Scale", sheet.Scale, "dpi", sheet.DPI)
 	nground := resolution.Ground(
 		resolution.MercatorEarthCircumference,
 		zoom,
 		grid.SWLat,
 	)
 
-	//nground = math.RoundToEven(nground)
-	log.Println("zoom", zoom, "ground measure", nground)
-
-	width, height := grid.WidthHeightForZoom(zoom)
-	log.Println("z, width", width, "z, height", height)
-	zoom = resolution.ZoomForGround(
-		resolution.MercatorEarthCircumference,
-		nground,
-		grid.SWLat,
-	)
-	log.Println("zoom", zoom)
-
 	// Generate the PNG
 	prj := bounds.ESPG3857
+	width, height := grid.WidthHeightForZoom(zoom)
 	latLngCenterPt := grid.CenterPtForZoom(zoom)
-	width, height = grid.WidthHeightForZoom(zoom)
 	log.Println("width", width, "height", height)
+	log.Println("zoom", zoom, "Scale", sheet.Scale, "dpi", sheet.DPI, "ground measure", nground)
+
 	centerPt := bounds.LatLngToPoint(prj, latLngCenterPt[0], latLngCenterPt[1], zoom, tilesize)
 	dstimg, err := image.New(
 		prj,
@@ -219,7 +221,7 @@ func GeneratePDF(ctx context.Context, sheet *Sheet, grid *grids.Grid, filenames 
 		// TODO(gdey): Need to remove this hack and figure out how to used the
 		// ppi value as well as set the correct scale on the svg/pdf document
 		// that is produced later on. (https://github.com/go-spatial/maptoolkit/issues/13)
-		1.0, //ppiRatio,
+		1.0, // ppiRatio, (we adjust the zoom)
 		0.0, // Bearing
 		0.0, // Pitch
 		sheet.Style,
@@ -228,15 +230,15 @@ func GeneratePDF(ctx context.Context, sheet *Sheet, grid *grids.Grid, filenames 
 	if err != nil {
 		return err
 	}
-	imgBounds := dstimg.Bounds()
 
 	file, err := multiWriter.Writer(filenames.SVG, true)
+	defer file.Close()
+
 	img := ImgStruct{
-		filename:  filenames.IMG,
-		image:     dstimg,
-		filestore: multiWriter,
-		Width:     imgBounds.Dx(),
-		Height:    imgBounds.Dy(),
+		filename:     filenames.IMG,
+		image:        dstimg,
+		filestore:    multiWriter,
+		intermediate: true,
 	}
 
 	// Fill out template
@@ -249,44 +251,45 @@ func GeneratePDF(ctx context.Context, sheet *Sheet, grid *grids.Grid, filenames 
 		Grid:          *grid,
 	})
 	if err != nil {
-		log.Printf("Got an error trying to fillout sheet template")
-		file.Close()
+		log.Printf("error trying to fillout sheet template")
 		return err
 	}
-	_ = file.Close()
 
 	//TODO(gdey): here we should change directories to the working directory.
 	// This is needed to generate the PDF. It might make sense to do this
 	// as the first thing we do when entering this function. Atlante object
 	// does have a working directory parameter for this.
 
-	// svg2pdf
-	//err = svg2pdf.GeneratePDF(filenames.SVG, filenames.PDF, 2500, 3000)
-	//	err = svg2pdf.GeneratePDF(filenames.SVG, filenames.PDF, 10419, 12501)
+	//TODO(gdey): 2028 and 2607 are file sizes for the size of the
+	// page we are generating. This should really be configuration
+	// options in the sheet. Using standard name like A0.
+	// see: https://www.belightsoft.com/products/resources/paper-sizes-and-formats-explained
+	// Though the 2028 and 2606 don't quite match up.
 
-	pdffn := filepath.Clean(filepath.Join(grp, filenames.PDF))
-	svgfn := filepath.Clean(filepath.Join(grp, filenames.SVG))
+	pdffn := assetsWriter.Path(filenames.PDF)
+	svgfn := assetsWriter.Path(filenames.SVG)
+
 	if err = svg2pdf.GeneratePDF(svgfn, pdffn, 2028, 2607); err != nil {
 		return err
 	}
+
 	if len(multiWriter.Writers) > 1 {
 		// Don't want the assets writer
 		wrts, err := multiWriter.Writers[1].Writer(filenames.PDF, false)
 		if err != nil {
-			if err == filestore.ErrSkipWrite {
-				return nil
-			}
 			return err
 		}
+		// nil writer move on.
+		if wrts == nil {
+			return nil
+		}
+		defer wrts.Close()
 		// Copy the pdf over
 		pdffile, err := os.Open(pdffn)
 		if err != nil {
 			return err
 		}
-
 		io.Copy(wrts, pdffile)
-		file.Close()
-		wrts.Close()
 	}
 	return err
 }

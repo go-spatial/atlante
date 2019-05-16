@@ -92,11 +92,11 @@ type Writer struct {
 func (w Writer) Writer(fpath string, isIntermediate bool) (io.WriteCloser, error) {
 	// If we are not writing out intermediate file, skip.
 	if !w.Intermediate && isIntermediate {
-		return nil, filestore.ErrSkipWrite
+		return nil, nil
 	}
-	// We are writing this file. First thing to do is
-	// combine the file path with the base path.
-	path := filepath.Join(w.Base, fpath)
+	// We are writing this file.
+	// First thing to do is combine the file path with the base path.
+	path := w.Path(fpath)
 	dir := filepath.Dir(path)
 	if err := os.MkdirAll(dir, os.ModePerm); err != nil {
 		return nil, errors.Wrapf(err, "error failed create base dir %v", dir)
@@ -106,6 +106,11 @@ func (w Writer) Writer(fpath string, isIntermediate bool) (io.WriteCloser, error
 		return nil, errors.Wrapf(err, "error failed to create file %v", path)
 	}
 	return f, nil
+}
+
+// Path for returns the file path of where the file would be copied to.
+func (w Writer) Path(fpath string) string {
+	return filepath.Clean(filepath.Join(w.Base, fpath))
 }
 
 // make sure we are always adhering to the interface.

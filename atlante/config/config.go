@@ -33,13 +33,13 @@ type Config struct {
 
 // Sheet models a sheet in the config file
 type Sheet struct {
-	Name         env.String `toml:"name"`
-	ProviderGrid env.String `toml:"provider_grid"`
-	Filestore    env.String `toml:"file_store"`
-	Scale        env.Int    `toml:"scale"`
-	Template     env.String `toml:"template"`
-	Style        env.String `toml:"style"`
-	Notifier     env.String `toml:"notifier"`
+	Name         env.String   `toml:"name"`
+	ProviderGrid env.String   `toml:"provider_grid"`
+	Filestores   []env.String `toml:"file_stores"`
+	Scale        env.Int      `toml:"scale"`
+	Template     env.String   `toml:"template"`
+	Style        env.String   `toml:"style"`
+	Notifier     env.String   `toml:"notifier"`
 }
 
 // Validate will validate the config and make sure the is valid

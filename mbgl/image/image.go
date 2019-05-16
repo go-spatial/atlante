@@ -9,6 +9,7 @@ import (
 	"log"
 	"math"
 	"os"
+	"sync"
 
 	"github.com/go-spatial/geom"
 	"github.com/go-spatial/maptoolkit/mbgl"
@@ -63,6 +64,7 @@ type Image struct {
 	// We will write the data to this and then use this for the
 	// At function.
 	backingStore *os.File
+	initLck      sync.Mutex
 	initilized   bool
 
 	numberOfTilesNeeded int
@@ -99,15 +101,25 @@ func (im Image) Bounds() image.Rectangle {
 	return image.Rect(0, 0, int(float64(im.width)*im.ppiratio), int(float64(im.height)*im.ppiratio))
 }
 
+// Close will close the backing store and remove it.
 func (im Image) Close() {
 	if im.backingStore == nil {
 		return
 	}
-	im.backingStore.Close()
+	// Want to make sure generate/At don't try to use this if it's closing
+	im.initLck.Lock()
+	defer im.initLck.Unlock()
+	if err := im.backingStore.Close(); err != nil {
+		log.Printf("warning failed to close %v : %v", im.backingStore.Name(), err)
+	}
 	// ignore any errors.
-	_ = os.Remove(im.backingStore.Name())
+	if err := os.Remove(im.backingStore.Name()); err != nil {
+		log.Printf("warning failed to remove %v : %v", im.backingStore.Name(), err)
+	}
+	im.initilized = false
 }
 
+//At returns the color for the x,y position in the image.
 func (im Image) At(x, y int) color.Color {
 	if !im.initilized {
 		if err := im.GenerateImage(); err != nil {
@@ -197,10 +209,15 @@ func New(
 	return &img, nil
 }
 
+// GenerateImage will attempt to generate the backing store.
+// This will be call automatically when At() is called, but
+// the error will be lost.
 func (img *Image) GenerateImage() error {
 	if img == nil || img.initilized {
 		return nil
 	}
+	img.initLck.Lock()
+	defer img.initLck.Unlock()
 	numTilesNeeded := img.numberOfTilesNeeded
 	centerXY := img.centerXY
 	prj := img.prj
@@ -238,13 +255,15 @@ func (img *Image) GenerateImage() error {
 			}
 			snpImage, err := mbgl.Snapshot(snpsht)
 			if err != nil {
-				// Delete the tempfile
+				// Delete the tempfile -- don't need to worry about the error.
+				// we want to shadow the err here
 				img.Close()
 				return err
 			}
 			crect.length, err = img.backingStore.Write(snpImage.Data)
 			if err != nil {
-				// Delete the tempfile
+				// Delete the tempfile -- don't need to worry about the error.
+				// we want to shadow the err here
 				img.Close()
 				return err
 			}
@@ -261,7 +280,7 @@ func (img *Image) GenerateImage() error {
 	img.offsetWidth = (rx / 2) - int(float64(desiredWidth/2)*ppi)
 	img.offsetHeight = (ry / 2) - int(float64(desiredHeight/2)*ppi)
 
-	log.Println("Done generating images")
+	log.Println("done generating images")
 	img.initilized = true
 	err := img.backingStore.Sync()
 	// Move to the top of the file.
