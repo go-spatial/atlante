@@ -15,8 +15,6 @@ github.com/go-spatial/geom/cmp
 github.com/go-spatial/tegola/dict
 github.com/go-spatial/tegola
 github.com/go-spatial/tegola/maths/webmercator
-github.com/go-spatial/tegola/internal/env
-github.com/go-spatial/tegola/internal/p
 # github.com/gogo/protobuf v1.2.1
 github.com/gogo/protobuf/proto
 # github.com/golang/protobuf v1.3.1
