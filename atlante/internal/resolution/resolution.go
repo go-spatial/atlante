@@ -1,7 +1,6 @@
 package resolution
 
 import (
-	"log"
 	"math"
 )
 
@@ -19,7 +18,6 @@ func Zoom(earthCircumference float64, scale uint, dpi uint, lat float64) float64
 	//
 	width := math.Cos(lat * Rad)
 	ground := float64(scale) * MeterPerInch / float64(dpi)
-	log.Println("ground (meter/pixel):", ground)
 	mapWidth := (width * earthCircumference) / ground
 	return math.Log2(mapWidth / TileSize)
 

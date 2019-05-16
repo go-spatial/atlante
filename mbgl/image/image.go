@@ -9,10 +9,16 @@ import (
 	"log"
 	"math"
 	"os"
+	"sync"
 
 	"github.com/go-spatial/geom"
 	"github.com/go-spatial/maptoolkit/mbgl"
 	"github.com/go-spatial/maptoolkit/mbgl/bounds"
+)
+
+const (
+	tilesize = 4096 / 2
+	scale    = 4
 )
 
 type ReadAtCloser interface {
@@ -36,6 +42,9 @@ type Image struct {
 	// Height of the desired image, it will be multipiled by the PPIRatio to get the final height.
 	height int
 
+	// PPIRatio
+	ppiratio float64
+
 	// These are the centers and the rectangles where the image will be
 	// placed
 	centers []CenterRect
@@ -43,9 +52,6 @@ type Image struct {
 	// the offset from the top, this is for clip
 	offsetHeight int
 	offsetWidth  int
-
-	// PPIRatio
-	ppiratio float64
 
 	// Style to use to generate the tile
 	style string
@@ -58,7 +64,11 @@ type Image struct {
 	// We will write the data to this and then use this for the
 	// At function.
 	backingStore *os.File
+	initLck      sync.Mutex
 	initilized   bool
+
+	numberOfTilesNeeded int
+	centerXY            [2]float64
 
 	// this is for debugging.
 	drawBounds bool
@@ -69,9 +79,6 @@ type Image struct {
 }
 
 func (im *Image) SetDebugBounds(extent *geom.Extent, zoom float64) {
-
-	const tilesize = 4096 / 2
-	const scale = 4
 
 	// for lat lng geom.Extent should be laid out as follows:
 	// {west, south, east, north}
@@ -94,16 +101,34 @@ func (im Image) Bounds() image.Rectangle {
 	return image.Rect(0, 0, int(float64(im.width)*im.ppiratio), int(float64(im.height)*im.ppiratio))
 }
 
+// Close will close the backing store and remove it.
 func (im Image) Close() {
 	if im.backingStore == nil {
 		return
 	}
-	im.backingStore.Close()
+	// Want to make sure generate/At don't try to use this if it's closing
+	im.initLck.Lock()
+	defer im.initLck.Unlock()
+	if err := im.backingStore.Close(); err != nil {
+		log.Printf("warning failed to close %v : %v", im.backingStore.Name(), err)
+	}
+	log.Printf("removeing backing store %v", im.backingStore.Name())
 	// ignore any errors.
-	_ = os.Remove(im.backingStore.Name())
+	if err := os.Remove(im.backingStore.Name()); err != nil {
+		log.Printf("warning failed to remove %v : %v", im.backingStore.Name(), err)
+	}
+	im.backingStore = nil
+	im.initilized = false
 }
 
+//At returns the color for the x,y position in the image.
 func (im Image) At(x, y int) color.Color {
+	if !im.initilized {
+		if err := im.GenerateImage(); err != nil {
+			// Failed to generate the image, just return black
+			return color.RGBA{0, 0, 0, 255}
+		}
+	}
 	rx, ry := x+im.offsetWidth, y+im.offsetHeight
 	// rx, ry := x, y
 	var data [4]byte
@@ -153,7 +178,6 @@ func New(
 	)
 	log.Println("desiredWidth", desiredWidth)
 	log.Println("desiredHeight", desiredHeight)
-	centerTileLength := int(math.Ceil((tilesize - 1) * ppi))
 
 	tmpDir := "."
 	if tempDir == "" {
@@ -172,15 +196,39 @@ func New(
 	log.Println("numbTilesNeeded", numTilesNeeded)
 
 	img := Image{
-		prj:          prj,
-		style:        style,
-		zoom:         zoom,
-		width:        desiredWidth,
-		height:       desiredHeight,
-		ppiratio:     ppi,
-		centers:      make([]CenterRect, 0, numTilesNeeded*numTilesNeeded),
-		backingStore: tmpfile,
+		prj:                 prj,
+		style:               style,
+		zoom:                zoom,
+		width:               desiredWidth,
+		height:              desiredHeight,
+		ppiratio:            ppi,
+		numberOfTilesNeeded: numTilesNeeded,
+		centers:             make([]CenterRect, 0, numTilesNeeded*numTilesNeeded),
+		centerXY:            centerXY,
+		backingStore:        tmpfile,
 	}
+
+	return &img, nil
+}
+
+// GenerateImage will attempt to generate the backing store.
+// This will be call automatically when At() is called, but
+// the error will be lost.
+func (img *Image) GenerateImage() error {
+	if img == nil || img.initilized {
+		return nil
+	}
+	img.initLck.Lock()
+	defer img.initLck.Unlock()
+	numTilesNeeded := img.numberOfTilesNeeded
+	centerXY := img.centerXY
+	prj := img.prj
+	zoom := img.zoom
+	style := img.style
+	ppi := img.ppiratio
+	desiredWidth := img.width
+	desiredHeight := img.height
+	centerTileLength := int(math.Ceil((tilesize - 1) * ppi))
 
 	ry := 0
 	rx := 0
@@ -209,15 +257,17 @@ func New(
 			}
 			snpImage, err := mbgl.Snapshot(snpsht)
 			if err != nil {
-				// Delete the tempfile
+				// Delete the tempfile -- don't need to worry about the error.
+				// we want to shadow the err here
 				img.Close()
-				return nil, err
+				return err
 			}
 			crect.length, err = img.backingStore.Write(snpImage.Data)
 			if err != nil {
-				// Delete the tempfile
+				// Delete the tempfile -- don't need to worry about the error.
+				// we want to shadow the err here
 				img.Close()
-				return nil, err
+				return err
 			}
 			crect.offset = bsOffset
 			crect.imgWidth = snpImage.Width
@@ -232,12 +282,14 @@ func New(
 	img.offsetWidth = (rx / 2) - int(float64(desiredWidth/2)*ppi)
 	img.offsetHeight = (ry / 2) - int(float64(desiredHeight/2)*ppi)
 
-	log.Println("Done generating images")
+	log.Println("done generating images")
 	img.initilized = true
-	err = img.backingStore.Sync()
+	err := img.backingStore.Sync()
 	// Move to the top of the file.
 	log.Printf("Backing store has been sync'd : %v -- %v", img.backingStore.Name(), err)
+	if err != nil {
+		return err
+	}
 	_, _ = img.backingStore.Seek(0, 0)
-	return &img, nil
-
+	return nil
 }

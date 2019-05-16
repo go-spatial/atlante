@@ -103,7 +103,7 @@ func For(notifierType string, config NotifierConfig) (Notifier, error) {
 	}
 	n, ok := notifiers[notifierType]
 	if !ok {
-		return nil, ErrNotifiernotRegistered(notifierType)
+		return nil, ErrNotifierNotRegistered(notifierType)
 	}
 	return n.init(config)
 }

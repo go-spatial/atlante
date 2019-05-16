@@ -7,6 +7,7 @@ import (
 	"text/template"
 	"time"
 
+	"github.com/go-spatial/maptoolkit/atlante/filestore"
 	"github.com/go-spatial/maptoolkit/atlante/grids"
 	"github.com/go-spatial/maptoolkit/atlante/internal/urlutil"
 )
@@ -43,12 +44,15 @@ type Sheet struct {
 	// Template file to use
 	SvgTemplateFilename string
 
+	// Where to write the file created for the seet.
+	Filestore filestore.Provider
+
 	// Parsed and ready template
 	svgTemplate *template.Template
 }
 
 // NewSheet returns a new sheet
-func NewSheet(name string, provider grids.Provider, dpi uint, scale uint, style string, svgTemplateFilename *url.URL) (*Sheet, error) {
+func NewSheet(name string, provider grids.Provider, dpi uint, scale uint, style string, svgTemplateFilename *url.URL, fs filestore.Provider) (*Sheet, error) {
 	var (
 		err error
 		t   *template.Template
@@ -77,6 +81,7 @@ func NewSheet(name string, provider grids.Provider, dpi uint, scale uint, style 
 		Style:               style,
 		SvgTemplateFilename: svgTemplateFilename.String(),
 		svgTemplate:         t,
+		Filestore:           fs,
 	}, nil
 }
 

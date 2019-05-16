@@ -5,7 +5,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/go-spatial/tegola/internal/env"
+	"github.com/go-spatial/maptoolkit/atlante/internal/env"
 )
 
 func TestDict(t *testing.T) {
@@ -422,70 +422,70 @@ func TestDict(t *testing.T) {
 			dict: env.Dict{
 				"interface": interface{}("hello"),
 			},
-			key:"interface",
+			key:      "interface",
 			expected: "hello",
 		},
 		"iface to bool": {
 			dict: env.Dict{
 				"interface": interface{}(true),
 			},
-			key:"interface",
+			key:      "interface",
 			expected: true,
 		},
 		"iface to int": {
 			dict: env.Dict{
 				"interface": interface{}(int(-25)),
 			},
-			key:"interface",
+			key:      "interface",
 			expected: int(-25),
 		},
 		"iface to uint": {
 			dict: env.Dict{
 				"interface": interface{}(uint(42)),
 			},
-			key:"interface",
+			key:      "interface",
 			expected: uint(42),
 		},
 		"iface to float": {
 			dict: env.Dict{
 				"interface": interface{}(-25e-10),
 			},
-			key:"interface",
+			key:      "interface",
 			expected: -25e-10,
 		},
 		"iface slice to string slice": {
 			dict: env.Dict{
 				"interface_slice": []interface{}{"hello", "world"},
 			},
-			key:"interface_slice",
+			key:      "interface_slice",
 			expected: []string{"hello", "world"},
 		},
 		"iface slice to bool slice": {
 			dict: env.Dict{
 				"interface_slice": []interface{}{true, false, false},
 			},
-			key:"interface_slice",
+			key:      "interface_slice",
 			expected: []bool{true, false, false},
 		},
 		"iface slice to int slice": {
 			dict: env.Dict{
 				"interface_slice": []interface{}{int(42), int(-25), int(1970)},
 			},
-			key:"interface_slice",
+			key:      "interface_slice",
 			expected: []int{42, -25, 1970},
 		},
 		"iface slice to uint slice": {
 			dict: env.Dict{
 				"interface_slice": []interface{}{uint(42), uint(25), uint(1970)},
 			},
-			key:"interface_slice",
+			key:      "interface_slice",
 			expected: []uint{42, 25, 1970},
 		},
 		"iface slice to float slice": {
 			dict: env.Dict{
 				"interface_slice": []interface{}{float64(42.0), float64(-25e-10), float64(1.970e4)},
 			},
-			key:"interface_slice",
+			key:      "interface_slice",
 			expected: []float64{42.0, -25e-10, 1.970e4},
 		},
 	}
