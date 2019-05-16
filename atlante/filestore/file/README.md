@@ -13,7 +13,7 @@ base_path="/usr/dir"
 [[sheets]]
 name = "sheet1"
 # ...
-file_store="usr/dir"
+file_stores=["usr/dir"]
 ```
 
 ## Properties

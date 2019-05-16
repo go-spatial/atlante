@@ -2,6 +2,10 @@
 
 Used to group a set of other file stores.
 
+There should be no need to use this filestore. This is here
+for internal use only. Sheets can take multiple file stores
+, and that should be used instead. 
+
 ```toml
 [[filestores]]
 name = "multi"
@@ -13,7 +17,7 @@ file_stores = [ 'usr/local/', 'null']
 [[sheets]]
 name = "sheet1"
 # ...
-file_store="multi"
+file_stores=["multi"]
 ```
 
 ## Properties

@@ -12,7 +12,7 @@ type = "null"
 [[sheets]]
 name = "sheet1"
 # ...
-file_store="null"
+file_stores=["null"]
 ```
 
 ## Properties
