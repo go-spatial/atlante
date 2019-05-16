@@ -42,12 +42,25 @@ func (img ImgStruct) Height() int { return img.image.Bounds().Dy() }
 func (img ImgStruct) Width() int { return img.image.Bounds().Dx() }
 
 // Filename returns the file name of the image
-func (img ImgStruct) Filename() (string, error) {
-	if img.generated {
+func (img *ImgStruct) Filename() (string, error) {
+	if img == nil {
+		return "", nil
+	}
+	// User only cares about filename if img.image is nil
+	if img.generated || img.image == nil {
 		return img.filename, nil
 	}
 	// We need to generate the file and then return the filename
 	return img.generateImage()
+}
+
+// Close closes out any open resources
+func (img ImgStruct) Close() {
+	log.Printf("closing img struct: %b %b", img.generated, img.image == nil)
+	if !img.generated || img.image == nil {
+		return
+	}
+	img.image.Close()
 }
 
 // generateIamge is use to create the image into the filestore
@@ -56,11 +69,15 @@ func (img *ImgStruct) generateImage() (fn string, err error) {
 		return img.filename, nil
 	}
 
+	// If we don't have an image to generator.
+	// User only cares about the filename
 	if img.image == nil {
 		img.generated = true
 		return img.filename, nil
 	}
 
+	// No file store to write out the image.
+	// User only cares about the filename
 	if img.filestore == nil {
 		img.generated = true
 		return img.filename, nil
@@ -92,12 +109,11 @@ func (img *ImgStruct) generateImage() (fn string, err error) {
 	}
 	// Clean up the backing store.
 	img.generated = true
-	img.image.Close()
 	return img.filename, nil
 }
 
 type GridTemplateContext struct {
-	Image         ImgStruct
+	Image         *ImgStruct
 	GroundMeasure float64
 	Grid          grids.Grid
 	DPI           uint
@@ -231,19 +247,23 @@ func GeneratePDF(ctx context.Context, sheet *Sheet, grid *grids.Grid, filenames 
 		return err
 	}
 
-	file, err := multiWriter.Writer(filenames.SVG, true)
-	defer file.Close()
-
 	img := ImgStruct{
 		filename:     filenames.IMG,
 		image:        dstimg,
 		filestore:    multiWriter,
 		intermediate: true,
 	}
+	defer func() {
+		log.Println("closing out image")
+		img.Close()
+	}()
+
+	file, err := multiWriter.Writer(filenames.SVG, true)
+	defer file.Close()
 
 	// Fill out template
 	err = sheet.Execute(file, GridTemplateContext{
-		Image:         img,
+		Image:         &img,
 		DPI:           sheet.DPI,
 		Scale:         sheet.Scale,
 		Zoom:          zoom,
