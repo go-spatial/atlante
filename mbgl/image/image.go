@@ -112,7 +112,7 @@ func (im Image) Close() {
 	if err := im.backingStore.Close(); err != nil {
 		log.Printf("warning failed to close %v : %v", im.backingStore.Name(), err)
 	}
-	log.Printf("removeing backing store %v", im.backingStore.Name())
+	log.Printf("removing backing store %v", im.backingStore.Name())
 	// ignore any errors.
 	if err := os.Remove(im.backingStore.Name()); err != nil {
 		log.Printf("warning failed to remove %v : %v", im.backingStore.Name(), err)

@@ -71,10 +71,10 @@ func (l LogProvider) FileWriter(grp string) (filestore.FileWriter, error) {
 // Writer confirms to the filestore.FileWriter interface
 func (l writer) Writer(filepath string, isIntermediate bool) (io.WriteCloser, error) {
 	if !l.intermediate && isIntermediate {
-		return nil, filestore.ErrSkipWrite
+		return nil, nil
 	}
 	log.Printf("%v would write: %v\n", l.grp, filepath)
-	return nil, filestore.ErrSkipWrite
+	return nil, nil
 }
 
 // make sure we are always adhering to the interface.
