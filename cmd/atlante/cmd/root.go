@@ -132,7 +132,6 @@ func LoadConfig(location string) error {
 		Providers[name] = prv
 	}
 
-	log.Println(conf.FileStores)
 	// filestores
 	for i, fstore := range conf.FileStores {
 		// type is required
@@ -242,6 +241,7 @@ func sheetname() string {
 }
 
 func rootCmdParseArgs(ctx context.Context) (*atlante.GeneratedFiles, error) {
+	defer filestore.Cleanup()
 	switch {
 	case showJob:
 		switch {

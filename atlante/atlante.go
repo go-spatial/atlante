@@ -56,7 +56,6 @@ func (img *ImgStruct) Filename() (string, error) {
 
 // Close closes out any open resources
 func (img ImgStruct) Close() {
-	log.Printf("closing img struct: %b %b", img.generated, img.image == nil)
 	if !img.generated || img.image == nil {
 		return
 	}
@@ -254,7 +253,6 @@ func GeneratePDF(ctx context.Context, sheet *Sheet, grid *grids.Grid, filenames 
 		intermediate: true,
 	}
 	defer func() {
-		log.Println("closing out image")
 		img.Close()
 	}()
 

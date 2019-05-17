@@ -5,6 +5,7 @@ go 1.12
 require (
 	github.com/BurntSushi/toml v0.3.1
 	github.com/arolek/p v0.0.0-20180324024118-a1316a6b2662
+	github.com/aws/aws-sdk-go v1.19.32
 	github.com/cockroachdb/apd v1.1.0 // indirect
 	github.com/dimfeld/httptreemux v5.0.1+incompatible
 	github.com/gdey/errors v0.0.0-20190426172550-8ebd5bc891fb

@@ -122,8 +122,13 @@ func For(providerType string, config Config) (Provider, error) {
 func Cleanup() {
 	providerLock.Lock()
 	for _, p := range providers {
+		if p.cleanup == nil {
+			continue
+		}
 		p.cleanup()
 	}
 	providers = make(map[string]funcs)
 	providerLock.Unlock()
+	// call our global cleanup
+	cleanup()
 }
