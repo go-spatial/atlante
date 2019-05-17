@@ -36,3 +36,7 @@ The file supports the following properties:
 * `end_point` (string) : [optional] ("") the aws end point
 * `aws_access_key_id` (string) [optional] aws key
 * `aws_secret_access_key` (string) [optional] aws secret key
+
+## Credential chain
+
+If the `aws_access_key_id` and `aws_secret_access_key` are not set, then the [credential provider chain](http://docs.aws.amazon.com/sdk-for-go/v1/developer-guide/configuring-sdk.html) will be used. The provider chain supports multiple methods for passing credentials, one of which is setting environment variables.
