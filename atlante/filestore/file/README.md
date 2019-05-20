@@ -3,7 +3,7 @@
 Use to copy artificates to a different location on the file system.
 
 ```toml
-[[filestores]]
+[[file_stores]]
 name = "usr/dir"
 type = "file"
 base_path="/usr/dir"

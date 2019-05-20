@@ -7,7 +7,7 @@ for internal use only. Sheets can take multiple file stores
 , and that should be used instead. 
 
 ```toml
-[[filestores]]
+[[file_stores]]
 name = "multi"
 type = "multi"
 file_stores = [ 'usr/local/', 'null']
