@@ -226,7 +226,7 @@ func LoadConfig(location string) error {
 func generatePDFForJob(ctx context.Context, jobstr string) (*atlante.GeneratedFiles, error) {
 	job, err := atlante.Base64UnmarshalJob(jobstr)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("%v : jobstr '%v' ", err, jobstr)
 	}
 	return a.GeneratePDFJob(ctx, *job, "")
 }
@@ -249,7 +249,7 @@ func rootCmdParseArgs(ctx context.Context) (*atlante.GeneratedFiles, error) {
 			// We need to print out what's in the job.
 			jb, err := atlante.Base64UnmarshalJob(job)
 			if err != nil {
-				return nil, err
+				return nil, fmt.Errorf("%v : jobstr '%v' ", err, job)
 			}
 			fmt.Fprintln(os.Stdout, proto.MarshalTextString(jb))
 		default:
@@ -283,6 +283,7 @@ func rootCmdRun(cmd *cobra.Command, args []string) {
 	err := LoadConfig(configFile)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error loading config: %v\n", err)
+		cmd.Usage()
 		os.Exit(1)
 	}
 	ctx, cancel := context.WithCancel(context.Background())
@@ -292,6 +293,7 @@ func rootCmdRun(cmd *cobra.Command, args []string) {
 	if workDir != "" {
 		if err := os.Chdir(workDir); err != nil {
 			fmt.Fprintf(os.Stderr, "error changing to working dir (%v), aborting", workDir)
+			cmd.Usage()
 			os.Exit(3)
 		}
 	}
@@ -310,6 +312,7 @@ func rootCmdRun(cmd *cobra.Command, args []string) {
 		default:
 			fmt.Fprintf(os.Stderr, "error generating pdf\n\t%v\n", err)
 		}
+		cmd.Usage()
 		os.Exit(2)
 	}
 

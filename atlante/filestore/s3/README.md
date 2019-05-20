@@ -3,7 +3,7 @@
 Use to copy artificates to s3 buckets
 
 ```toml
-[[filestores]]
+[[file_stores]]
 name = "s3"
 type = "s3"
 base_path="/"

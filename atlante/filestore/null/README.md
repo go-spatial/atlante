@@ -3,7 +3,7 @@
 Use to throw away the file data.
 
 ```toml
-[[filestores]]
+[[file_stores]]
 name = "null"
 type = "null"
 
