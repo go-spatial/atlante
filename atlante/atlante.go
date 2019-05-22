@@ -180,6 +180,7 @@ func GeneratePDF(ctx context.Context, sheet *Sheet, grid *grids.Grid, filenames 
 	if grid == nil {
 		return ErrNilGrid
 	}
+
 	// TODO(gdey): use MdgID once we move to partial templates system
 	// grp := grid.MdgID.String(), an empty group is current directory
 	grp := ""
