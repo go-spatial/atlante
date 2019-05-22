@@ -181,8 +181,6 @@ func GeneratePDF(ctx context.Context, sheet *Sheet, grid *grids.Grid, filenames 
 		return ErrNilGrid
 	}
 
-	fmt.Fprintf(os.Stderr, "GeneratePDF DEBUG:\n\tSheet:\t%#+v\n\tGrid:\t%#+v\n\tFilenames:\t%#+v\n", sheet, grid, filenames)
-
 	// TODO(gdey): use MdgID once we move to partial templates system
 	// grp := grid.MdgID.String(), an empty group is current directory
 	grp := ""
@@ -248,7 +246,6 @@ func GeneratePDF(ctx context.Context, sheet *Sheet, grid *grids.Grid, filenames 
 	if err != nil {
 		return err
 	}
-	fmt.Fprintf(os.Stderr, "Img DEBUG:\n\timg:\t%#+v\n", dstimg)
 
 	img := ImgStruct{
 		filename:     filenames.IMG,
@@ -313,7 +310,6 @@ func GeneratePDF(ctx context.Context, sheet *Sheet, grid *grids.Grid, filenames 
 		}
 		io.Copy(wrts, pdffile)
 	}
-	log.Println("Returning error: ", err)
 	return err
 }
 
