@@ -48,6 +48,8 @@ message Job {
 
     LatLngDMS sw_dms = 14;
     LatLngDMS ne_dms = 15;
+
+    string series = 16;
   }
 
   string sheet_name = 1;

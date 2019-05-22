@@ -44,11 +44,11 @@ func toJobGrid(grid *grids.Grid) *Job_Grid {
 		},
 		Sw: &Job_Grid_LatLng{
 			Lat: float32(grid.SWLat),
-			Lng: float32(grid.SWLat),
+			Lng: float32(grid.SWLng),
 		},
 		Ne: &Job_Grid_LatLng{
 			Lat: float32(grid.NELat),
-			Lng: float32(grid.NELat),
+			Lng: float32(grid.NELng),
 		},
 		Len: &Job_Grid_LatLng{
 			Lat: float32(grid.LatLen),
@@ -58,6 +58,7 @@ func toJobGrid(grid *grids.Grid) *Job_Grid {
 		Country: grid.Country,
 		City:    grid.City,
 		Sheet:   grid.Sheet,
+		Series:  grid.Series,
 
 		MetaData:    grid.Metadata,
 		PublishedAt: ts,
@@ -114,7 +115,8 @@ func (j *Job) GridsGrid() *grids.Grid {
 		LatLen: float64(g.GetLen().GetLat()),
 		LngLen: float64(g.GetLen().GetLng()),
 
-		Sheet: g.GetSheet(),
+		Sheet:  g.GetSheet(),
+		Series: g.GetSeries(),
 
 		Metadata:        g.GetMetaData(),
 		PublicationDate: publishedAt,
