@@ -1,4 +1,4 @@
-FROM centos:latest AS build
+FROM centos@sha256:8d487d68857f5bc9595793279b33d082b03713341ddec91054382641d14db861 AS build
 
 USER root
 
@@ -35,7 +35,6 @@ ENV PATH="${PATH}:/usr/local/cmake/bin"
 
 RUN yum install -y cairo-devel librsvg2-devel
 
-# deps for building rsvg
 RUN yum install -y gdk-pixbuf2-devel \
 	pango-devel \
 	libxml2-devel \
@@ -44,7 +43,9 @@ RUN yum install -y gdk-pixbuf2-devel \
 	libjpeg-turbo-devel \
 	gtk3-devel
 
-RUN yum install -y sqlite-devel.x86_64  mesa-libOSMesa-devel.x86_64  libcurl-devel.x86_64
+RUN yum install -y sqlite-devel.x86_64 \
+	mesa-libOSMesa-devel.x86_64 \
+	libcurl-devel.x86_64
 
 # copy source code to container
 COPY . $GOPATH/src/github.com/go-spatial/maptoolkit/
@@ -53,12 +54,16 @@ COPY . $GOPATH/src/github.com/go-spatial/maptoolkit/
 WORKDIR $GOPATH/src/github.com/go-spatial/maptoolkit/cmd/atlante/
 RUN source ~/.bash_profile && go install
 
-FROM centos:latest
+# build final container without build dependencies
+FROM centos@sha256:8d487d68857f5bc9595793279b33d082b03713341ddec91054382641d14db861
 
 USER root
 
 RUN yum -y update
-RUN yum install -y mesa-libOSMesa.x86_64 libpng libjpeg-turbo librsvg2
+RUN yum install -y mesa-libOSMesa.x86_64 \
+	libpng \
+	libjpeg-turbo \
+	librsvg2
 
 # copy binary from build image
 COPY --from=build /go/bin/atlante /usr/bin/atlante
