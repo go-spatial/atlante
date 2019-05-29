@@ -15,10 +15,13 @@ import (
 	"github.com/jackc/pgx"
 )
 
+// Name is the name of the provider type
 const Name = "postgresql"
 
+// AppName is shown by the pqclient
 var AppName = "atlante"
 
+// Provider implements the Grid.Provider interface
 type Provider struct {
 	config           pgx.ConnPoolConfig
 	pool             *pgx.ConnPool
@@ -28,14 +31,22 @@ type Provider struct {
 }
 
 const (
-	DefaultSRID           = tegola.WebMercator
-	DefaultPort           = 5432
-	DefaultMaxConn        = 100
-	DefaultSSLMode        = "disable"
-	DefaultSSLKey         = ""
-	DefaultSSLCert        = ""
-	DefaultEditDateFromat = time.RFC3339
-	DefaultEditBy         = ""
+	// DefaultSRID is the assumed srid of data unless specified
+	DefaultSRID = tegola.WebMercator
+	// DefaultPort is the default port for postgis
+	DefaultPort = 5432
+	// DefaultMaxConn is the max number of connections to attempt
+	DefaultMaxConn = 100
+	// DefaultSSLMode by default ssl is disabled
+	DefaultSSLMode = "disable"
+	// DefaultSSLKey by default is empty
+	DefaultSSLKey = ""
+	// DefaultSSLCert by default is empty
+	DefaultSSLCert = ""
+	// DefaultEditDateFormat the time format to expect
+	DefaultEditDateFormat = time.RFC3339
+	// DefaultEditBy who edited the content if not provided
+	DefaultEditBy = ""
 )
 
 const (
@@ -126,7 +137,7 @@ func NewGridProvider(config grids.ProviderConfig) (grids.Provider, error) {
 		return nil, err
 	}
 
-	editedDateFormat := DefaultEditDateFromat
+	editedDateFormat := DefaultEditDateFormat
 	if editedDateFormat, err = config.String(ConfigKeyEditBy, &editedDateFormat); err != nil {
 		return nil, err
 	}
@@ -169,6 +180,7 @@ func NewGridProvider(config grids.ProviderConfig) (grids.Provider, error) {
 	return &p, nil
 }
 
+// ConfigTLS is used to configure TLS
 // derived from github.com/jackc/pgx configTLS (https://github.com/jackc/pgx/blob/master/conn.go)
 func ConfigTLS(sslMode string, sslKey string, sslCert string, sslRootCert string, cc *pgx.ConnConfig) error {
 

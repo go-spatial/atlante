@@ -5,8 +5,6 @@ import (
 	"os"
 
 	"github.com/go-spatial/maptoolkit/cmd/atlante/cmd"
-
-	_ "github.com/go-spatial/maptoolkit/atlante/grids/postgresql"
 )
 
 func main() {

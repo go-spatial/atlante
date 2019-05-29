@@ -1,4 +1,5 @@
-//go:generate protoc "--go_out=." "job.proto"
+//go:generate protoc "--go_out=paths=source_relative:." "job.proto"
+
 package atlante
 
 import (
