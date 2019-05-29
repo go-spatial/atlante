@@ -1,5 +1,6 @@
 git:
   depth: 3
+
 env:
   global:
   - DOCKERHUB_ORG="gospatial"
@@ -8,10 +9,18 @@ env:
   - secure: biokdQm0a7hUdFg8tCwWDbZl+Gv+WglgpZyFEmmZy3UfARij/zBYlha4yCy1NiIYQHABzmhEiISQJDD2pykQQ32Vrynt2RJ+g1yvqwl67vzxTLTsXjBfyfCH/FXAUf9DAdk0QXKrFznpvEoTyBbgsGIRbrID8uIaxFyXjtSy7pK5Z9eGmfBmhTkS8MG6lnNzDwQcJ0kEjZCxfdWqdS6xeJA/WbxtxEaWWYsUfnik1yjGelVF6uRM5VJST3DW7zsMg1c7ekShxxcGGry/N3iPk9wIVeGL6fpe4WqS72P8K8UXzxUGEolpGFf+WDRnWOVEcqauyh2GV9+xGwccL18vMXs0FujC7fWKPpdWVb1IFGibKXglowv7WAUdJfowP0+fNB9Oq/SGuxjClYgFDmAL2yph9Jor3f37nxu9SLb4FFOiUyoTTlVB135NpaqSRpa0/qJjRzPxwE41PJ4ZZR5kxet9WF18MdkEq2ohUakb7HHeXpzDNDL3Zv7TFfgKtF5sgOKdmHHrahuvR2W4VNYaXMy6dMxkj2v9QpXPJO+EtQp5DioI7evbyBZnDIcpGAJbNdBewt4i6He2DJPGhHKZo9vnW3ntkwlWH3A2k/yxtWZxOEclt0qEA8rTKO+gP/YmO0sY7GfSwwIVTQK6BqhQeq/UMHp0HIuDJ/8kIwbokHI=
   # DOCKER_PASSWORD
   - secure: E9Dm2qF36jvCiqTZm5Bi2Z7J0n/FC8+JMUpzazzPrAfTCRjhExqwu9JMT1DN+sZOjyS3SCxA02zrudhMVMiOgOI77j3pGc86GrUnN+esQUunq5SJEPcmlSn3kOqwA7/90gCayAtEkXAyKnutb21vPUFLVZ4U/5w6deLDDbml5HVlaxTM4LrpSiQ/wlGCS5WzAxItrGYSFuSrqaXUgav/IdRPPcS1yni5h9NdG1BxZ89+ltje6Lf3LqbuCPdS1qkPr9JDj2QnNRDcjFLrn/TBVSK4/f/wZeZrhvBlJNiiqTwS3hfkucBHxNg/Nspw5JkMuigOKji5efPkumGv6E7b27dhzB6wF8YaG8TWefDkAenLwdI0ic6hQJEoQJcHdRCtDBSnPykTn7WCC4bjKKVC30VHoEz2AxNCasXmV/VNXIJMFwqyhm4kpSlVgLFJ/Y5InkPHPsfi02XQpQfP35lGWaKm1Ry2X2FluGEpne7us4e0h0C3MumX64DxW6FpnZTybh5dRdb4XZk1qKG+Km/VqTbxu+na+Sj97UARVlpX+Zxln3zgccdyRYsN5Dqijx+QmTvhaUE1qnbh4/JZYqW7wt9B1e7daRn/27Vq9V8Y9ZjFJFcwCUGKs2JtAz/5fVEx8WqnpR5WGdJ2djaU+3ZH+DKh4gfb2vcACcd8CT1wJdI=
+
+stages:
+  - name: script
+    # require the branch name to be master (note for PRs this is the base branch name)
+    if: branch = master
+
 services:
 - docker
+
 before_install:
 - git lfs pull
+
 script:
 - docker build -f docker/Dockerfile -t ${DOCKERHUB_ORG}/${DOCKERHUB_REPO} .
 - echo "$DOCKER_PASSWORD" | docker login --username "$DOCKER_USER" --password-stdin
