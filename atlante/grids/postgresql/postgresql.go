@@ -237,26 +237,6 @@ func ConfigTLS(sslMode string, sslKey string, sslCert string, sslRootCert string
 	return nil
 }
 
-func (p *Provider) newEditInfo(by, date sql.NullString) (*grids.EditInfo, error) {
-	var err error
-	strBy := p.editedBy
-	if by.Valid {
-		strBy = by.String
-	}
-	ei := grids.EditInfo{
-		By: strBy,
-	}
-	// Try and parse the date
-	if date.Valid {
-		ei.Date, err = time.Parse(p.editedDateFormat, date.String)
-		if err != nil {
-			log.Printf("Got an error trying to parse %v -- %v", p.editedDateFormat, date)
-			return nil, err
-		}
-	}
-	return &ei, nil
-}
-
 func (p *Provider) GridForLatLng(lat, lng float64, srid uint) (*grids.Grid, error) {
 	const selectQuery = `
 SELECT
@@ -298,7 +278,8 @@ LIMIT 1;
 
 	return p.gridFromRow(row)
 }
-func (p *Provider) GridForMDGID(mdgid grids.MDGID) (*grids.Grid, error) {
+
+func (p *Provider) GridForMDGID(mdgid *grids.MDGID) (*grids.Grid, error) {
 	const selectQuery = `
 SELECT
   mdg_id,
@@ -326,7 +307,7 @@ WHERE
 LIMIT 1;
 `
 
-	row := p.pool.QueryRow(selectQuery, mdgid.ID)
+	row := p.pool.QueryRow(selectQuery, mdgid.Id)
 
 	return p.gridFromRow(row)
 }
@@ -349,9 +330,9 @@ func (p *Provider) gridFromRow(row *pgx.Row) (*grids.Grid, error) {
 		nelat sql.NullFloat64
 		nelng sql.NullFloat64
 
-		country   sql.NullString
-		edited_by sql.NullString
-		edited_at sql.NullString
+		country  sql.NullString
+		editedBy sql.NullString
+		editedAt sql.NullString
 	)
 
 	err := row.Scan(
@@ -368,43 +349,53 @@ func (p *Provider) gridFromRow(row *pgx.Row) (*grids.Grid, error) {
 		&nelat,
 		&nelng,
 		&country,
-		&edited_by,
-		&edited_at,
+		&editedBy,
+		&editedAt,
 	)
 	if err != nil {
 		return nil, err
 	}
 
-	latlen, lnglen := grids.CalculateSecLengths(nelng.Float64)
-
-	ei, err := p.newEditInfo(edited_by, edited_at)
+	byStr, edAt, err := p.newEditInfo(editedBy, editedAt)
 	if err != nil {
 		return nil, err
 	}
 
-	return &grids.Grid{
-		MdgID:  grids.NewMDGID(mdgid.String),
-		Sheet:  sheet.String,
-		Series: series.String,
-		NRN:    nrn.String,
+	city := ""
 
-		SWLatDMS: swlatdms.String,
-		SWLngDMS: swlngdms.String,
-		NELatDMS: nelatdms.String,
-		NELngDMS: nelngdms.String,
+	return grids.NewGrid(
+		mdgid.String,                             // mdgid
+		[2]float64{swlat.Float64, swlng.Float64}, // sw
+		[2]float64{nelat.Float64, nelng.Float64}, // ne
+		country.String,                           // country
+		city,                                     // city
+		nil,                                      // utminfo
+		grids.NewEditInfo(byStr, edAt),           // edited info
+		time.Now(),                               // publishedAt
+		nrn.String,                               // nrn
+		sheet.String,                             // sheet
+		series.String,                            // series
+		[2]string{swlatdms.String, swlngdms.String}, // sw dms
+		[2]string{nelatdms.String, nelngdms.String}, // ne dms
+		nil, // metadata
+	), nil
+}
 
-		SWLat: swlat.Float64,
-		SWLng: swlng.Float64,
-		NELat: nelat.Float64,
-		NELng: nelng.Float64,
+func (p *Provider) newEditInfo(by, date sql.NullString) (strBy string, edtAt time.Time, err error) {
 
-		LatLen: latlen,
-		LngLen: lnglen,
+	strBy = p.editedBy
+	if by.Valid {
+		strBy = by.String
+	}
 
-		PublicationDate: time.Now(),
-		Country:         country.String,
-		Edited:          ei,
-	}, nil
+	// Try and parse the date
+	if date.Valid {
+		edtAt, err = time.Parse(p.editedDateFormat, date.String)
+		if err != nil {
+			return strBy, edtAt, err
+		}
+	}
+	return strBy, edtAt, nil
 }
 
 // Close will close the provider's database connection
