@@ -25,7 +25,7 @@ message UTMInfo {
   HEMIType hemi = 2; // Format for this should be N/S
 }
 
-message Grid {
+message Cell {
   message LatLng {
     float lat = 1;
     float lng = 2;

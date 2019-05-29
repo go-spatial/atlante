@@ -6,7 +6,6 @@ import (
 	"database/sql"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"sync"
 	"time"
 
@@ -50,21 +49,35 @@ const (
 )
 
 const (
-	ConfigKeyHost           = "host"
-	ConfigKeyPort           = "port"
-	ConfigKeyDB             = "database"
-	ConfigKeyUser           = "user"
-	ConfigKeyPassword       = "password"
-	ConfigKeySSLMode        = "ssl_mode"
-	ConfigKeySSLKey         = "ssl_key"
-	ConfigKeySSLCert        = "ssl_cert"
-	ConfigKeySSLRootCert    = "ssl_root_cert"
-	ConfigKeyMaxConn        = "max_connections"
-	ConfigKeySRID           = "srid"
+	// ConfigKeyHost is the config key for the postgres host
+	ConfigKeyHost = "host"
+	// ConfigKeyPort is the config key for the postgres port
+	ConfigKeyPort = "port"
+	// ConfigKeyDB is the config key for the postgres db
+	ConfigKeyDB = "database"
+	// ConfigKeyUser is the config key for the postgres user
+	ConfigKeyUser = "user"
+	// ConfigKeyPassword is the config key for the postgres user's password
+	ConfigKeyPassword = "password"
+	// ConfigKeySSLMode is the config key for the postgres SSL
+	ConfigKeySSLMode = "ssl_mode"
+	// ConfigKeySSLKey is the config key for the postgres SSL
+	ConfigKeySSLKey = "ssl_key"
+	// ConfigKeySSLCert is the config key for the postgres SSL
+	ConfigKeySSLCert = "ssl_cert"
+	// ConfigKeySSLRootCert is the config key for the postgres SSL
+	ConfigKeySSLRootCert = "ssl_root_cert"
+	// ConfigKeyMaxConn is the max number of connections to keep in the pool
+	ConfigKeyMaxConn = "max_connections"
+	// ConfigKeySRID is the srid of the data
+	ConfigKeySRID = "srid"
+	// ConfigKeyEditDateFormat is the format to use for dates
 	ConfigKeyEditDateFormat = "edit_date_format"
-	ConfigKeyEditBy         = "edit_by"
+	// ConfigKeyEditBy who the default user for edit_by should be
+	ConfigKeyEditBy = "edit_by"
 )
 
+// ErrInvalidSSLMode is returned when something is wrong with SSL configuration
 type ErrInvalidSSLMode string
 
 func (e ErrInvalidSSLMode) Error() string {
@@ -75,6 +88,7 @@ func init() {
 	grids.Register(Name, NewGridProvider, Cleanup)
 }
 
+// NewGridProvider returns a grid provider based on the postgis database
 func NewGridProvider(config grids.ProviderConfig) (grids.Provider, error) {
 	host, err := config.String(ConfigKeyHost, nil)
 	if err != nil {
@@ -237,7 +251,8 @@ func ConfigTLS(sslMode string, sslKey string, sslCert string, sslRootCert string
 	return nil
 }
 
-func (p *Provider) GridForLatLng(lat, lng float64, srid uint) (*grids.Grid, error) {
+// CellForLatLng returns a grid cell object that matches the cloest grid cell.
+func (p *Provider) CellForLatLng(lat, lng float64, srid uint) (*grids.Cell, error) {
 	const selectQuery = `
 SELECT
   mdg_id,
@@ -276,10 +291,11 @@ LIMIT 1;
 
 	row := p.pool.QueryRow(selectQuery, lat, lng, srid)
 
-	return p.gridFromRow(row)
+	return p.cellFromRow(row)
 }
 
-func (p *Provider) GridForMDGID(mdgid *grids.MDGID) (*grids.Grid, error) {
+// CellForMDGID returns an grid cell object for the given mdgid
+func (p *Provider) CellForMDGID(mdgid *grids.MDGID) (*grids.Cell, error) {
 	const selectQuery = `
 SELECT
   mdg_id,
@@ -309,11 +325,11 @@ LIMIT 1;
 
 	row := p.pool.QueryRow(selectQuery, mdgid.Id)
 
-	return p.gridFromRow(row)
+	return p.cellFromRow(row)
 }
 
-// gridFromRow parses grid attributes into a girds.Grid struct
-func (p *Provider) gridFromRow(row *pgx.Row) (*grids.Grid, error) {
+// cellFromRow parses grid attributes into a girds.Cell struct
+func (p *Provider) cellFromRow(row *pgx.Row) (*grids.Cell, error) {
 	var (
 		mdgid  sql.NullString
 		sheet  sql.NullString
@@ -363,7 +379,7 @@ func (p *Provider) gridFromRow(row *pgx.Row) (*grids.Grid, error) {
 
 	city := ""
 
-	return grids.NewGrid(
+	return grids.NewCell(
 		mdgid.String,                             // mdgid
 		[2]float64{swlat.Float64, swlng.Float64}, // sw
 		[2]float64{nelat.Float64, nelng.Float64}, // ne

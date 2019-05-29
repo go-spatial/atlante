@@ -1,10 +1,10 @@
 syntax = "proto3";
 package atlante;
 
-import "grids/grid.proto";
+import "grids/cell.proto";
 
 message Job {
   string sheet_name = 1;
-  atlante.grids.Grid grid = 2;
+  atlante.grids.Cell cell = 2;
   map<string, string> meta_data = 3;
 }

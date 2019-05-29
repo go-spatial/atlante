@@ -77,7 +77,7 @@ func rootCmdParseArgs(ctx context.Context, a *atlante.Atlante) (*atlante.Generat
 			if err != nil {
 				return nil, err
 			}
-			grid, err := sheet.GridForMDGID(mdgID)
+			grid, err := sheet.CellForMDGID(mdgID)
 			if err != nil {
 				return nil, err
 			}

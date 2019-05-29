@@ -15,10 +15,10 @@ type Notifier interface {
 }
 
 // NewJob returns a new job object for the given sheet, grid and metadata
-func NewJob(sheet string, grid *grids.Grid, metadata map[string]string) *Job {
+func NewJob(sheet string, cell *grids.Cell, metadata map[string]string) *Job {
 	return &Job{
 		SheetName: sheet,
-		Grid:      grid,
+		Cell:      cell,
 		MetaData:  metadata,
 	}
 }

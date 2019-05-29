@@ -1,4 +1,4 @@
-//go:generate protoc "--go_out=paths=source_relative:." "grid.proto"
+//go:generate protoc "--go_out=paths=source_relative:." "cell.proto"
 
 package grids
 
@@ -20,8 +20,8 @@ import (
 // Provider returns a grid object that can be used to generate
 // a Map Grid
 type Provider interface {
-	GridForLatLng(lat, lng float64, srid uint) (*Grid, error)
-	GridForMDGID(mgdID *MDGID) (*Grid, error)
+	CellForLatLng(lat, lng float64, srid uint) (*Cell, error)
+	CellForMDGID(mgdID *MDGID) (*Cell, error)
 }
 
 // AsString provides a human readable version of the MDGID
@@ -72,8 +72,8 @@ func NewUTM(zone uint8, hemi HEMIType) *UTMInfo {
 	}
 }
 
-// NewGrid returns a new grid object
-func NewGrid(
+// NewCell returns a new cell object
+func NewCell(
 	mdgid string,
 	sw [2]float64,
 	ne [2]float64,
@@ -88,14 +88,14 @@ func NewGrid(
 	dmsSW [2]string,
 	dmsNE [2]string,
 	metadata map[string]string,
-) *Grid {
+) *Cell {
 
 	latlen, lnglen := CalculateSecLengths(ne[1])
 	// If there is an error we will return the zero value for time.
 	pubat, _ := ptypes.TimestampProto(publishedAt)
 
-	swlatlng := &Grid_LatLng{Lat: float32(sw[0]), Lng: float32(sw[1])}
-	nelatlng := &Grid_LatLng{Lat: float32(ne[0]), Lng: float32(ne[1])}
+	swlatlng := &Cell_LatLng{Lat: float32(sw[0]), Lng: float32(sw[1])}
+	nelatlng := &Cell_LatLng{Lat: float32(ne[0]), Lng: float32(ne[1])}
 
 	if utm == nil {
 		utm = nelatlng.ToUTMInfo()
@@ -111,13 +111,13 @@ func NewGrid(
 		dmsNE[0], dmsNE[1] = dms[0].String(), dms[1].String()
 	}
 
-	return &Grid{
+	return &Cell{
 		Mdgid: NewMDGID(mdgid),
 		Sw:    swlatlng,
 		Ne:    nelatlng,
-		Len:   &Grid_LatLng{Lat: float32(latlen), Lng: float32(lnglen)},
-		NeDms: &Grid_LatLngDMS{Lat: dmsNE[0], Lng: dmsNE[1]},
-		SwDms: &Grid_LatLngDMS{Lat: dmsSW[0], Lng: dmsSW[1]},
+		Len:   &Cell_LatLng{Lat: float32(latlen), Lng: float32(lnglen)},
+		NeDms: &Cell_LatLngDMS{Lat: dmsNE[0], Lng: dmsNE[1]},
+		SwDms: &Cell_LatLngDMS{Lat: dmsSW[0], Lng: dmsSW[1]},
 
 		Nrn:    nrn,
 		Sheet:  sheet,
@@ -133,33 +133,57 @@ func NewGrid(
 	}
 }
 
-// PublicationDate returns the date the Grid was published.
-func (g *Grid) PublicationDate() (time.Time, error) {
-	return ptypes.Timestamp(g.PublishedAt)
+// Init will fill out fields with default values based on SW and NE values.
+func (c *Cell) Init() {
+	ne := c.Ne
+
+	if c.Utm == nil && ne != nil {
+		c.Utm = ne.ToUTMInfo()
+	}
+	if c.NeDms == nil && ne != nil {
+		dms := ne.ToDMS()
+		c.NeDms = &Cell_LatLngDMS{Lat: dms[0].String(), Lng: dms[1].String()}
+	}
+
+	sw := c.Sw
+	// Need to initialize the Len based on sw.
+	if c.Len == nil && sw != nil {
+		latlen, lnglen := CalculateSecLengths(float64(sw.Lat))
+		c.Len = &Cell_LatLng{Lat: float32(latlen), Lng: float32(lnglen)}
+	}
+	if c.SwDms == nil && sw != nil {
+		dms := sw.ToDMS()
+		c.SwDms = &Cell_LatLngDMS{Lat: dms[0].String(), Lng: dms[1].String()}
+	}
+}
+
+// PublicationDate returns the date the cell was published.
+func (c *Cell) PublicationDate() (time.Time, error) {
+	return ptypes.Timestamp(c.PublishedAt)
 }
 
 // ReferenceNumber is the MDG id reference number, including a
 // sub-part number if there is one.
-func (g *Grid) ReferenceNumber() string {
-	if g.Mdgid.Part == 0 {
-		return g.Mdgid.Id
+func (c *Cell) ReferenceNumber() string {
+	if c.Mdgid.Part == 0 {
+		return c.Mdgid.Id
 	}
-	return fmt.Sprintf("%s-%v", g.Mdgid.Id, g.Mdgid.Part)
+	return fmt.Sprintf("%s-%v", c.Mdgid.Id, c.Mdgid.Part)
 }
 
 // SheetNumber is the sheet number for the grid, including a
 // sub-part number if there is one.
-func (g *Grid) SheetNumber() string {
-	if g.Mdgid.Part == 0 {
-		return g.Sheet
+func (c *Cell) SheetNumber() string {
+	if c.Mdgid.Part == 0 {
+		return c.Sheet
 	}
-	return fmt.Sprintf("%s-%v", g.Sheet, g.Mdgid.Part)
+	return fmt.Sprintf("%s-%v", c.Sheet, c.Mdgid.Part)
 }
 
 // Zone returns the string representation of a zone i.e. 01-60, if the zone is out of that range
 // we will return "01"
-func (g *Grid) Zone() string {
-	utm := g.GetUtm()
+func (c *Cell) Zone() string {
+	utm := c.GetUtm()
 	if utm == nil {
 		return "01"
 	}
@@ -171,91 +195,91 @@ func (g *Grid) Zone() string {
 }
 
 // Hemi return the hemisphere
-func (g *Grid) Hemi() string {
-	if u := g.GetUtm(); u == nil || u.GetHemi() != HEMIType_SOUTH {
+func (c *Cell) Hemi() string {
+	if u := c.GetUtm(); u == nil || u.GetHemi() != HEMIType_SOUTH {
 		return "N"
 	}
 	return "S"
 }
 
 // NELatDMS returns the DMS version of the NE lat
-func (g *Grid) NELatDMS() (string, error) {
-	dms := g.GetNeDms().GetLat()
+func (c *Cell) NELatDMS() (string, error) {
+	dms := c.GetNeDms().GetLat()
 	if dms == "" {
-		dms = g.GetNe().ToDMS()[0].String()
+		dms = c.GetNe().ToDMS()[0].String()
 	}
 	return dms, nil
 }
 
 // NELngDMS returns the DMS version of the NE lng
-func (g *Grid) NELngDMS() (string, error) {
-	dms := g.GetNeDms().GetLng()
+func (c *Cell) NELngDMS() (string, error) {
+	dms := c.GetNeDms().GetLng()
 	if dms == "" {
-		dms = g.GetNe().ToDMS()[1].String()
+		dms = c.GetNe().ToDMS()[1].String()
 	}
 	return dms, nil
 }
 
 // SWLatDMS returns the DMS version of the SW lat
-func (g *Grid) SWLatDMS() (string, error) {
-	dms := g.GetSwDms().GetLat()
+func (c *Cell) SWLatDMS() (string, error) {
+	dms := c.GetSwDms().GetLat()
 	if dms == "" {
-		dms = g.GetSw().ToDMS()[0].String()
+		dms = c.GetSw().ToDMS()[0].String()
 	}
 	return dms, nil
 }
 
 // SWLngDMS returns the DMS version of the NE lng
-func (g *Grid) SWLngDMS() (string, error) {
-	dms := g.GetSwDms().GetLng()
+func (c *Cell) SWLngDMS() (string, error) {
+	dms := c.GetSwDms().GetLng()
 	if dms == "" {
-		dms = g.GetSw().ToDMS()[1].String()
+		dms = c.GetSw().ToDMS()[1].String()
 	}
 	return dms, nil
 }
 
 // LatLen will return the lat arc length.
-func (g *Grid) LatLen() float64 {
-	return float64(g.GetLen().GetLat())
+func (c *Cell) LatLen() float64 {
+	return float64(c.GetLen().GetLat())
 }
 
 // LngLen will return the lat arc length.
-func (g *Grid) LngLen() float64 {
-	return float64(g.GetLen().GetLng())
+func (c *Cell) LngLen() float64 {
+	return float64(c.GetLen().GetLng())
 }
 
 // NE will return the North East coordinate
-func (g *Grid) NE() [2]float64 {
-	ne := g.GetNe()
+func (c *Cell) NE() [2]float64 {
+	ne := c.GetNe()
 	return [2]float64{float64(ne.GetLng()), float64(ne.GetLat())}
 }
 
 // SW will return the South West coordinate
-func (g *Grid) SW() [2]float64 {
-	sw := g.GetSw()
+func (c *Cell) SW() [2]float64 {
+	sw := c.GetSw()
 	return [2]float64{float64(sw.GetLng()), float64(sw.GetLat())}
 }
 
-// Hull returns the hull of the Grid
-func (g *Grid) Hull() *geom.Extent { return spherical.Hull(g.NE(), g.SW()) }
+// Hull returns the hull of the Cell
+func (c *Cell) Hull() *geom.Extent { return spherical.Hull(c.NE(), c.SW()) }
 
 // CenterPtForZoom returns the center point of the bounds for the given zoom value
-func (g *Grid) CenterPtForZoom(zoom float64) [2]float64 {
-	return bounds.Center(g.Hull(), zoom)
+func (c *Cell) CenterPtForZoom(zoom float64) [2]float64 {
+	return bounds.Center(c.Hull(), zoom)
 }
 
 // WidthHeightForZoom return the width and height in pixels of the bounds for the given zoom
-func (g *Grid) WidthHeightForZoom(zoom float64) (width, height float64) {
-	return bounds.WidthHeightTile(g.Hull(), zoom, 4096/8)
+func (c *Cell) WidthHeightForZoom(zoom float64) (width, height float64) {
+	return bounds.WidthHeightTile(c.Hull(), zoom, 4096/8)
 }
 
 // ZoomForScaleDPI returns the zoom value tto use for the given scale and dpi values.
-func (g *Grid) ZoomForScaleDPI(scale uint, dpi uint) float64 {
-	return resolution.Zoom(resolution.MercatorEarthCircumference, scale, dpi, g.SW()[1])
+func (c *Cell) ZoomForScaleDPI(scale uint, dpi uint) float64 {
+	return resolution.Zoom(resolution.MercatorEarthCircumference, scale, dpi, c.SW()[1])
 }
 
 // ToUTMInfo will return the utm info values based on the lat.
-func (latlng *Grid_LatLng) ToUTMInfo() *UTMInfo {
+func (latlng *Cell_LatLng) ToUTMInfo() *UTMInfo {
 	lat, lng := float64(latlng.GetLat()), float64(latlng.GetLng())
 	z := zoneFromLatLng(lat, lng)
 	h := HEMIType_NORTH
@@ -269,7 +293,7 @@ func (latlng *Grid_LatLng) ToUTMInfo() *UTMInfo {
 }
 
 // ToDMS returns the DMS (degree minute section, hemisphere) version of the encoded lat lng
-func (latlng *Grid_LatLng) ToDMS() [2]DMS {
+func (latlng *Cell_LatLng) ToDMS() [2]DMS {
 	return ToDMS(float64(latlng.GetLat()), float64(latlng.GetLng()))
 }
 
