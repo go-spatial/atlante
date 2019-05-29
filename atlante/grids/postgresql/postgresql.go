@@ -6,7 +6,6 @@ import (
 	"database/sql"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"sync"
 	"time"
 
@@ -15,10 +14,13 @@ import (
 	"github.com/jackc/pgx"
 )
 
+// Name is the name of the provider type
 const Name = "postgresql"
 
+// AppName is shown by the pqclient
 var AppName = "atlante"
 
+// Provider implements the Grid.Provider interface
 type Provider struct {
 	config           pgx.ConnPoolConfig
 	pool             *pgx.ConnPool
@@ -28,32 +30,54 @@ type Provider struct {
 }
 
 const (
-	DefaultSRID           = tegola.WebMercator
-	DefaultPort           = 5432
-	DefaultMaxConn        = 100
-	DefaultSSLMode        = "disable"
-	DefaultSSLKey         = ""
-	DefaultSSLCert        = ""
-	DefaultEditDateFromat = time.RFC3339
-	DefaultEditBy         = ""
+	// DefaultSRID is the assumed srid of data unless specified
+	DefaultSRID = tegola.WebMercator
+	// DefaultPort is the default port for postgis
+	DefaultPort = 5432
+	// DefaultMaxConn is the max number of connections to attempt
+	DefaultMaxConn = 100
+	// DefaultSSLMode by default ssl is disabled
+	DefaultSSLMode = "disable"
+	// DefaultSSLKey by default is empty
+	DefaultSSLKey = ""
+	// DefaultSSLCert by default is empty
+	DefaultSSLCert = ""
+	// DefaultEditDateFormat the time format to expect
+	DefaultEditDateFormat = time.RFC3339
+	// DefaultEditBy who edited the content if not provided
+	DefaultEditBy = ""
 )
 
 const (
-	ConfigKeyHost           = "host"
-	ConfigKeyPort           = "port"
-	ConfigKeyDB             = "database"
-	ConfigKeyUser           = "user"
-	ConfigKeyPassword       = "password"
-	ConfigKeySSLMode        = "ssl_mode"
-	ConfigKeySSLKey         = "ssl_key"
-	ConfigKeySSLCert        = "ssl_cert"
-	ConfigKeySSLRootCert    = "ssl_root_cert"
-	ConfigKeyMaxConn        = "max_connections"
-	ConfigKeySRID           = "srid"
+	// ConfigKeyHost is the config key for the postgres host
+	ConfigKeyHost = "host"
+	// ConfigKeyPort is the config key for the postgres port
+	ConfigKeyPort = "port"
+	// ConfigKeyDB is the config key for the postgres db
+	ConfigKeyDB = "database"
+	// ConfigKeyUser is the config key for the postgres user
+	ConfigKeyUser = "user"
+	// ConfigKeyPassword is the config key for the postgres user's password
+	ConfigKeyPassword = "password"
+	// ConfigKeySSLMode is the config key for the postgres SSL
+	ConfigKeySSLMode = "ssl_mode"
+	// ConfigKeySSLKey is the config key for the postgres SSL
+	ConfigKeySSLKey = "ssl_key"
+	// ConfigKeySSLCert is the config key for the postgres SSL
+	ConfigKeySSLCert = "ssl_cert"
+	// ConfigKeySSLRootCert is the config key for the postgres SSL
+	ConfigKeySSLRootCert = "ssl_root_cert"
+	// ConfigKeyMaxConn is the max number of connections to keep in the pool
+	ConfigKeyMaxConn = "max_connections"
+	// ConfigKeySRID is the srid of the data
+	ConfigKeySRID = "srid"
+	// ConfigKeyEditDateFormat is the format to use for dates
 	ConfigKeyEditDateFormat = "edit_date_format"
-	ConfigKeyEditBy         = "edit_by"
+	// ConfigKeyEditBy who the default user for edit_by should be
+	ConfigKeyEditBy = "edit_by"
 )
 
+// ErrInvalidSSLMode is returned when something is wrong with SSL configuration
 type ErrInvalidSSLMode string
 
 func (e ErrInvalidSSLMode) Error() string {
@@ -64,6 +88,7 @@ func init() {
 	grids.Register(Name, NewGridProvider, Cleanup)
 }
 
+// NewGridProvider returns a grid provider based on the postgis database
 func NewGridProvider(config grids.ProviderConfig) (grids.Provider, error) {
 	host, err := config.String(ConfigKeyHost, nil)
 	if err != nil {
@@ -126,7 +151,7 @@ func NewGridProvider(config grids.ProviderConfig) (grids.Provider, error) {
 		return nil, err
 	}
 
-	editedDateFormat := DefaultEditDateFromat
+	editedDateFormat := DefaultEditDateFormat
 	if editedDateFormat, err = config.String(ConfigKeyEditBy, &editedDateFormat); err != nil {
 		return nil, err
 	}
@@ -169,6 +194,7 @@ func NewGridProvider(config grids.ProviderConfig) (grids.Provider, error) {
 	return &p, nil
 }
 
+// ConfigTLS is used to configure TLS
 // derived from github.com/jackc/pgx configTLS (https://github.com/jackc/pgx/blob/master/conn.go)
 func ConfigTLS(sslMode string, sslKey string, sslCert string, sslRootCert string, cc *pgx.ConnConfig) error {
 
@@ -225,27 +251,8 @@ func ConfigTLS(sslMode string, sslKey string, sslCert string, sslRootCert string
 	return nil
 }
 
-func (p *Provider) newEditInfo(by, date sql.NullString) (*grids.EditInfo, error) {
-	var err error
-	strBy := p.editedBy
-	if by.Valid {
-		strBy = by.String
-	}
-	ei := grids.EditInfo{
-		By: strBy,
-	}
-	// Try and parse the date
-	if date.Valid {
-		ei.Date, err = time.Parse(p.editedDateFormat, date.String)
-		if err != nil {
-			log.Printf("Got an error trying to parse %v -- %v", p.editedDateFormat, date)
-			return nil, err
-		}
-	}
-	return &ei, nil
-}
-
-func (p *Provider) GridForLatLng(lat, lng float64, srid uint) (*grids.Grid, error) {
+// CellForLatLng returns a grid cell object that matches the cloest grid cell.
+func (p *Provider) CellForLatLng(lat, lng float64, srid uint) (*grids.Cell, error) {
 	const selectQuery = `
 SELECT
   mdg_id,
@@ -284,9 +291,11 @@ LIMIT 1;
 
 	row := p.pool.QueryRow(selectQuery, lat, lng, srid)
 
-	return p.gridFromRow(row)
+	return p.cellFromRow(row)
 }
-func (p *Provider) GridForMDGID(mdgid grids.MDGID) (*grids.Grid, error) {
+
+// CellForMDGID returns an grid cell object for the given mdgid
+func (p *Provider) CellForMDGID(mdgid *grids.MDGID) (*grids.Cell, error) {
 	const selectQuery = `
 SELECT
   mdg_id,
@@ -314,13 +323,13 @@ WHERE
 LIMIT 1;
 `
 
-	row := p.pool.QueryRow(selectQuery, mdgid.ID)
+	row := p.pool.QueryRow(selectQuery, mdgid.Id)
 
-	return p.gridFromRow(row)
+	return p.cellFromRow(row)
 }
 
-// gridFromRow parses grid attributes into a girds.Grid struct
-func (p *Provider) gridFromRow(row *pgx.Row) (*grids.Grid, error) {
+// cellFromRow parses grid attributes into a girds.Cell struct
+func (p *Provider) cellFromRow(row *pgx.Row) (*grids.Cell, error) {
 	var (
 		mdgid  sql.NullString
 		sheet  sql.NullString
@@ -337,9 +346,9 @@ func (p *Provider) gridFromRow(row *pgx.Row) (*grids.Grid, error) {
 		nelat sql.NullFloat64
 		nelng sql.NullFloat64
 
-		country   sql.NullString
-		edited_by sql.NullString
-		edited_at sql.NullString
+		country  sql.NullString
+		editedBy sql.NullString
+		editedAt sql.NullString
 	)
 
 	err := row.Scan(
@@ -356,43 +365,53 @@ func (p *Provider) gridFromRow(row *pgx.Row) (*grids.Grid, error) {
 		&nelat,
 		&nelng,
 		&country,
-		&edited_by,
-		&edited_at,
+		&editedBy,
+		&editedAt,
 	)
 	if err != nil {
 		return nil, err
 	}
 
-	latlen, lnglen := grids.CalculateSecLengths(nelng.Float64)
-
-	ei, err := p.newEditInfo(edited_by, edited_at)
+	byStr, edAt, err := p.newEditInfo(editedBy, editedAt)
 	if err != nil {
 		return nil, err
 	}
 
-	return &grids.Grid{
-		MdgID:  grids.NewMDGID(mdgid.String),
-		Sheet:  sheet.String,
-		Series: series.String,
-		NRN:    nrn.String,
+	city := ""
 
-		SWLatDMS: swlatdms.String,
-		SWLngDMS: swlngdms.String,
-		NELatDMS: nelatdms.String,
-		NELngDMS: nelngdms.String,
+	return grids.NewCell(
+		mdgid.String,                             // mdgid
+		[2]float64{swlat.Float64, swlng.Float64}, // sw
+		[2]float64{nelat.Float64, nelng.Float64}, // ne
+		country.String,                           // country
+		city,                                     // city
+		nil,                                      // utminfo
+		grids.NewEditInfo(byStr, edAt),           // edited info
+		time.Now(),                               // publishedAt
+		nrn.String,                               // nrn
+		sheet.String,                             // sheet
+		series.String,                            // series
+		[2]string{swlatdms.String, swlngdms.String}, // sw dms
+		[2]string{nelatdms.String, nelngdms.String}, // ne dms
+		nil, // metadata
+	), nil
+}
 
-		SWLat: swlat.Float64,
-		SWLng: swlng.Float64,
-		NELat: nelat.Float64,
-		NELng: nelng.Float64,
+func (p *Provider) newEditInfo(by, date sql.NullString) (strBy string, edtAt time.Time, err error) {
 
-		LatLen: latlen,
-		LngLen: lnglen,
+	strBy = p.editedBy
+	if by.Valid {
+		strBy = by.String
+	}
 
-		PublicationDate: time.Now(),
-		Country:         country.String,
-		Edited:          ei,
-	}, nil
+	// Try and parse the date
+	if date.Valid {
+		edtAt, err = time.Parse(p.editedDateFormat, date.String)
+		if err != nil {
+			return strBy, edtAt, err
+		}
+	}
+	return strBy, edtAt, nil
 }
 
 // Close will close the provider's database connection

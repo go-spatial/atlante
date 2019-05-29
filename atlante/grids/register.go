@@ -8,27 +8,30 @@ import (
 	"github.com/go-spatial/tegola/dict"
 )
 
+// ErrProviderTypeExists is returned when the Provider type was already registered.
 type ErrProviderTypeExists string
 
 func (err ErrProviderTypeExists) Error() string {
 	return "provider (" + string(err) + ") already exists"
 }
 
+// ErrNoProvidersRegistered is returned when providers have not been registered with the system
 var ErrNoProvidersRegistered = errors.New("no providers registered")
 
+// ErrProviderNotRegistered is returned when the requested provider has not registered
 type ErrProviderNotRegistered string
 
 func (err ErrProviderNotRegistered) Error() string {
 	return "provider (" + string(err) + ") not registered"
 }
 
+// ProviderConfig implements the ProviderConfig interface
 type ProviderConfig interface {
 	dict.Dicter
 	// Returns the Grid Provider for the key
 	// if the a Provider does not exist ErrKeyMissingProvider will be returned
 	// if the key does not exist ErrNoProvidersRegistered will be returned
-	NameGridProvider(Key string)(Provider, error)
-	
+	NameGridProvider(Key string) (Provider, error)
 }
 
 /******************************************************************************/
@@ -41,7 +44,6 @@ type InitFunc func(ProviderConfig) (Provider, error)
 
 // CleanupFunc is called when the system is shuting down;
 // allowing the provider to do any needed cleanup.
-
 type CleanupFunc func()
 type funcs struct {
 	init    InitFunc

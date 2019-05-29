@@ -5,8 +5,8 @@ package atlante
 
 import (
 	fmt "fmt"
+	grids "github.com/go-spatial/maptoolkit/atlante/grids"
 	proto "github.com/golang/protobuf/proto"
-	timestamp "github.com/golang/protobuf/ptypes/timestamp"
 	math "math"
 )
 
@@ -19,36 +19,11 @@ var _ = math.Inf
 // is compatible with the proto package it is being compiled against.
 // A compilation error at this line likely means your copy of the
 // proto package needs to be updated.
-const _ = proto.ProtoPackageIsVersion3 // please upgrade the proto package
-
-type Job_Grid_HEMIType int32
-
-const (
-	Job_Grid_NORTH Job_Grid_HEMIType = 0
-	Job_Grid_SOUTH Job_Grid_HEMIType = 1
-)
-
-var Job_Grid_HEMIType_name = map[int32]string{
-	0: "NORTH",
-	1: "SOUTH",
-}
-
-var Job_Grid_HEMIType_value = map[string]int32{
-	"NORTH": 0,
-	"SOUTH": 1,
-}
-
-func (x Job_Grid_HEMIType) String() string {
-	return proto.EnumName(Job_Grid_HEMIType_name, int32(x))
-}
-
-func (Job_Grid_HEMIType) EnumDescriptor() ([]byte, []int) {
-	return fileDescriptor_f32c477d91a04ead, []int{0, 0, 0}
-}
+const _ = proto.ProtoPackageIsVersion2 // please upgrade the proto package
 
 type Job struct {
 	SheetName            string            `protobuf:"bytes,1,opt,name=sheet_name,json=sheetName,proto3" json:"sheet_name,omitempty"`
-	Grid                 *Job_Grid         `protobuf:"bytes,2,opt,name=grid,proto3" json:"grid,omitempty"`
+	Cell                 *grids.Cell       `protobuf:"bytes,2,opt,name=cell,proto3" json:"cell,omitempty"`
 	MetaData             map[string]string `protobuf:"bytes,3,rep,name=meta_data,json=metaData,proto3" json:"meta_data,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
 	XXX_NoUnkeyedLiteral struct{}          `json:"-"`
 	XXX_unrecognized     []byte            `json:"-"`
@@ -87,9 +62,9 @@ func (m *Job) GetSheetName() string {
 	return ""
 }
 
-func (m *Job) GetGrid() *Job_Grid {
+func (m *Job) GetCell() *grids.Cell {
 	if m != nil {
-		return m.Grid
+		return m.Cell
 	}
 	return nil
 }
@@ -101,446 +76,26 @@ func (m *Job) GetMetaData() map[string]string {
 	return nil
 }
 
-type Job_Grid struct {
-	Mdgid                *Job_Grid_MDGID      `protobuf:"bytes,1,opt,name=mdgid,proto3" json:"mdgid,omitempty"`
-	Sw                   *Job_Grid_LatLng     `protobuf:"bytes,2,opt,name=sw,proto3" json:"sw,omitempty"`
-	Ne                   *Job_Grid_LatLng     `protobuf:"bytes,3,opt,name=ne,proto3" json:"ne,omitempty"`
-	Len                  *Job_Grid_LatLng     `protobuf:"bytes,4,opt,name=len,proto3" json:"len,omitempty"`
-	Country              string               `protobuf:"bytes,5,opt,name=country,proto3" json:"country,omitempty"`
-	City                 string               `protobuf:"bytes,6,opt,name=city,proto3" json:"city,omitempty"`
-	Utm                  *Job_Grid_UTMInfo    `protobuf:"bytes,7,opt,name=utm,proto3" json:"utm,omitempty"`
-	Edited               *Job_Grid_EditInfo   `protobuf:"bytes,8,opt,name=edited,proto3" json:"edited,omitempty"`
-	PublishedAt          *timestamp.Timestamp `protobuf:"bytes,10,opt,name=published_at,json=publishedAt,proto3" json:"published_at,omitempty"`
-	MetaData             map[string]string    `protobuf:"bytes,11,rep,name=meta_data,json=metaData,proto3" json:"meta_data,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
-	Nrn                  string               `protobuf:"bytes,12,opt,name=nrn,proto3" json:"nrn,omitempty"`
-	Sheet                string               `protobuf:"bytes,13,opt,name=sheet,proto3" json:"sheet,omitempty"`
-	SwDms                *Job_Grid_LatLngDMS  `protobuf:"bytes,14,opt,name=sw_dms,json=swDms,proto3" json:"sw_dms,omitempty"`
-	NeDms                *Job_Grid_LatLngDMS  `protobuf:"bytes,15,opt,name=ne_dms,json=neDms,proto3" json:"ne_dms,omitempty"`
-	Series               string               `protobuf:"bytes,16,opt,name=series,proto3" json:"series,omitempty"`
-	XXX_NoUnkeyedLiteral struct{}             `json:"-"`
-	XXX_unrecognized     []byte               `json:"-"`
-	XXX_sizecache        int32                `json:"-"`
-}
-
-func (m *Job_Grid) Reset()         { *m = Job_Grid{} }
-func (m *Job_Grid) String() string { return proto.CompactTextString(m) }
-func (*Job_Grid) ProtoMessage()    {}
-func (*Job_Grid) Descriptor() ([]byte, []int) {
-	return fileDescriptor_f32c477d91a04ead, []int{0, 0}
-}
-
-func (m *Job_Grid) XXX_Unmarshal(b []byte) error {
-	return xxx_messageInfo_Job_Grid.Unmarshal(m, b)
-}
-func (m *Job_Grid) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	return xxx_messageInfo_Job_Grid.Marshal(b, m, deterministic)
-}
-func (m *Job_Grid) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_Job_Grid.Merge(m, src)
-}
-func (m *Job_Grid) XXX_Size() int {
-	return xxx_messageInfo_Job_Grid.Size(m)
-}
-func (m *Job_Grid) XXX_DiscardUnknown() {
-	xxx_messageInfo_Job_Grid.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_Job_Grid proto.InternalMessageInfo
-
-func (m *Job_Grid) GetMdgid() *Job_Grid_MDGID {
-	if m != nil {
-		return m.Mdgid
-	}
-	return nil
-}
-
-func (m *Job_Grid) GetSw() *Job_Grid_LatLng {
-	if m != nil {
-		return m.Sw
-	}
-	return nil
-}
-
-func (m *Job_Grid) GetNe() *Job_Grid_LatLng {
-	if m != nil {
-		return m.Ne
-	}
-	return nil
-}
-
-func (m *Job_Grid) GetLen() *Job_Grid_LatLng {
-	if m != nil {
-		return m.Len
-	}
-	return nil
-}
-
-func (m *Job_Grid) GetCountry() string {
-	if m != nil {
-		return m.Country
-	}
-	return ""
-}
-
-func (m *Job_Grid) GetCity() string {
-	if m != nil {
-		return m.City
-	}
-	return ""
-}
-
-func (m *Job_Grid) GetUtm() *Job_Grid_UTMInfo {
-	if m != nil {
-		return m.Utm
-	}
-	return nil
-}
-
-func (m *Job_Grid) GetEdited() *Job_Grid_EditInfo {
-	if m != nil {
-		return m.Edited
-	}
-	return nil
-}
-
-func (m *Job_Grid) GetPublishedAt() *timestamp.Timestamp {
-	if m != nil {
-		return m.PublishedAt
-	}
-	return nil
-}
-
-func (m *Job_Grid) GetMetaData() map[string]string {
-	if m != nil {
-		return m.MetaData
-	}
-	return nil
-}
-
-func (m *Job_Grid) GetNrn() string {
-	if m != nil {
-		return m.Nrn
-	}
-	return ""
-}
-
-func (m *Job_Grid) GetSheet() string {
-	if m != nil {
-		return m.Sheet
-	}
-	return ""
-}
-
-func (m *Job_Grid) GetSwDms() *Job_Grid_LatLngDMS {
-	if m != nil {
-		return m.SwDms
-	}
-	return nil
-}
-
-func (m *Job_Grid) GetNeDms() *Job_Grid_LatLngDMS {
-	if m != nil {
-		return m.NeDms
-	}
-	return nil
-}
-
-func (m *Job_Grid) GetSeries() string {
-	if m != nil {
-		return m.Series
-	}
-	return ""
-}
-
-type Job_Grid_MDGID struct {
-	Id                   string   `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	Part                 uint32   `protobuf:"varint,2,opt,name=part,proto3" json:"part,omitempty"`
-	XXX_NoUnkeyedLiteral struct{} `json:"-"`
-	XXX_unrecognized     []byte   `json:"-"`
-	XXX_sizecache        int32    `json:"-"`
-}
-
-func (m *Job_Grid_MDGID) Reset()         { *m = Job_Grid_MDGID{} }
-func (m *Job_Grid_MDGID) String() string { return proto.CompactTextString(m) }
-func (*Job_Grid_MDGID) ProtoMessage()    {}
-func (*Job_Grid_MDGID) Descriptor() ([]byte, []int) {
-	return fileDescriptor_f32c477d91a04ead, []int{0, 0, 0}
-}
-
-func (m *Job_Grid_MDGID) XXX_Unmarshal(b []byte) error {
-	return xxx_messageInfo_Job_Grid_MDGID.Unmarshal(m, b)
-}
-func (m *Job_Grid_MDGID) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	return xxx_messageInfo_Job_Grid_MDGID.Marshal(b, m, deterministic)
-}
-func (m *Job_Grid_MDGID) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_Job_Grid_MDGID.Merge(m, src)
-}
-func (m *Job_Grid_MDGID) XXX_Size() int {
-	return xxx_messageInfo_Job_Grid_MDGID.Size(m)
-}
-func (m *Job_Grid_MDGID) XXX_DiscardUnknown() {
-	xxx_messageInfo_Job_Grid_MDGID.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_Job_Grid_MDGID proto.InternalMessageInfo
-
-func (m *Job_Grid_MDGID) GetId() string {
-	if m != nil {
-		return m.Id
-	}
-	return ""
-}
-
-func (m *Job_Grid_MDGID) GetPart() uint32 {
-	if m != nil {
-		return m.Part
-	}
-	return 0
-}
-
-type Job_Grid_UTMInfo struct {
-	Zone uint32 `protobuf:"varint,1,opt,name=zone,proto3" json:"zone,omitempty"`
-	// should be formated at 01; 01-60
-	Hemi                 Job_Grid_HEMIType `protobuf:"varint,2,opt,name=hemi,proto3,enum=atlante.Job_Grid_HEMIType" json:"hemi,omitempty"`
-	XXX_NoUnkeyedLiteral struct{}          `json:"-"`
-	XXX_unrecognized     []byte            `json:"-"`
-	XXX_sizecache        int32             `json:"-"`
-}
-
-func (m *Job_Grid_UTMInfo) Reset()         { *m = Job_Grid_UTMInfo{} }
-func (m *Job_Grid_UTMInfo) String() string { return proto.CompactTextString(m) }
-func (*Job_Grid_UTMInfo) ProtoMessage()    {}
-func (*Job_Grid_UTMInfo) Descriptor() ([]byte, []int) {
-	return fileDescriptor_f32c477d91a04ead, []int{0, 0, 1}
-}
-
-func (m *Job_Grid_UTMInfo) XXX_Unmarshal(b []byte) error {
-	return xxx_messageInfo_Job_Grid_UTMInfo.Unmarshal(m, b)
-}
-func (m *Job_Grid_UTMInfo) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	return xxx_messageInfo_Job_Grid_UTMInfo.Marshal(b, m, deterministic)
-}
-func (m *Job_Grid_UTMInfo) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_Job_Grid_UTMInfo.Merge(m, src)
-}
-func (m *Job_Grid_UTMInfo) XXX_Size() int {
-	return xxx_messageInfo_Job_Grid_UTMInfo.Size(m)
-}
-func (m *Job_Grid_UTMInfo) XXX_DiscardUnknown() {
-	xxx_messageInfo_Job_Grid_UTMInfo.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_Job_Grid_UTMInfo proto.InternalMessageInfo
-
-func (m *Job_Grid_UTMInfo) GetZone() uint32 {
-	if m != nil {
-		return m.Zone
-	}
-	return 0
-}
-
-func (m *Job_Grid_UTMInfo) GetHemi() Job_Grid_HEMIType {
-	if m != nil {
-		return m.Hemi
-	}
-	return Job_Grid_NORTH
-}
-
-type Job_Grid_LatLng struct {
-	Lat                  float32  `protobuf:"fixed32,1,opt,name=lat,proto3" json:"lat,omitempty"`
-	Lng                  float32  `protobuf:"fixed32,2,opt,name=lng,proto3" json:"lng,omitempty"`
-	XXX_NoUnkeyedLiteral struct{} `json:"-"`
-	XXX_unrecognized     []byte   `json:"-"`
-	XXX_sizecache        int32    `json:"-"`
-}
-
-func (m *Job_Grid_LatLng) Reset()         { *m = Job_Grid_LatLng{} }
-func (m *Job_Grid_LatLng) String() string { return proto.CompactTextString(m) }
-func (*Job_Grid_LatLng) ProtoMessage()    {}
-func (*Job_Grid_LatLng) Descriptor() ([]byte, []int) {
-	return fileDescriptor_f32c477d91a04ead, []int{0, 0, 2}
-}
-
-func (m *Job_Grid_LatLng) XXX_Unmarshal(b []byte) error {
-	return xxx_messageInfo_Job_Grid_LatLng.Unmarshal(m, b)
-}
-func (m *Job_Grid_LatLng) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	return xxx_messageInfo_Job_Grid_LatLng.Marshal(b, m, deterministic)
-}
-func (m *Job_Grid_LatLng) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_Job_Grid_LatLng.Merge(m, src)
-}
-func (m *Job_Grid_LatLng) XXX_Size() int {
-	return xxx_messageInfo_Job_Grid_LatLng.Size(m)
-}
-func (m *Job_Grid_LatLng) XXX_DiscardUnknown() {
-	xxx_messageInfo_Job_Grid_LatLng.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_Job_Grid_LatLng proto.InternalMessageInfo
-
-func (m *Job_Grid_LatLng) GetLat() float32 {
-	if m != nil {
-		return m.Lat
-	}
-	return 0
-}
-
-func (m *Job_Grid_LatLng) GetLng() float32 {
-	if m != nil {
-		return m.Lng
-	}
-	return 0
-}
-
-type Job_Grid_LatLngDMS struct {
-	Lat                  string   `protobuf:"bytes,1,opt,name=lat,proto3" json:"lat,omitempty"`
-	Lng                  string   `protobuf:"bytes,2,opt,name=lng,proto3" json:"lng,omitempty"`
-	XXX_NoUnkeyedLiteral struct{} `json:"-"`
-	XXX_unrecognized     []byte   `json:"-"`
-	XXX_sizecache        int32    `json:"-"`
-}
-
-func (m *Job_Grid_LatLngDMS) Reset()         { *m = Job_Grid_LatLngDMS{} }
-func (m *Job_Grid_LatLngDMS) String() string { return proto.CompactTextString(m) }
-func (*Job_Grid_LatLngDMS) ProtoMessage()    {}
-func (*Job_Grid_LatLngDMS) Descriptor() ([]byte, []int) {
-	return fileDescriptor_f32c477d91a04ead, []int{0, 0, 3}
-}
-
-func (m *Job_Grid_LatLngDMS) XXX_Unmarshal(b []byte) error {
-	return xxx_messageInfo_Job_Grid_LatLngDMS.Unmarshal(m, b)
-}
-func (m *Job_Grid_LatLngDMS) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	return xxx_messageInfo_Job_Grid_LatLngDMS.Marshal(b, m, deterministic)
-}
-func (m *Job_Grid_LatLngDMS) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_Job_Grid_LatLngDMS.Merge(m, src)
-}
-func (m *Job_Grid_LatLngDMS) XXX_Size() int {
-	return xxx_messageInfo_Job_Grid_LatLngDMS.Size(m)
-}
-func (m *Job_Grid_LatLngDMS) XXX_DiscardUnknown() {
-	xxx_messageInfo_Job_Grid_LatLngDMS.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_Job_Grid_LatLngDMS proto.InternalMessageInfo
-
-func (m *Job_Grid_LatLngDMS) GetLat() string {
-	if m != nil {
-		return m.Lat
-	}
-	return ""
-}
-
-func (m *Job_Grid_LatLngDMS) GetLng() string {
-	if m != nil {
-		return m.Lng
-	}
-	return ""
-}
-
-type Job_Grid_EditInfo struct {
-	By                   string               `protobuf:"bytes,1,opt,name=by,proto3" json:"by,omitempty"`
-	Date                 *timestamp.Timestamp `protobuf:"bytes,2,opt,name=date,proto3" json:"date,omitempty"`
-	XXX_NoUnkeyedLiteral struct{}             `json:"-"`
-	XXX_unrecognized     []byte               `json:"-"`
-	XXX_sizecache        int32                `json:"-"`
-}
-
-func (m *Job_Grid_EditInfo) Reset()         { *m = Job_Grid_EditInfo{} }
-func (m *Job_Grid_EditInfo) String() string { return proto.CompactTextString(m) }
-func (*Job_Grid_EditInfo) ProtoMessage()    {}
-func (*Job_Grid_EditInfo) Descriptor() ([]byte, []int) {
-	return fileDescriptor_f32c477d91a04ead, []int{0, 0, 4}
-}
-
-func (m *Job_Grid_EditInfo) XXX_Unmarshal(b []byte) error {
-	return xxx_messageInfo_Job_Grid_EditInfo.Unmarshal(m, b)
-}
-func (m *Job_Grid_EditInfo) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	return xxx_messageInfo_Job_Grid_EditInfo.Marshal(b, m, deterministic)
-}
-func (m *Job_Grid_EditInfo) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_Job_Grid_EditInfo.Merge(m, src)
-}
-func (m *Job_Grid_EditInfo) XXX_Size() int {
-	return xxx_messageInfo_Job_Grid_EditInfo.Size(m)
-}
-func (m *Job_Grid_EditInfo) XXX_DiscardUnknown() {
-	xxx_messageInfo_Job_Grid_EditInfo.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_Job_Grid_EditInfo proto.InternalMessageInfo
-
-func (m *Job_Grid_EditInfo) GetBy() string {
-	if m != nil {
-		return m.By
-	}
-	return ""
-}
-
-func (m *Job_Grid_EditInfo) GetDate() *timestamp.Timestamp {
-	if m != nil {
-		return m.Date
-	}
-	return nil
-}
-
 func init() {
-	proto.RegisterEnum("atlante.Job_Grid_HEMIType", Job_Grid_HEMIType_name, Job_Grid_HEMIType_value)
 	proto.RegisterType((*Job)(nil), "atlante.Job")
 	proto.RegisterMapType((map[string]string)(nil), "atlante.Job.MetaDataEntry")
-	proto.RegisterType((*Job_Grid)(nil), "atlante.Job.Grid")
-	proto.RegisterMapType((map[string]string)(nil), "atlante.Job.Grid.MetaDataEntry")
-	proto.RegisterType((*Job_Grid_MDGID)(nil), "atlante.Job.Grid.MDGID")
-	proto.RegisterType((*Job_Grid_UTMInfo)(nil), "atlante.Job.Grid.UTMInfo")
-	proto.RegisterType((*Job_Grid_LatLng)(nil), "atlante.Job.Grid.LatLng")
-	proto.RegisterType((*Job_Grid_LatLngDMS)(nil), "atlante.Job.Grid.LatLngDMS")
-	proto.RegisterType((*Job_Grid_EditInfo)(nil), "atlante.Job.Grid.EditInfo")
 }
 
 func init() { proto.RegisterFile("job.proto", fileDescriptor_f32c477d91a04ead) }
 
 var fileDescriptor_f32c477d91a04ead = []byte{
-	// 602 bytes of a gzipped FileDescriptorProto
-	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xa4, 0x53, 0xdb, 0x6e, 0xd3, 0x40,
-	0x10, 0x25, 0x76, 0x6e, 0x9e, 0x34, 0x25, 0xac, 0x10, 0x2c, 0x46, 0xa8, 0x51, 0x25, 0xa4, 0x88,
-	0x82, 0x2b, 0x85, 0x07, 0x10, 0x97, 0x07, 0xa4, 0x54, 0xbd, 0xa8, 0x69, 0xa5, 0x6d, 0xfa, 0x1c,
-	0xad, 0xbb, 0x53, 0xd7, 0x10, 0xaf, 0x23, 0x7b, 0x43, 0x14, 0x7e, 0x8b, 0x0f, 0xe3, 0x17, 0xd0,
-	0x8e, 0xed, 0xaa, 0x55, 0x0a, 0x45, 0xe2, 0x6d, 0x66, 0xf6, 0x9c, 0xd9, 0x99, 0x3d, 0x67, 0xc1,
-	0xfb, 0x9a, 0x86, 0xc1, 0x3c, 0x4b, 0x4d, 0xca, 0x5a, 0xd2, 0xcc, 0xa4, 0x36, 0xe8, 0x6f, 0x45,
-	0x69, 0x1a, 0xcd, 0x70, 0x97, 0xca, 0xe1, 0xe2, 0x72, 0xd7, 0xc4, 0x09, 0xe6, 0x46, 0x26, 0xf3,
-	0x02, 0xb9, 0xfd, 0xd3, 0x03, 0xf7, 0x28, 0x0d, 0xd9, 0x0b, 0x80, 0xfc, 0x0a, 0xd1, 0x4c, 0xb5,
-	0x4c, 0x90, 0xd7, 0xfa, 0xb5, 0x81, 0x27, 0x3c, 0xaa, 0x9c, 0xc8, 0x04, 0xd9, 0x4b, 0xa8, 0x47,
-	0x59, 0xac, 0xb8, 0xd3, 0xaf, 0x0d, 0x3a, 0xc3, 0x47, 0x41, 0xd9, 0x3f, 0x38, 0x4a, 0xc3, 0x60,
-	0x3f, 0x8b, 0x95, 0xa0, 0x63, 0xf6, 0x0e, 0xbc, 0x04, 0x8d, 0x9c, 0x2a, 0x69, 0x24, 0x77, 0xfb,
-	0xee, 0xa0, 0x33, 0xf4, 0x6f, 0x61, 0xc7, 0x68, 0xe4, 0x48, 0x1a, 0xb9, 0xa7, 0x4d, 0xb6, 0x12,
-	0xed, 0xa4, 0x4c, 0xfd, 0x5f, 0x2d, 0xa8, 0xdb, 0x3e, 0xec, 0x0d, 0x34, 0x12, 0x15, 0xc5, 0x8a,
-	0x46, 0xe8, 0x0c, 0x9f, 0xae, 0xdd, 0x14, 0x8c, 0x47, 0xfb, 0x87, 0x23, 0x51, 0xa0, 0xd8, 0x00,
-	0x9c, 0x7c, 0x59, 0x4e, 0xc5, 0xd7, 0xb1, 0xc7, 0xd2, 0x1c, 0xeb, 0x48, 0x38, 0xf9, 0xd2, 0x22,
-	0x35, 0x72, 0xf7, 0x3e, 0xa4, 0x46, 0xf6, 0x0a, 0xdc, 0x19, 0x6a, 0x5e, 0xbf, 0x07, 0x6a, 0x41,
-	0x8c, 0x43, 0xeb, 0x22, 0x5d, 0xd8, 0x65, 0x78, 0x83, 0xde, 0xac, 0x4a, 0x19, 0x83, 0xfa, 0x45,
-	0x6c, 0x56, 0xbc, 0x49, 0x65, 0x8a, 0xd9, 0x0e, 0xb8, 0x0b, 0x93, 0xf0, 0x16, 0x75, 0x7e, 0xb6,
-	0xde, 0xf9, 0x7c, 0x32, 0x3e, 0xd4, 0x97, 0xa9, 0xb0, 0x28, 0x36, 0x84, 0x26, 0xaa, 0xd8, 0xa0,
-	0xe2, 0x6d, 0xc2, 0xfb, 0xeb, 0xf8, 0x3d, 0x15, 0x1b, 0x22, 0x94, 0x48, 0xf6, 0x19, 0x36, 0xe6,
-	0x8b, 0x70, 0x16, 0xe7, 0x57, 0xa8, 0xa6, 0xd2, 0x70, 0x28, 0x99, 0x85, 0x0b, 0x82, 0xca, 0x05,
-	0xc1, 0xa4, 0x72, 0x81, 0xe8, 0x5c, 0xe3, 0xbf, 0x18, 0xf6, 0xe9, 0xa6, 0x7c, 0x1d, 0x92, 0x6f,
-	0xeb, 0x0e, 0x01, 0xee, 0xd6, 0x90, 0xf5, 0xc0, 0xd5, 0x99, 0xe6, 0x1b, 0xb4, 0xb0, 0x0d, 0xd9,
-	0x63, 0x68, 0x90, 0x85, 0x78, 0x97, 0x6a, 0x45, 0x62, 0x17, 0xcb, 0x97, 0x53, 0x95, 0xe4, 0x7c,
-	0x93, 0xc6, 0x7b, 0xfe, 0xa7, 0x27, 0x1e, 0x8d, 0xcf, 0x44, 0x23, 0x5f, 0x8e, 0x92, 0xdc, 0x72,
-	0x34, 0x12, 0xe7, 0xe1, 0x3f, 0x70, 0x34, 0x5a, 0xce, 0x13, 0x68, 0xe6, 0x98, 0xc5, 0x98, 0xf3,
-	0x1e, 0x5d, 0x5f, 0x66, 0xfe, 0x0e, 0x34, 0xc8, 0x43, 0x6c, 0x13, 0x9c, 0xd2, 0x68, 0x9e, 0x70,
-	0x62, 0x65, 0x25, 0x9b, 0xcb, 0xcc, 0x90, 0x9d, 0xba, 0x82, 0x62, 0x7f, 0x0c, 0xad, 0x52, 0x15,
-	0x7b, 0xfc, 0x23, 0xd5, 0xc5, 0xe7, 0xe8, 0x0a, 0x8a, 0x59, 0x00, 0xf5, 0x2b, 0x4c, 0x62, 0xa2,
-	0x6c, 0xde, 0x25, 0xd1, 0xc1, 0xde, 0xf8, 0x70, 0xb2, 0x9a, 0xa3, 0x20, 0x9c, 0xff, 0x1a, 0x9a,
-	0xc5, 0x9c, 0xf6, 0xb5, 0x66, 0xd2, 0x50, 0x33, 0x47, 0xd8, 0x90, 0x2a, 0x3a, 0xa2, 0x56, 0xb6,
-	0xa2, 0x23, 0x7f, 0x17, 0xbc, 0xeb, 0xad, 0x6e, 0x12, 0xbc, 0x35, 0x82, 0x57, 0x10, 0x8e, 0xa0,
-	0x5d, 0x79, 0xc2, 0x6e, 0x17, 0xae, 0xaa, 0xed, 0xc2, 0x95, 0x1d, 0x55, 0x49, 0x83, 0xe5, 0x67,
-	0xf9, 0x9b, 0x27, 0x08, 0xe7, 0x7f, 0x84, 0xee, 0x2d, 0xa5, 0xed, 0x75, 0xdf, 0xb0, 0xea, 0x68,
-	0x43, 0xab, 0xef, 0x77, 0x39, 0x5b, 0x60, 0x39, 0x42, 0x91, 0x7c, 0x70, 0xde, 0xd7, 0xb6, 0xfb,
-	0xd0, 0xae, 0x36, 0x67, 0x1e, 0x34, 0x4e, 0x4e, 0xc5, 0xe4, 0xa0, 0xf7, 0xc0, 0x86, 0x67, 0xa7,
-	0xe7, 0x93, 0x83, 0x5e, 0xed, 0xbf, 0xda, 0x87, 0x4d, 0x9a, 0xfa, 0xed, 0xef, 0x00, 0x00, 0x00,
-	0xff, 0xff, 0xbd, 0xb9, 0xa5, 0x41, 0xf3, 0x04, 0x00, 0x00,
+	// 208 bytes of a gzipped FileDescriptorProto
+	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xe2, 0xe2, 0xcc, 0xca, 0x4f, 0xd2,
+	0x2b, 0x28, 0xca, 0x2f, 0xc9, 0x17, 0x62, 0x4f, 0x2c, 0xc9, 0x49, 0xcc, 0x2b, 0x49, 0x95, 0x12,
+	0x48, 0x2f, 0xca, 0x4c, 0x29, 0xd6, 0x4f, 0x4e, 0xcd, 0xc9, 0x81, 0x48, 0x29, 0x1d, 0x66, 0xe4,
+	0x62, 0xf6, 0xca, 0x4f, 0x12, 0x92, 0xe5, 0xe2, 0x2a, 0xce, 0x48, 0x4d, 0x2d, 0x89, 0xcf, 0x4b,
+	0xcc, 0x4d, 0x95, 0x60, 0x54, 0x60, 0xd4, 0xe0, 0x0c, 0xe2, 0x04, 0x8b, 0xf8, 0x25, 0xe6, 0xa6,
+	0x0a, 0xa9, 0x73, 0xb1, 0x80, 0x34, 0x49, 0x30, 0x29, 0x30, 0x6a, 0x70, 0x1b, 0x09, 0xeb, 0x41,
+	0x0d, 0xd4, 0x03, 0x9b, 0xa7, 0xe7, 0x9c, 0x9a, 0x93, 0x13, 0x04, 0x56, 0x20, 0x64, 0xce, 0xc5,
+	0x99, 0x9b, 0x5a, 0x92, 0x18, 0x9f, 0x92, 0x58, 0x92, 0x28, 0xc1, 0xac, 0xc0, 0xac, 0xc1, 0x6d,
+	0x24, 0x05, 0x57, 0xed, 0x95, 0x9f, 0xa4, 0xe7, 0x9b, 0x5a, 0x92, 0xe8, 0x92, 0x58, 0x92, 0xe8,
+	0x9a, 0x57, 0x52, 0x54, 0x19, 0xc4, 0x91, 0x0b, 0xe5, 0x4a, 0x59, 0x73, 0xf1, 0xa2, 0x48, 0x09,
+	0x09, 0x70, 0x31, 0x67, 0xa7, 0x56, 0x42, 0x9d, 0x02, 0x62, 0x0a, 0x89, 0x70, 0xb1, 0x96, 0x25,
+	0xe6, 0x94, 0xa6, 0x82, 0x5d, 0xc1, 0x19, 0x04, 0xe1, 0x58, 0x31, 0x59, 0x30, 0x26, 0xb1, 0x81,
+	0x3d, 0x63, 0x0c, 0x08, 0x00, 0x00, 0xff, 0xff, 0x01, 0x5a, 0xd3, 0x92, 0xf4, 0x00, 0x00, 0x00,
 }

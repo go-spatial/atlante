@@ -7,7 +7,6 @@ require (
 	github.com/arolek/p v0.0.0-20180324024118-a1316a6b2662
 	github.com/aws/aws-sdk-go v1.19.32
 	github.com/cockroachdb/apd v1.1.0 // indirect
-	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/dimfeld/httptreemux v5.0.1+incompatible
 	github.com/gdey/errors v0.0.0-20190426172550-8ebd5bc891fb
 	github.com/gdey/tbltest v0.0.0-20180914212833-1865222d591f // indirect
@@ -21,6 +20,7 @@ require (
 	github.com/kr/pretty v0.1.0 // indirect
 	github.com/lib/pq v1.1.1 // indirect
 	github.com/pkg/errors v0.8.1
+	github.com/prometheus/common v0.4.1
 	github.com/satori/go.uuid v1.2.0 // indirect
 	github.com/shopspring/decimal v0.0.0-20180709203117-cd690d0c9e24 // indirect
 	github.com/spf13/cobra v0.0.3

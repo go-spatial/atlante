@@ -114,7 +114,7 @@ func (img *ImgStruct) generateImage() (fn string, err error) {
 type GridTemplateContext struct {
 	Image         *ImgStruct
 	GroundMeasure float64
-	Grid          grids.Grid
+	Grid          *grids.Cell
 	DPI           uint
 	Scale         uint
 	Zoom          float64
@@ -126,7 +126,8 @@ type GeneratedFiles struct {
 	PDF string
 }
 
-func NewGeneratedFilesFromTpl(fnTemplate *filenameTemplate, sheetName string, grid grids.Grid, wd string) *GeneratedFiles {
+// NewGeneratedFilesFromTpl will generate the three filesnames we need based on a filename template
+func NewGeneratedFilesFromTpl(fnTemplate *filenameTemplate, sheetName string, grid *grids.Cell, wd string) *GeneratedFiles {
 
 	fn := func(ext string) string {
 		dirtyFilename := fnTemplate.Filename(sheetName, grid, wd, ext)
@@ -141,7 +142,7 @@ func NewGeneratedFilesFromTpl(fnTemplate *filenameTemplate, sheetName string, gr
 }
 
 type FilenameTemplateContext struct {
-	Grid          grids.Grid
+	Grid          *grids.Cell
 	Ext           string
 	SheetName     string
 	WorkDirectory string
@@ -162,7 +163,7 @@ func NewFilenameTemplate(fnTemplate string) (*filenameTemplate, error) {
 
 const DefaultFilenameTemplate = "{{.SheetName}}_{{.Grid.ReferenceNumber}}.{{.Ext}}"
 
-func (ft filenameTemplate) Filename(sheetName string, grid grids.Grid, wd string, ext string) string {
+func (ft filenameTemplate) Filename(sheetName string, grid *grids.Cell, wd string, ext string) string {
 	var str strings.Builder
 	err := ft.t.Execute(&str, FilenameTemplateContext{
 		Grid:          grid,
@@ -176,7 +177,7 @@ func (ft filenameTemplate) Filename(sheetName string, grid grids.Grid, wd string
 	return str.String()
 }
 
-func GeneratePDF(ctx context.Context, sheet *Sheet, grid *grids.Grid, filenames *GeneratedFiles) error {
+func GeneratePDF(ctx context.Context, sheet *Sheet, grid *grids.Cell, filenames *GeneratedFiles) error {
 	if grid == nil {
 		return ErrNilGrid
 	}
@@ -218,7 +219,7 @@ func GeneratePDF(ctx context.Context, sheet *Sheet, grid *grids.Grid, filenames 
 	nground := resolution.Ground(
 		resolution.MercatorEarthCircumference,
 		zoom,
-		grid.SWLat,
+		grid.SW()[0],
 	)
 
 	// Generate the PNG
@@ -267,7 +268,7 @@ func GeneratePDF(ctx context.Context, sheet *Sheet, grid *grids.Grid, filenames 
 		Scale:         sheet.Scale,
 		Zoom:          zoom,
 		GroundMeasure: nground,
-		Grid:          *grid,
+		Grid:          grid,
 	})
 	if err != nil {
 		log.Printf("error trying to fillout sheet template")
@@ -321,7 +322,7 @@ type Atlante struct {
 
 func (a *Atlante) Shutdown() {}
 
-func (a *Atlante) filenamesForGrid(sheetName string, grid *grids.Grid, fname string) (*GeneratedFiles, error) {
+func (a *Atlante) filenamesForCell(sheetName string, cell *grids.Cell, fname string) (*GeneratedFiles, error) {
 	if fname == "" {
 		fname = DefaultFilenameTemplate
 	}
@@ -330,7 +331,7 @@ func (a *Atlante) filenamesForGrid(sheetName string, grid *grids.Grid, fname str
 	if err != nil {
 		return nil, err
 	}
-	return NewGeneratedFilesFromTpl(filenameGenerator, sheetName, *grid, a.workDirectory), nil
+	return NewGeneratedFilesFromTpl(filenameGenerator, sheetName, cell, a.workDirectory), nil
 }
 
 func (a *Atlante) GeneratePDFLatLng(ctx context.Context, sheetName string, lat, lng float64, srid uint64, filenameTemplate string) (*GeneratedFiles, error) {
@@ -350,23 +351,23 @@ func (a *Atlante) GeneratePDFLatLng(ctx context.Context, sheetName string, lat, 
 	}
 	a.sLock.Unlock()
 
-	grid, err := provider.GridForLatLng(lat, lng, uint(srid))
+	cell, err := provider.CellForLatLng(lat, lng, uint(srid))
 	if err != nil {
 		return nil, err
 	}
 
-	filenames, err := a.filenamesForGrid(sheetName, grid, filenameTemplate)
+	filenames, err := a.filenamesForCell(sheetName, cell, filenameTemplate)
 	if err != nil {
 		return nil, err
 	}
 
-	err = GeneratePDF(ctx, provider, grid, filenames)
+	err = GeneratePDF(ctx, provider, cell, filenames)
 	return filenames, err
 
 }
 
-func (a *Atlante) generatePDF(ctx context.Context, sheet *Sheet, grid *grids.Grid, filenameTemplate string) (*GeneratedFiles, error) {
-	filenames, err := a.filenamesForGrid(sheet.Name, grid, filenameTemplate)
+func (a *Atlante) generatePDF(ctx context.Context, sheet *Sheet, grid *grids.Cell, filenameTemplate string) (*GeneratedFiles, error) {
+	filenames, err := a.filenamesForCell(sheet.Name, grid, filenameTemplate)
 	if err != nil {
 		return nil, err
 	}
@@ -375,24 +376,24 @@ func (a *Atlante) generatePDF(ctx context.Context, sheet *Sheet, grid *grids.Gri
 }
 
 func (a *Atlante) GeneratePDFJob(ctx context.Context, job Job, filenameTemplate string) (*GeneratedFiles, error) {
-	grid := job.GridsGrid()
+	cell := job.Cell
 	sheet, err := a.SheetFor(job.SheetName)
 	if err != nil {
 		return nil, err
 	}
-	return a.generatePDF(ctx, sheet, grid, filenameTemplate)
+	return a.generatePDF(ctx, sheet, cell, filenameTemplate)
 }
 
-func (a *Atlante) GeneratePDFMDGID(ctx context.Context, sheetName string, mdgID grids.MDGID, filenameTemplate string) (*GeneratedFiles, error) {
+func (a *Atlante) GeneratePDFMDGID(ctx context.Context, sheetName string, mdgID *grids.MDGID, filenameTemplate string) (*GeneratedFiles, error) {
 
 	sheet, err := a.SheetFor(sheetName)
 	if err != nil {
 		return nil, err
 	}
 
-	grid, err := sheet.GridForMDGID(mdgID)
+	cell, err := sheet.CellForMDGID(mdgID)
 	if err != nil {
 		return nil, err
 	}
-	return a.generatePDF(ctx, sheet, grid, filenameTemplate)
+	return a.generatePDF(ctx, sheet, cell, filenameTemplate)
 }

@@ -3,6 +3,7 @@ package atlante
 import (
 	"io"
 	"net/url"
+	"sort"
 	"strings"
 	"text/template"
 	"time"
@@ -90,6 +91,23 @@ func (sheet *Sheet) Execute(wr io.Writer, tplContext GridTemplateContext) error 
 	return sheet.svgTemplate.Execute(wr, tplContext)
 }
 
+// NormalizeSheetName will return a normalized version of the sheetname, or if the sheet
+func (a *Atlante) NormalizeSheetName(sheetName string, getDefault bool) string {
+
+	sheetnm := strings.TrimSpace(strings.ToLower(sheetName))
+	if sheetnm != "" {
+		return sheetnm
+	}
+	if !getDefault {
+		return ""
+	}
+	sheets := a.Sheets()
+	if len(sheets) == 0 {
+		return ""
+	}
+	return sheets[0]
+}
+
 // SheetFor returns the sheet for the given name, if the sheet does not exists
 // sheet.ErrUnkownSheetName is returned.
 func (a *Atlante) SheetFor(sheetName string) (*Sheet, error) {
@@ -99,7 +117,10 @@ func (a *Atlante) SheetFor(sheetName string) (*Sheet, error) {
 	if len(a.sheets) == 0 {
 		return nil, ErrNoSheets
 	}
-	sheetnm := strings.TrimSpace(strings.ToLower(sheetName))
+	sheetnm := a.NormalizeSheetName(sheetName, false)
+	if sheetnm == "" {
+		return nil, ErrBlankSheetName
+	}
 
 	a.sLock.RLock()
 	sheet := a.sheets[sheetnm]
@@ -123,6 +144,7 @@ func (a *Atlante) Sheets() (sheets []string) {
 		i++
 	}
 	a.sLock.RUnlock()
+	sort.Strings(sheets)
 	return sheets
 }
 

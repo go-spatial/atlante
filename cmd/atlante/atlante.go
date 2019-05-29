@@ -3,8 +3,6 @@ package main
 import (
 	"io"
 	"os"
-
-	_ "github.com/go-spatial/maptoolkit/atlante/grids/postgresql"
 )
 
 // copy the src file to dst. Any existing file will be overwritten and will not
