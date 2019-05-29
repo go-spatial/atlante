@@ -1,58 +1,10 @@
 syntax = "proto3";
 package atlante;
 
-import "google/protobuf/timestamp.proto";
+import "grids/cell.proto";
 
 message Job {
-  message Grid {
-    message MDGID {
-      string id = 1;   // MDGID
-      uint32 part = 2; // optional Part indicator, used for subdivided Grids
-    }
-    enum HEMIType {
-      NORTH = 0; // This is the Default -- N
-      SOUTH = 1; // -- S
-    }
-    message UTMInfo {
-      uint32 zone = 1;   // This is the two digit UTM Zone code, so 1
-                         // should be formated at 01; 01-60
-      HEMIType hemi = 2; // Format for this should be N/S
-    }
-    message LatLng {
-      float lat = 1;
-      float lng = 2;
-    }
-    message LatLngDMS {
-      string lat = 1;
-      string lng = 2;
-    }
-    message EditInfo {
-      string by = 1;
-      google.protobuf.Timestamp date = 2;
-    }
-
-    MDGID mdgid = 1;
-
-    LatLng sw = 2;
-    LatLng ne = 3;
-    LatLng len = 4;
-    string country = 5;
-    string city = 6;
-
-    UTMInfo utm = 7;
-    EditInfo edited = 8;
-    google.protobuf.Timestamp published_at = 10;
-    map<string, string> meta_data = 11;
-    string nrn = 12;
-    string sheet = 13;
-
-    LatLngDMS sw_dms = 14;
-    LatLngDMS ne_dms = 15;
-
-    string series = 16;
-  }
-
   string sheet_name = 1;
-  Grid grid = 2;
+  atlante.grids.Cell cell = 2;
   map<string, string> meta_data = 3;
 }
