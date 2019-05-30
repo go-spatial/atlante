@@ -219,7 +219,7 @@ func GeneratePDF(ctx context.Context, sheet *Sheet, grid *grids.Cell, filenames 
 	nground := resolution.Ground(
 		resolution.MercatorEarthCircumference,
 		zoom,
-		grid.SW()[0],
+		float64(grid.GetSw().GetLat()),
 	)
 
 	// Generate the PNG
