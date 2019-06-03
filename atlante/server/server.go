@@ -83,7 +83,7 @@ type (
 var (
 	// Version is the version of the software, this should be set by the main program, before starting up.
 	// It is used by various Middleware to determine the version.
-	Version string = "Version Not Set"
+	Version = "Version Not Set"
 
 	// HostName is the name of the host to use for construction of URLS.
 	HostName string
