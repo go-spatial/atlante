@@ -42,6 +42,7 @@ type Webserver struct {
 	Port     env.String        `toml:"port"`
 	Scheme   env.String        `toml:"scheme"`
 	Headers  map[string]string `toml:"headers"`
+	Queue    env.Dict          `toml:"queue"`
 }
 
 // Sheet models a sheet in the config file

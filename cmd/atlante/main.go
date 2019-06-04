@@ -7,6 +7,9 @@ import (
 	"github.com/go-spatial/maptoolkit/cmd/atlante/cmd"
 )
 
+// cleanupFns are functions that should be run beforing exiting.
+var cleanupFns []func()
+
 func runRoot() <-chan error {
 	errch := make(chan error)
 	go func(errch chan error) {
@@ -19,10 +22,22 @@ func runRoot() <-chan error {
 	return errch
 }
 
+// Cleanup should be call just before exiting the program. This allows all the registered
+// providers to run any cleanup routines they have.
+func Cleanup() {
+	for _, cln := range cleanupFns {
+		if cln == nil {
+			continue
+		}
+		cln()
+	}
+}
+
 func main() {
-	errch := runRoot()
+
+	exitCode := 0
 	select {
-	case err := <-errch:
+	case err := <-runRoot():
 		if err == nil {
 			break
 		}
@@ -32,10 +47,12 @@ func main() {
 				cmd.Root.Usage()
 			}
 			fmt.Fprintf(os.Stderr, e.Msg)
-			os.Exit(e.ExitCode)
+			exitCode = e.ExitCode
 		default:
 			fmt.Fprintln(os.Stderr, "got the following error:", err)
-			os.Exit(1)
+			exitCode = 1
 		}
 	}
+	Cleanup()
+	os.Exit(exitCode)
 }

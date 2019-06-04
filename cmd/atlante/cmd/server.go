@@ -5,6 +5,9 @@ import (
 	"net/http"
 	"net/url"
 
+	"github.com/go-spatial/maptoolkit/atlante/queuer"
+	"github.com/prometheus/common/log"
+
 	"github.com/dimfeld/httptreemux"
 
 	"github.com/go-spatial/maptoolkit/atlante/config"
@@ -24,7 +27,7 @@ var (
 	}
 
 	// port that server should start up on, but default we will use :8080
-	port string = ":8080"
+	port = ":8080"
 )
 
 func init() {
@@ -68,6 +71,24 @@ func serverCmdRunE(cmd *cobra.Command, args []string) error {
 		Atlante:  a,
 	}
 
+	// Now we need to look to see if a queue has been configured
+	if conf.Webserver.Queue != nil {
+		qType, _ := conf.Webserver.Queue.String(queuer.ConfigKeyType, nil)
+		if qType != "none" || qType != "" {
+			// Configure the queue
+			srv.Queue, err = queuer.For(qType, conf.Webserver.Queue)
+			if err != nil {
+				if _, ok := err.(queuer.ErrUnknownProvider); ok {
+					log.Infoln("known queue providers:")
+					for _, p := range queuer.Registered() {
+						log.Infoln("\t", p)
+					}
+				}
+				return err
+			}
+		}
+	}
+
 	for name, value := range conf.Webserver.Headers {
 		// cast to string
 		val := fmt.Sprintf("%v", value)
@@ -81,6 +102,7 @@ func serverCmdRunE(cmd *cobra.Command, args []string) error {
 
 	srv.RegisterRoutes(router)
 
+	fmt.Fprintf(cmd.OutOrStdout(), "starting up server on %v\n", port)
 	err = http.ListenAndServe(srv.Port, router)
 	switch err {
 	case nil:

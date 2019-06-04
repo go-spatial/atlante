@@ -1,14 +1,18 @@
 package server
 
 import (
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"hash/adler32"
 	"io"
+	"io/ioutil"
 	"net/http"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/go-spatial/maptoolkit/atlante/queuer"
 
 	"github.com/dimfeld/httptreemux"
 	"github.com/go-spatial/maptoolkit/atlante"
@@ -16,29 +20,39 @@ import (
 	"github.com/prometheus/common/log"
 )
 
-type URLPath string
+// URLPlaceholder allows us to define placeholder that cna be used by
+// genPath to construct the final url string.
+type URLPlaceholder string
 
-func (u URLPath) PathComponent() string { return ":" + string(u) }
+// PathComponent return the placeholder with a ':' prepended
+func (u URLPlaceholder) PathComponent() string { return ":" + string(u) }
 
 const (
 	// ParamsKeyMDGID is the key used for the mdgid
-	ParamsKeyMDGID = URLPath("mdgid")
+	ParamsKeyMDGID = URLPlaceholder("mdgid")
 	// ParamsKeyLat is the key used for the lat
-	ParamsKeyLat = URLPath("lat")
+	ParamsKeyLat = URLPlaceholder("lat")
 	// ParamsKeyLng is the key used for the lng
-	ParamsKeyLng = URLPath("lng")
+	ParamsKeyLng = URLPlaceholder("lng")
 	// ParamsKeySheetname is the key used for the sheetname
-	ParamsKeySheetname = URLPath("sheetname")
+	ParamsKeySheetname = URLPlaceholder("sheetname")
 
+	// HTTPErrorHeader is the name of the X-header where details of the error
+	// is provided.
 	HTTPErrorHeader = "X-HTTP-Error-Description"
+
+	// JobFileName is the filename  of the sqlite job tracking db
+	JobFileName = "jobs.db"
 )
 
+// GenPath take a set of compontents and constructs a url
+// string for treemux
 func GenPath(paths ...interface{}) string {
 	var path strings.Builder
 	for _, p := range paths {
 		var str string
 		switch pp := p.(type) {
-		case URLPath:
+		case URLPlaceholder:
 			str = pp.PathComponent()
 		case string:
 			str = pp
@@ -56,11 +70,23 @@ func GenPath(paths ...interface{}) string {
 		path.WriteString("/" + str)
 	}
 	gp := path.String()
-	log.Warnf("Sending path: %v", gp)
 	return gp
 }
 
 type (
+	jobItem struct {
+		ID    int    `json:"-"`
+		JobID string `json:"job_id"`
+		// QJobID is the job id returned by the queue when
+		// the item was enqueued
+		QJobID    string    `json:"-"`
+		MdgID     string    `json:"mdgid"`
+		MdgIDPart uint32    `json:"sheet_number,omitempty"`
+		Status    string    `json:"status,omitempty"`
+		EnquedAt  time.Time `json:"enqued_at,omitempty"`
+		UpdatedAt time.Time `json:"updated_at,omitempty"`
+	}
+
 	// Server is used to serve up grid information, and generate print jobs
 	Server struct {
 		// HostName is the name of the host to use for construction of URLS.
@@ -77,6 +103,13 @@ type (
 
 		// Atlante is the Atlante object that containts the providers and file_stores
 		Atlante *atlante.Atlante
+
+		// Queue is a QueueProvider that is configured for this server
+		Queue queuer.Provider
+
+		// jobsDB is the database (sqlite) containing the jobs we have sent to be processed
+		// this is for job tracking
+		jobsDB *sql.DB
 	}
 )
 
@@ -153,10 +186,11 @@ func badRequest(w http.ResponseWriter, reasonFmt string, data ...interface{}) {
 func encodeCellAsJSON(w io.Writer, cell *grids.Cell, pdf string, lat, lng *float64, lastGen time.Time) {
 	// Build out the geojson
 	const geoJSONFmt = `{"type":"FeatureCollection","features":[{"type":"Feature","properties":{"objectid":"%v"},"geometry":{"type":"Polygon","coordinates":[[[%v,%v],[%v, %v],[%v, %v],[%v, %v],[%v, %v]]]}}]}`
+	mdgid := cell.GetMdgid()
 
 	jsonCell := struct {
 		MDGID      string          `json:"mdgid"`
-		part       *int            `json:"sheet_number,omitempty"`
+		Part       *uint32         `json:"sheet_number,omitempty"`
 		PDF        string          `json:"pdf_url,omitempty"`
 		LastGen    string          `json:"last_generated,omitempty"` // RFC 3339 format
 		LastEdited string          `json:"last_edited,omitempty"`    // RFC 3339 format
@@ -166,7 +200,7 @@ func encodeCellAsJSON(w io.Writer, cell *grids.Cell, pdf string, lat, lng *float
 		SheetName  string          `json:"sheet_name"`
 		GeoJSON    json.RawMessage `json:"geo_json"`
 	}{
-		MDGID:     cell.GetMdgid().Id,
+		MDGID:     mdgid.Id,
 		LastGen:   lastGen.Format(time.RFC3339),
 		Lat:       lat,
 		Lng:       lng,
@@ -178,8 +212,11 @@ func encodeCellAsJSON(w io.Writer, cell *grids.Cell, pdf string, lat, lng *float
 	if err != nil && !pubdate.IsZero() {
 		jsonCell.LastEdited = pubdate.Format(time.RFC3339)
 	}
+	if mdgid.Part != 0 {
+		jsonCell.Part = &mdgid.Part
+	}
 
-	mdgidStr := cell.GetMdgid().AsString()
+	mdgidStr := mdgid.AsString()
 	sw := cell.GetSw()
 	ne := cell.GetNe()
 	jsonCell.GeoJSON = json.RawMessage(
@@ -194,6 +231,106 @@ func encodeCellAsJSON(w io.Writer, cell *grids.Cell, pdf string, lat, lng *float
 	)
 	// Encoding the cell into the json
 	json.NewEncoder(w).Encode(jsonCell)
+}
+
+// CreateJobDB will create the job tracking database
+func CreateJobDB(filename string) (*sql.DB, error) {
+	database, err := sql.Open("sqlite3", filename)
+	if err != nil {
+		return nil, err
+	}
+	statement, err := database.Prepare(`
+	CREATE TABLE IF NOT EXISTS jobs (
+		id INTEGER PRIMARY KEY, 
+		job_id TEXT, 
+		mdgid TEXT,
+		status TEXT,
+		enqued_at TEXT,
+		updated_at TEXT,
+		qjob_id TEXT,
+		jobobj TEXT
+	)
+`)
+	if err != nil {
+		return nil, err
+	}
+	statement.Exec()
+	statement, err = database.Prepare(`CREATE UNIQUE INDEX idx_job_id ON jobs (job_id);`)
+	if err != nil {
+		return nil, err
+	}
+	statement.Exec()
+	statement, err = database.Prepare(`CREATE UNIQUE INDEX idx_qjob_id ON jobs (qjob_id);`)
+	if err != nil {
+		return nil, err
+	}
+	statement.Exec()
+	return database, nil
+}
+
+func (s *Server) findJobItem(mdgidstr string) (jbs []jobItem, err error) {
+	database := s.jobsDB
+	if database == nil {
+		return nil, nil
+	}
+	mdgid := grids.NewMDGID(mdgidstr)
+	const selectSQL = `
+	SELECT  
+		id,
+		job_id,
+		status,
+		enqued_at,
+		updated_at
+	FROM 
+		jobs
+	WHERE 
+		mdgid=?
+	ORDER BY id DESC
+	`
+	rows, err := database.Query(selectSQL, mdgid.AsString())
+	if err != nil {
+		return jbs, err
+	}
+
+	for rows.Next() {
+		var enquedat, updatedat string
+		ji := jobItem{MdgID: mdgid.Id}
+		if mdgid.Part != 0 {
+			ji.MdgIDPart = mdgid.Part
+		}
+		err = rows.Scan(
+			&ji.ID,
+			&ji.JobID,
+			&ji.Status,
+			&enquedat,
+			&updatedat,
+		)
+		if err != nil {
+			return []jobItem{}, err
+		}
+		ji.EnquedAt, err = time.Parse(time.RFC3339, enquedat)
+		if err != nil {
+			log.Warnf("failed to parse enqued at from db: %v for id: %v", enquedat, ji.ID)
+		}
+		ji.UpdatedAt, err = time.Parse(time.RFC3339, updatedat)
+		if err != nil {
+			log.Warnf("failed to parse updated at from db: %v for id: %v", updatedat, ji.ID)
+		}
+		jbs = append(jbs, ji)
+	}
+	return jbs, nil
+}
+
+// TODO(gdey): job management
+func (s *Server) addJobItem(ji *jobItem) (*jobItem, error) {
+	database := s.jobsDB
+	if database == nil {
+		return nil, fmt.Errorf("jobDB not initilized")
+	}
+	const intertSQL = `
+	INSERT INTO jobs (job_id, status, ) VALUES (?, ?)
+	`
+	return nil, nil
 }
 
 // GetHostName returns determines the hostname:port to return based on the following hierarchy
@@ -271,14 +408,14 @@ func (s *Server) GridInfoHandler(w http.ResponseWriter, request *http.Request, u
 		lastGen time.Time
 	)
 
-	log.Warnf("Got a call to GridInfoHandler: %v", urlParams)
-
 	sheetName, ok := urlParams[string(ParamsKeySheetname)]
 	if !ok {
 		// We need a sheetnumber.
 		badRequest(w, "missing sheet name)")
 		return
 	}
+
+	sheetName = s.Atlante.NormalizeSheetName(sheetName, false)
 
 	sheet, err := s.Atlante.SheetFor(sheetName)
 	if err != nil {
@@ -338,10 +475,87 @@ func (s *Server) GridInfoHandler(w http.ResponseWriter, request *http.Request, u
 	encodeCellAsJSON(w, cell, pdfURL, latp, lngp, lastGen)
 }
 
+// QueueHandler takes a job from a post and enqueues it on the configured queue
+// if the job has not be submitted before
+func (s *Server) QueueHandler(w http.ResponseWriter, request *http.Request, urlParams map[string]string) {
+	// TODO(gdey): this initial version will not do job tracking.
+	// meaning every request to the handler will get a job enqued into the
+	// queueing system.
+
+	// Get json body
+	var ji jobItem
+	bdy, err := ioutil.ReadAll(request.Body)
+	request.Body.Close()
+	if err != nil {
+		badRequest(w, "error reading body")
+		return
+	}
+	err = json.Unmarshal(bdy, &ji)
+	if err != nil {
+		badRequest(w, "unable to unmarshal json: %v", err)
+		return
+	}
+	mdgid := grids.MDGID{
+		Id:   ji.MdgID,
+		Part: ji.MdgIDPart,
+	}
+
+	sheetName, ok := urlParams[string(ParamsKeySheetname)]
+	if !ok {
+		// We need a sheetnumber.
+		badRequest(w, "missing sheet name)")
+		return
+	}
+
+	sheetName = s.Atlante.NormalizeSheetName(sheetName, false)
+
+	// ji is now going to be what get's returned
+	ji.EnquedAt = time.Now()
+	ji.JobID = fmt.Sprintf("%v:%v", sheetName, mdgid.AsString())
+
+	sheet, err := s.Atlante.SheetFor(sheetName)
+	if err != nil {
+		badRequest(w, "error getting sheet(%v):%v", sheetName, err)
+		return
+	}
+	cell, err := sheet.CellForMDGID(&mdgid)
+	if err != nil {
+		badRequest(w, "error getting grid(%v):%v", mdgid.AsString(), err)
+		return
+	}
+
+	qjob := atlante.Job{
+		Cell:      cell,
+		SheetName: sheetName,
+		MetaData: map[string]string{
+			"job_id": ji.JobID,
+		},
+	}
+	// TODO(gdye):Ignoring the returned job id for now. Will need it when we
+	// have the job management
+	_, err = s.Queue.Enqueue(ji.JobID, &qjob)
+	if err != nil {
+		badRequest(w, "failed to queue job: %v", err)
+		return
+	}
+
+	err = json.NewEncoder(w).Encode(ji)
+	if err != nil {
+		badRequest(w, "failed marshal json: %v", err)
+		return
+	}
+}
+
 // RegisterRoutes setup the routes
 func (s *Server) RegisterRoutes(r *httptreemux.TreeMux) {
 
 	group := r.NewGroup(GenPath(ParamsKeySheetname))
+	log.Infof("registering: GET  /:sheetname/info/:lat/:lng")
 	group.GET(GenPath("info", ParamsKeyLat, ParamsKeyLng), s.GridInfoHandler)
+	log.Infof("registering: GET  /:sheetname/info/:mdgid")
 	group.GET(GenPath("info", "mdgid", ParamsKeyMDGID), s.GridInfoHandler)
+	if s.Queue != nil {
+		log.Infof("registering: POST /:sheetname/mdgid")
+		group.POST("/mdgid", s.QueueHandler)
+	}
 }

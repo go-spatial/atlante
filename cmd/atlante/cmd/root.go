@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	"github.com/go-spatial/maptoolkit/atlante"
-	"github.com/go-spatial/maptoolkit/atlante/filestore"
 	"github.com/go-spatial/maptoolkit/atlante/grids"
 	"github.com/go-spatial/maptoolkit/cmd/atlante/config"
 	"github.com/go-spatial/maptoolkit/mbgl"
@@ -83,7 +82,6 @@ func generatePDFForJob(ctx context.Context, a *atlante.Atlante, jobstr string) (
 }
 
 func rootCmdParseArgs(ctx context.Context, a *atlante.Atlante) (*atlante.GeneratedFiles, error) {
-	defer filestore.Cleanup()
 	switch {
 	case showJob:
 		switch {
