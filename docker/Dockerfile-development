@@ -4,8 +4,15 @@ USER root
 
 RUN yum -y update
 
+
 # dev tools
 RUN yum group install -y "Development Tools"
+
+# Upated git
+RUN yum -y remove git
+RUN yum -y install  https://centos7.iuscommunity.org/ius-release.rpm
+RUN yum -y install  git2u-all
+
 
 # Install go 1.11
 RUN curl -SL https://dl.google.com/go/go1.12.4.linux-amd64.tar.gz | tar -xzC /usr/local && mkdir -p /go/bin
@@ -56,3 +63,5 @@ RUN go get github.com/golang/protobuf/protoc-gen-go
 # Install Fonts needed by the system
 COPY docker/files/fonts/* /usr/share/fonts/
 RUN fc-cache
+WORKDIR /go/src/github.com/go-spatial/maptoolkit
+
