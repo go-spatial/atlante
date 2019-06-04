@@ -15,9 +15,13 @@ type Config struct {
 	// FileLocation is the location that the config file was
 	// read from. If this value is nil, then the Parse() function
 	// was used directly
-	FileLocation *url.URL   `toml:"-"`
-	Providers    []env.Dict `toml:"providers"`
-	Sheets       []Sheet    `toml:"sheets"`
+	FileLocation *url.URL `toml:"-"`
+
+	// Webserver is the configuration for the webserver
+	Webserver Webserver `toml:"webserver"`
+
+	Providers []env.Dict `toml:"providers"`
+	Sheets    []Sheet    `toml:"sheets"`
 
 	// Workdirectory is the directory where the system should do it's work.
 	Workdirectory string `toml:"work_directory"`
@@ -29,6 +33,15 @@ type Config struct {
 	// metadata holds the metadata from parsing the toml
 	// file
 	metadata toml.MetaData `toml:"-"`
+}
+
+// Webserver represents the config values for the webserver potion
+// of the application.
+type Webserver struct {
+	HostName env.String        `toml:"hostname"`
+	Port     env.String        `toml:"port"`
+	Scheme   env.String        `toml:"scheme"`
+	Headers  map[string]string `toml:"headers"`
 }
 
 // Sheet models a sheet in the config file

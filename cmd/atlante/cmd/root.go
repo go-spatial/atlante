@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/go-spatial/maptoolkit/atlante"
 	"github.com/go-spatial/maptoolkit/atlante/filestore"
@@ -19,6 +20,24 @@ const (
 	DefaultDPI = 144
 )
 
+// ErrExitWith returns the an error that should be displayed to the user.
+// with the error code
+type ErrExitWith struct {
+	// Msg to show to the user.
+	Msg string
+	// Error is the wrapped error
+	Err error
+	// ExitCode to return to the system
+	ExitCode int
+	// ShowUsage will tell the main application
+	ShowUsage bool
+}
+
+// Error implements the Error interface
+func (e ErrExitWith) Error() string {
+	return fmt.Sprintf("%v: %v", e.Msg, e.Err)
+}
+
 var (
 	// Flags
 	mdgid      string
@@ -31,13 +50,18 @@ var (
 )
 
 func init() {
+
 	Root.PersistentFlags().StringVar(&configFile, "config", "config.toml", "config file to use")
+	Root.PersistentFlags().IntVar(&dpi, "dpi", DefaultDPI, "dpi to use")
 	Root.Flags().StringVar(&mdgid, "mdgid", "", "mdgid of the grid")
 	Root.Flags().StringVar(&sheetName, "sheet", "", "the sheet to use")
 	Root.Flags().StringVar(&job, "job", "", "base64 encoded job")
 	Root.Flags().BoolVar(&showJob, "show-job", false, "print out the job string for the parameters, and exit, if job is given with a string print out what's in the job string")
-	Root.Flags().IntVar(&dpi, "dpi", DefaultDPI, "dpi to use")
 	Root.Flags().StringVarP(&workDir, "workdir", "o", "", "workdir to find the assets and leave the output")
+
+	// Add server command
+	Root.AddCommand(Server)
+
 }
 
 // Root is the main cobra command
@@ -47,7 +71,7 @@ var Root = &cobra.Command{
 	Long: `A flexable server for building static print maps from tegola servers
 built with love and c8h10n4o2. Complete documentation is available at
 http://github.com/go-spatial/maptoolkit`,
-	Run: rootCmdRun,
+	RunE: rootCmdRun,
 }
 
 func generatePDFForJob(ctx context.Context, a *atlante.Atlante, jobstr string) (*atlante.GeneratedFiles, error) {
@@ -98,13 +122,16 @@ func rootCmdParseArgs(ctx context.Context, a *atlante.Atlante) (*atlante.Generat
 	}
 }
 
-func rootCmdRun(cmd *cobra.Command, args []string) {
+func rootCmdRun(cmd *cobra.Command, args []string) error {
 
 	a, err := config.Load(configFile, dpi, cmd.Flag("dpi").Changed)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "error loading config: %v\n", err)
-		cmd.Usage()
-		os.Exit(1)
+		return ErrExitWith{
+			ShowUsage: true,
+			Msg:       fmt.Sprintf("error loading config: %v\n", err),
+			Err:       err,
+			ExitCode:  1,
+		}
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -112,9 +139,12 @@ func rootCmdRun(cmd *cobra.Command, args []string) {
 
 	if workDir != "" {
 		if err := os.Chdir(workDir); err != nil {
-			fmt.Fprintf(os.Stderr, "error changing to working dir (%v), aborting", workDir)
-			cmd.Usage()
-			os.Exit(3)
+			return ErrExitWith{
+				ShowUsage: true,
+				Msg:       fmt.Sprintf("error changing to working dir (%v), aborting", workDir),
+				Err:       err,
+				ExitCode:  2,
+			}
 		}
 	}
 
@@ -122,24 +152,30 @@ func rootCmdRun(cmd *cobra.Command, args []string) {
 	generatedFiles, err := rootCmdParseArgs(ctx, a)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error generating pdf\n")
+		eerr := ErrExitWith{
+			Err:       err,
+			ShowUsage: true,
+			ExitCode:  3,
+		}
+		var strwriter strings.Builder
 		switch e := err.(type) {
 		case atlante.ErrUnknownSheetName:
-			fmt.Fprintf(os.Stderr, "\terror unknown sheet name `%v`\n", string(e))
-			fmt.Fprintf(os.Stderr, "\tknown sheets\n")
+			fmt.Fprintf(&strwriter, "\terror unknown sheet name `%v`\n", string(e))
+			fmt.Fprintf(&strwriter, "\tknown sheets\n")
 			for _, snm := range a.Sheets() {
-				fmt.Fprintf(os.Stderr, "\t\t%v\n", snm)
+				fmt.Fprintf(&strwriter, "\t\t%v\n", snm)
 			}
 		default:
-			fmt.Fprintf(os.Stderr, "error generating pdf\n\t%v\n", err)
+			fmt.Fprintf(&strwriter, "error generating pdf\n\t%v\n", err)
 		}
-		cmd.Usage()
-		os.Exit(2)
+		eerr.Msg = strwriter.String()
+		return eerr
 	}
 
 	if generatedFiles != nil {
-		fmt.Fprintf(os.Stdout, "PDF File: %v\n", generatedFiles.PDF)
-		fmt.Fprintf(os.Stdout, "PNG File: %v\n", generatedFiles.IMG)
-		fmt.Fprintf(os.Stdout, "SVG File: %v\n", generatedFiles.SVG)
+		fmt.Fprintf(cmd.OutOrStderr(), "PDF File: %v\n", generatedFiles.PDF)
+		fmt.Fprintf(cmd.OutOrStderr(), "PNG File: %v\n", generatedFiles.IMG)
+		fmt.Fprintf(cmd.OutOrStderr(), "SVG File: %v\n", generatedFiles.SVG)
 	}
-	os.Exit(0)
+	return nil
 }

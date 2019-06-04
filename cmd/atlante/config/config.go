@@ -58,19 +58,12 @@ func (fscfg Filestore) FileStoreFor(name string) (filestore.Provider, error) {
 	return p, nil
 }
 
-// Load will attempt to load and validate a config at the given location
-func Load(location string, dpi int, overrideDPI bool) (*atlante.Atlante, error) {
+// LoadConfig will load
+func LoadConfig(conf config.Config, dpi int, overrideDPI bool) (*atlante.Atlante, error) {
+
 	var ok bool
 	var a atlante.Atlante
 
-	aURL, err := url.Parse(location)
-	if err != nil {
-		return nil, err
-	}
-	conf, err := config.LoadAndValidate(aURL)
-	if err != nil {
-		return nil, err
-	}
 	// Loop through providers creating a provider type mapping.
 	for i, p := range conf.Providers {
 		// type is required
@@ -186,6 +179,20 @@ func Load(location string, dpi int, overrideDPI bool) (*atlante.Atlante, error) 
 			return nil, fmt.Errorf("error trying to add sheet %v: %v", i, err)
 		}
 	}
-
 	return &a, nil
+
+}
+
+// Load will attempt to load and validate a config at the given location
+func Load(location string, dpi int, overrideDPI bool) (*atlante.Atlante, error) {
+
+	aURL, err := url.Parse(location)
+	if err != nil {
+		return nil, err
+	}
+	conf, err := config.LoadAndValidate(aURL)
+	if err != nil {
+		return nil, err
+	}
+	return LoadConfig(conf, dpi, overrideDPI)
 }
