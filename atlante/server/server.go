@@ -180,16 +180,16 @@ func encodeCellAsJSON(w io.Writer, cell *grids.Cell, pdf string, lat, lng *float
 	}
 
 	mdgidStr := cell.GetMdgid().AsString()
-	sw := cell.SW()
-	ne := cell.NE()
+	sw := cell.GetSw()
+	ne := cell.GetNe()
 	jsonCell.GeoJSON = json.RawMessage(
 		fmt.Sprintf(geoJSONFmt,
 			adler32.Checksum([]byte(mdgidStr)), // Just need a stable unique number, a checksum will do.
-			sw[1], sw[0],
-			sw[1], ne[0],
-			ne[1], ne[0],
-			ne[1], sw[0],
-			sw[1], sw[0],
+			sw.GetLng(), sw.GetLat(),
+			sw.GetLng(), ne.GetLat(),
+			ne.GetLng(), ne.GetLat(),
+			ne.GetLng(), sw.GetLat(),
+			sw.GetLng(), sw.GetLat(),
 		),
 	)
 	// Encoding the cell into the json
@@ -256,6 +256,9 @@ func (s *Server) URLRoot(r *http.Request) string {
 // Requires
 func (s *Server) GridInfoHandler(w http.ResponseWriter, request *http.Request, urlParams map[string]string) {
 
+	const (
+		srid = 4326
+	)
 	var (
 		mdgid      *grids.MDGID
 		cell       *grids.Cell
@@ -315,7 +318,9 @@ func (s *Server) GridInfoHandler(w http.ResponseWriter, request *http.Request, u
 			return
 		}
 
-		cell, err = sheet.CellForLatLng(lat, lng, 3857)
+		// TODO(gdey): make srid for server configurable? should this come through
+		// the url?
+		cell, err = sheet.CellForLatLng(lat, lng, srid)
 		if err != nil {
 			badRequest(w, "error getting grid(%v,%v):%v", lat, lng, err)
 			return

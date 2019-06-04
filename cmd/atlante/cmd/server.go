@@ -81,9 +81,6 @@ func serverCmdRunE(cmd *cobra.Command, args []string) error {
 
 	srv.RegisterRoutes(router)
 
-	// Log out current routes
-	fmt.Fprintln(cmd.OutOrStderr(), "Routes", router.Dump())
-
 	err = http.ListenAndServe(srv.Port, router)
 	switch err {
 	case nil:
