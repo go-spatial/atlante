@@ -278,6 +278,7 @@ func (s *Server) findJobItem(mdgidstr string) (jbs []jobItem, err error) {
 	SELECT  
 		id,
 		job_id,
+		qjob_id,
 		status,
 		enqued_at,
 		updated_at
@@ -301,6 +302,7 @@ func (s *Server) findJobItem(mdgidstr string) (jbs []jobItem, err error) {
 		err = rows.Scan(
 			&ji.ID,
 			&ji.JobID,
+			&ji.QJobID,
 			&ji.Status,
 			&enquedat,
 			&updatedat,
@@ -323,14 +325,36 @@ func (s *Server) findJobItem(mdgidstr string) (jbs []jobItem, err error) {
 
 // TODO(gdey): job management
 func (s *Server) addJobItem(ji *jobItem) (*jobItem, error) {
+	if s == nil || ji == nil {
+		return nil, fmt.Errorf("server or jobItem is nil")
+	}
 	database := s.jobsDB
 	if database == nil {
 		return nil, fmt.Errorf("jobDB not initilized")
 	}
-	const intertSQL = `
-	INSERT INTO jobs (job_id, status, ) VALUES (?, ?)
+	const insertSQL = `
+	INSERT INTO jobs (
+		job_id, 
+		qjob_id,
+		mdgid,
+		status, 
+		enqued_at
+	) VALUES (?, ?, ?, ?, ?)
 	`
-	return nil, nil
+	enqueded := ji.EnquedAt.Format(time.RFC3339)
+	stm, err := database.Prepare(insertSQL)
+	if err != nil {
+		return nil, err
+	}
+	mdgid := grids.MDGID{
+		Id:   ji.MdgID,
+		Part: ji.MdgIDPart,
+	}
+	_, err = stm.Exec(ji.ID, ji.JobID, mdgid.AsString, ji.Status, enqueded)
+	if err != nil {
+		return nil, err
+	}
+	return ji, nil
 }
 
 // GetHostName returns determines the hostname:port to return based on the following hierarchy

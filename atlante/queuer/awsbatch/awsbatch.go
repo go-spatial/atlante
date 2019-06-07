@@ -43,13 +43,14 @@ func init() {
 	queuer.Register(TYPE, initFunc, nil)
 }
 
+// Provider implements the queuer interface
 type Provider struct {
 	Definition string
 	Name       string
 	Queue      string
 	Params     map[string]string
 	ObjectKey  string
-	C          *batch.Batch
+	Client     *batch.Batch
 }
 
 func initFunc(cfg queuer.Config) (queuer.Provider, error) {
@@ -61,7 +62,7 @@ func initFunc(cfg queuer.Config) (queuer.Provider, error) {
 	if err != nil {
 		return nil, err
 	}
-	queue.C = batch.New(sess)
+	queue.Client = batch.New(sess)
 
 	queue.Definition, _ = cfg.String(ConfigKeyJobDefinition, nil)
 	queue.Name, err = cfg.String(ConfigKeyJobName, &emptyStr)
@@ -157,7 +158,7 @@ func (p *Provider) Enqueue(key string, job *atlante.Job) (jobid string, err erro
 		JobQueue:      aws.String(p.Queue),
 		Parameters:    params,
 	}
-	result, err := p.C.SubmitJob(input)
+	result, err := p.Client.SubmitJob(input)
 	if err != nil {
 		log.Warnf("Got the error submitting job: %v", err)
 		return "", err

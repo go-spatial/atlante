@@ -1,6 +1,6 @@
 # awsbatch
 
-Use to copy artificates to s3 buckets
+Use [AWS Batch](https://aws.amazon.com/batch/) for queueing
 
 ```toml
 [webserver.queue]
