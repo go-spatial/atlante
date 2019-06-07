@@ -334,6 +334,12 @@ func (a *Atlante) filenamesForCell(sheetName string, cell *grids.Cell, fname str
 	return NewGeneratedFilesFromTpl(filenameGenerator, sheetName, cell, a.workDirectory), nil
 }
 
+func (a *Atlante) FilenamesForCell(sheetName string, cell *grids.Cell) *GeneratedFiles {
+	// This will not generate an error
+	filenameGenerator, _ := NewFilenameTemplate(DefaultFilenameTemplate)
+	return NewGeneratedFilesFromTpl(filenameGenerator, sheetName, cell, a.workDirectory)
+}
+
 func (a *Atlante) GeneratePDFLatLng(ctx context.Context, sheetName string, lat, lng float64, srid uint64, filenameTemplate string) (*GeneratedFiles, error) {
 	if a == nil {
 		return nil, ErrNilAtlanteObject
