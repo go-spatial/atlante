@@ -8,6 +8,8 @@ github.com/arolek/p v0.0.0-20180324024118-a1316a6b2662 h1:EDM9RrVkS/Tuj158dlu6LK
 github.com/arolek/p v0.0.0-20180324024118-a1316a6b2662/go.mod h1:WL44PUp/ahX3BCXOnk5AORrRXie5KDjULEkLvrcQy8E=
 github.com/aws/aws-sdk-go v1.19.32 h1:/usjSR6qsKfOKzk4tDNvZq7LqmP5+J0Cq/Uwsr2XVG8=
 github.com/aws/aws-sdk-go v1.19.32/go.mod h1:KmX6BPdI08NWTb3/sm4ZGu5ShLoqVDhKgpiN924inxo=
+github.com/aws/aws-sdk-go v1.19.45 h1:jAxmC8qqa7mW531FDgM8Ahbqlb3zmiHgTpJU6fY3vJ0=
+github.com/aws/aws-sdk-go v1.19.45/go.mod h1:KmX6BPdI08NWTb3/sm4ZGu5ShLoqVDhKgpiN924inxo=
 github.com/beorn7/perks v0.0.0-20180321164747-3a771d992973/go.mod h1:Dwedo/Wpr24TaqPxmxbtue+5NUziq4I4S80YR8gNf3Q=
 github.com/cockroachdb/apd v1.1.0 h1:3LFP3629v+1aKXU5Q37mxmRxX/pIu1nijXydLShEq5I=
 github.com/cockroachdb/apd v1.1.0/go.mod h1:8Sl8LxpKi29FqWXR16WEFZRNSz3SoPzUzeMeY4+DwBQ=
