@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/go-spatial/maptoolkit/atlante/filestore"
 	"github.com/go-spatial/maptoolkit/atlante/queuer"
 
 	"github.com/dimfeld/httptreemux"
@@ -488,6 +489,21 @@ func (s *Server) GridInfoHandler(w http.ResponseWriter, request *http.Request, u
 		}
 		latp, lngp = &lat, &lng
 	}
+
+	// Figure out the PDF URL
+	if pather, ok := sheet.Filestore.(filestore.Pather); ok {
+		gf := s.Atlante.FilenamesForCell(sheetName, cell)
+		url, err := pather.PathURL(mdgid.AsString(), gf.PDF, false)
+		if err != nil {
+			if err != filestore.ErrUnsupportedOperation {
+				log.Warnf("filestore error: %v", err)
+			}
+		}
+		if url != nil {
+			pdfURL = url.String()
+		}
+	}
+
 	// content type
 	w.Header().Add("Content-Type", "application/json")
 

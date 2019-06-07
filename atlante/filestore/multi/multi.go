@@ -2,6 +2,7 @@ package multi
 
 import (
 	"io"
+	"net/url"
 
 	"github.com/gdey/errors"
 	"github.com/go-spatial/maptoolkit/atlante/filestore"
@@ -122,9 +123,9 @@ type Provider struct {
 // obtain it's FileWriter. If there is an error other then
 // filestore.ErrSkipWrite, then the operation will stop and return that error; it
 // does not continue down the list.
-func (t Provider) FileWriter(grp string) (filestore.FileWriter, error) {
+func (p Provider) FileWriter(grp string) (filestore.FileWriter, error) {
 	var filewriter FileWriter
-	for _, p := range t.providers {
+	for _, p := range p.providers {
 		fw, err := p.FileWriter(grp)
 		if err != nil {
 			return nil, err
@@ -165,4 +166,38 @@ func (t FileWriter) Writer(fpath string, isIntermediate bool) (io.WriteCloser, e
 	return &writer, nil
 }
 
+// PathURL will go through each of the filestore looking for the first filestore that
+// support the Pather interface and has the file and returns that url
+func (p Provider) PathURL(group string, filepath string, isIntermediate bool) (*url.URL, error) {
+	var firstError error
+	// Search through our filestores and find the first one that supportes the
+	// pather interface and has a url for it.
+	for _, fs := range p.providers {
+		pather, ok := fs.(filestore.Pather)
+		if !ok {
+			continue
+		}
+		// Try and get url.
+		furl, err := pather.PathURL(group, filepath, isIntermediate)
+		if err != nil {
+			if err == filestore.ErrUnsupportedOperation {
+				continue
+			}
+			if firstError != nil {
+				firstError = err
+			}
+			continue
+		}
+		if furl == nil {
+			continue
+		}
+		return furl, nil
+	}
+	if firstError != nil {
+		return nil, firstError
+	}
+	return nil, filestore.ErrUnsupportedOperation
+}
+
 var _ filestore.Provider = Provider{}
+var _ filestore.Pather = Provider{}

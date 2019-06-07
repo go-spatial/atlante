@@ -34,8 +34,10 @@ The file supports the following properties:
 * `intermediate_base_path` (string) : [optional] (base_path) the base pat to add to intermediate files
 * `region` (string) : [optional] ("us-east-1") the aws region
 * `end_point` (string) : [optional] ("") the aws end point
-* `aws_access_key_id` (string) [optional] aws key
-* `aws_secret_access_key` (string) [optional] aws secret key
+* `aws_access_key_id` (string) : [optional] aws key
+* `aws_secret_access_key` (string) : [optional] aws secret key
+* `generate_presigned_urls` (bool) : [optional] (false) should we support generating presigned urls
+* `url_timeout` (int) : [optional] (10) in minutes how long the url will last
 
 ## Credential chain
 
