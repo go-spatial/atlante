@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/gdey/errors"
 	cfgaws "github.com/go-spatial/maptoolkit/atlante/config/aws"
 
 	"github.com/aws/aws-sdk-go/aws"
@@ -88,10 +89,12 @@ func initFunc(cfg filestore.Config) (filestore.Provider, error) {
 		intermediate:         intermediate,
 		intermediateBucket:   intermediateBucket,
 		intermediateBasePath: intermediateBasePath,
-		s3:                   s3.New(sess),
 		uploader:             s3manager.NewUploader(sess),
 		urlTimeout:           time.Duration(urlTimeout) * time.Minute,
-		genPresignedURL:      genPresigned,
+	}
+
+	if genPresigned {
+		p.s3 = s3.New(sess)
 	}
 
 	testPath := filepath.Join(p.basePath("upload_test"), "testdata")
@@ -122,7 +125,6 @@ type Provider struct {
 	intermediateBasePath string
 	uploader             *s3manager.Uploader
 
-	genPresignedURL bool
 	// used for getting signed urls
 	s3 *s3.S3
 	// time for urls that are generated if zero, then default is used.
@@ -169,7 +171,7 @@ func (p Provider) bucketPath(group, filepth string, isIntermediate bool) (bucket
 
 // PathURL will get a pre-signed URL from aws for supported files.
 func (p Provider) PathURL(group string, filepth string, isIntermediate bool) (*url.URL, error) {
-	if !p.genPresignedURL || p.s3 == nil {
+	if p.s3 == nil {
 		return nil, filestore.ErrUnsupportedOperation
 	}
 	// We don't support intermediate files for this operation
@@ -177,9 +179,25 @@ func (p Provider) PathURL(group string, filepth string, isIntermediate bool) (*u
 		return nil, filestore.ErrUnsupportedOperation
 	}
 	bucket, key := p.bucketPath(group, filepth, isIntermediate)
+	abucket, akey := aws.String(bucket), aws.String(key)
+
+	// Check to see if the key exists.
+	headObjInput := &s3.HeadObjectInput{
+		Bucket: abucket,
+		Key:    akey,
+	}
+	if _, err := p.s3.HeadObject(headObjInput); err != nil {
+		return nil, filestore.ErrPath{
+			Filepath:       filepth,
+			IsIntermediate: isIntermediate,
+			FilestoreType:  TYPE,
+			Err:            errors.String("file does not exist"),
+		}
+	}
+
 	req, _ := p.s3.GetObjectRequest(&s3.GetObjectInput{
-		Bucket: aws.String(bucket),
-		Key:    aws.String(key),
+		Bucket: abucket,
+		Key:    akey,
 	})
 	urlStr, err := req.Presign(p.urlTimeout)
 	if err != nil {
