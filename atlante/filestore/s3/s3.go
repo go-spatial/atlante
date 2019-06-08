@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/gdey/errors"
 	cfgaws "github.com/go-spatial/maptoolkit/atlante/config/aws"
 
 	"github.com/aws/aws-sdk-go/aws"
@@ -177,6 +178,21 @@ func (p Provider) PathURL(group string, filepth string, isIntermediate bool) (*u
 		return nil, filestore.ErrUnsupportedOperation
 	}
 	bucket, key := p.bucketPath(group, filepth, isIntermediate)
+
+	// Check to see if the key exists.
+	headObjInput := &s3.HeadObjectInput{
+		Bucket: aws.String(bucket),
+		Key:    aws.String(key),
+	}
+	if _, err := p.s3.HeadObject(headObjInput); err != nil {
+		return nil, filestore.ErrPath{
+			Filepath:       filepth,
+			IsIntermediate: isIntermediate,
+			FilestoreType:  TYPE,
+			Err:            errors.String("file does not exist"),
+		}
+	}
+
 	req, _ := p.s3.GetObjectRequest(&s3.GetObjectInput{
 		Bucket: aws.String(bucket),
 		Key:    aws.String(key),

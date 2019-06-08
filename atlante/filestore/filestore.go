@@ -28,7 +28,7 @@ type timeout interface {
 // timeout errors should have a Timeout() bool on it.
 type ErrPath struct {
 	Filepath       string
-	isIntermediate bool
+	IsIntermediate bool
 	FilestoreType  string
 	Err            error
 }
@@ -38,6 +38,8 @@ func (err ErrPath) Timeout() bool {
 	t, ok := err.Err.(timeout)
 	return ok && t.Timeout()
 }
+
+func (err ErrPath) Error() string { return err.Err.Error() }
 
 // FileWriter returns a writer object
 type FileWriter interface {
