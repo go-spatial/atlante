@@ -600,8 +600,8 @@ func (s *Server) RegisterRoutes(r *httptreemux.TreeMux) {
 	r.GET("/sheets", s.SheetInfoHandler)
 	log.Infof("registering: GET  /sheets")
 	group := r.NewGroup(GenPath("sheets", ParamsKeySheetname))
-	log.Infof("registering: GET  /sheets/:sheetname/info/:lat/:lng")
-	group.GET(GenPath("info", ParamsKeyLat, ParamsKeyLng), s.GridInfoHandler)
+	log.Infof("registering: GET  /sheets/:sheetname/info/:lng/:lat")
+	group.GET(GenPath("info", ParamsKeyLng, ParamsKeyLat), s.GridInfoHandler)
 	log.Infof("registering: GET  /sheets/:sheetname/info/:mdgid")
 	group.GET(GenPath("info", "mdgid", ParamsKeyMDGID), s.GridInfoHandler)
 	if s.Queue != nil {
