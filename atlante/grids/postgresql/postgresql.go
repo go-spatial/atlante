@@ -280,7 +280,7 @@ FROM
   grids.grid50K
 WHERE
   ST_Intersects(
-    geom,
+    wkb_geometry,
     ST_Transform(
       ST_SetSRID(
         ST_MakePoint($1,$2),
