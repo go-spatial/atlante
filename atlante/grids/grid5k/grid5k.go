@@ -86,10 +86,10 @@ func (p *Provider) CellForMDGID(mdgid *grids.MDGID) (*grids.Cell, error) {
 	part := mdgid.Part
 	mdgid.Part = 0
 	grd, err := p.Provider.CellForMDGID(mdgid)
-	grd.Mdgid.Part = part
 	if err != nil {
 		return nil, err
 	}
+	grd.Mdgid.Part = part
 	return adjustGrid(grd)
 }
 
