@@ -160,7 +160,7 @@ func rootCmdRun(cmd *cobra.Command, args []string) error {
 		case atlante.ErrUnknownSheetName:
 			fmt.Fprintf(&strwriter, "\terror unknown sheet name `%v`\n", string(e))
 			fmt.Fprintf(&strwriter, "\tknown sheets\n")
-			for _, snm := range a.Sheets() {
+			for _, snm := range a.SheetNames() {
 				fmt.Fprintf(&strwriter, "\t\t%v\n", snm)
 			}
 		default:

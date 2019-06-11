@@ -6,30 +6,11 @@ import (
 	"sort"
 	"strings"
 	"text/template"
-	"time"
 
 	"github.com/go-spatial/maptoolkit/atlante/filestore"
 	"github.com/go-spatial/maptoolkit/atlante/grids"
 	"github.com/go-spatial/maptoolkit/atlante/internal/urlutil"
 )
-
-var funcMap = template.FuncMap{
-	"to_upper":    strings.ToUpper,
-	"to_lower":    strings.ToLower,
-	"format":      tplFormat,
-	"now":         time.Now,
-	"div":         tplMathDiv,
-	"add":         tplMathAdd,
-	"sub":         tplMathSub,
-	"mul":         tplMathMul,
-	"neg":         tplMathNeg,
-	"abs":         tplMathAbs,
-	"seq":         tplSeq,
-	"new_toggler": tplNewToggle,
-	"rounder_for": tplRoundTo,
-	"rounder3":    tplRound3,
-	"first":       tplFirstNonZero,
-}
 
 // Sheet describes a map sheet
 type Sheet struct {
@@ -50,10 +31,13 @@ type Sheet struct {
 
 	// Parsed and ready template
 	svgTemplate *template.Template
+
+	// Description of the sheet
+	Desc string
 }
 
 // NewSheet returns a new sheet
-func NewSheet(name string, provider grids.Provider, dpi uint, scale uint, style string, svgTemplateFilename *url.URL, fs filestore.Provider) (*Sheet, error) {
+func NewSheet(name string, provider grids.Provider, dpi uint, desc string, style string, svgTemplateFilename *url.URL, fs filestore.Provider) (*Sheet, error) {
 	var (
 		err error
 		t   *template.Template
@@ -74,15 +58,18 @@ func NewSheet(name string, provider grids.Provider, dpi uint, scale uint, style 
 		return nil, err
 	}
 
+	scale := provider.CellSize()
+
 	return &Sheet{
 		Name:                name,
 		Provider:            provider,
 		DPI:                 dpi,
-		Scale:               scale,
+		Scale:               uint(scale),
 		Style:               style,
 		SvgTemplateFilename: svgTemplateFilename.String(),
 		svgTemplate:         t,
 		Filestore:           fs,
+		Desc:                desc,
 	}, nil
 }
 
@@ -101,7 +88,7 @@ func (a *Atlante) NormalizeSheetName(sheetName string, getDefault bool) string {
 	if !getDefault {
 		return ""
 	}
-	sheets := a.Sheets()
+	sheets := a.SheetNames()
 	if len(sheets) == 0 {
 		return ""
 	}
@@ -131,8 +118,8 @@ func (a *Atlante) SheetFor(sheetName string) (*Sheet, error) {
 	return sheet, nil
 }
 
-// Sheets returns the currently configured sheet names.
-func (a *Atlante) Sheets() (sheets []string) {
+// SheetNames returns the currently configured sheet names.
+func (a *Atlante) SheetNames() (sheets []string) {
 	if a == nil || len(a.sheets) == 0 {
 		return sheets
 	}
@@ -145,6 +132,21 @@ func (a *Atlante) Sheets() (sheets []string) {
 	}
 	a.sLock.RUnlock()
 	sort.Strings(sheets)
+	return sheets
+}
+
+// Sheets returns the currently configured sheets
+func (a *Atlante) Sheets() (sheets []*Sheet) {
+	if a == nil || len(a.sheets) == 0 {
+		return sheets
+	}
+	sheetnames := a.SheetNames()
+	sheets = make([]*Sheet, len(sheetnames))
+	a.sLock.RLock()
+	for i, k := range sheetnames {
+		sheets[i] = a.sheets[k]
+	}
+	a.sLock.RUnlock()
 	return sheets
 }
 

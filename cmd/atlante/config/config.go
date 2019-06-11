@@ -163,7 +163,7 @@ func LoadConfig(conf config.Config, dpi int, overrideDPI bool) (*atlante.Atlante
 			name,
 			prv,
 			uint(odpi),
-			uint(sheet.Scale),
+			string(sheet.Description),
 			string(sheet.Style),
 			templateURL,
 			fsprv,
