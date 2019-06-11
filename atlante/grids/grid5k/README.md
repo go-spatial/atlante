@@ -17,7 +17,7 @@ A grid provider that derives 5k grids from a configured 50k grid provider
 
 # Properties
 
-The provider support s the following properties
+The provider supports the following properties
 
 * `type` (string) : [required] should be 'grid5k'
 * `name` (string) : [required] the name of the provider (this will be normalized to the lowercase version)

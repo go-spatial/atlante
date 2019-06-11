@@ -6,8 +6,28 @@ import (
 	"math"
 	"reflect"
 	"strconv"
+	"strings"
+	"text/template"
 	"time"
 )
+
+var funcMap = template.FuncMap{
+	"to_upper":    strings.ToUpper,
+	"to_lower":    strings.ToLower,
+	"format":      tplFormat,
+	"now":         time.Now,
+	"div":         tplMathDiv,
+	"add":         tplMathAdd,
+	"sub":         tplMathSub,
+	"mul":         tplMathMul,
+	"neg":         tplMathNeg,
+	"abs":         tplMathAbs,
+	"seq":         tplSeq,
+	"new_toggler": tplNewToggle,
+	"rounder_for": tplRoundTo,
+	"rounder3":    tplRound3,
+	"first":       tplFirstNonZero,
+}
 
 //tplFormat is a helper function for templates that will format the given
 // value. It uses Sprintf for most value, except time.

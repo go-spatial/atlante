@@ -159,6 +159,11 @@ func badRequest(w http.ResponseWriter, reasonFmt string, data ...interface{}) {
 	w.WriteHeader(http.StatusBadRequest)
 }
 
+func serverError(w http.ResponseWriter, reasonFmt string, data ...interface{}){
+	w.Header().Set(HTTPErrorHeader, fmt.Sprintf(reasonFmt, data...))
+	w.WriteHeader(http.StatusInternalServerError)
+}
+
 func encodeCellAsJSON(w io.Writer, cell *grids.Cell, pdf string, lat, lng *float64, lastGen time.Time) {
 	// Build out the geojson
 	const geoJSONFmt = `{"type":"FeatureCollection","features":[{"type":"Feature","properties":{"objectid":"%v"},"geometry":{"type":"Polygon","coordinates":[[[%v,%v],[%v, %v],[%v, %v],[%v, %v],[%v, %v]]]}}]}`
@@ -167,7 +172,7 @@ func encodeCellAsJSON(w io.Writer, cell *grids.Cell, pdf string, lat, lng *float
 	jsonCell := struct {
 		MDGID      string          `json:"mdgid"`
 		Part       *uint32         `json:"sheet_number,omitempty"`
-		PDF        string          `json:"pdf_url,omitempty"`
+		PDF        string          `json:"pdf_url"`
 		LastGen    string          `json:"last_generated,omitempty"` // RFC 3339 format
 		LastEdited string          `json:"last_edited,omitempty"`    // RFC 3339 format
 		Series     string          `json:"series"`
@@ -556,21 +561,51 @@ func (s *Server) QueueHandler(w http.ResponseWriter, request *http.Request, urlP
 
 	err = json.NewEncoder(w).Encode(ji)
 	if err != nil {
-		badRequest(w, "failed marshal json: %v", err)
+		serverError(w, "failed marshal json: %v", err)
 		return
 	}
 }
 
+// SheetInfoHandler takes a job from a post and enqueues it on the configured queue
+// if the job has not be submitted before
+func (s *Server) SheetInfoHandler(w http.ResponseWriter, request *http.Request, urlParams map[string]string) {
+	type sheetInfo struct {
+		Name string `json:"name"`
+		Desc string `json:"desc"`
+		Scale uint `json:"scale"`
+	}
+	type sheetsDef struct {
+		Sheets []sheetInfo `json:"sheets"`
+	}
+	var newSheets sheetsDef
+	sheets := s.Atlante.Sheets()
+	newSheets.Sheets = make([]sheetInfo,0, len(sheets))
+	for _, sh := range sheets {
+		newSheets.Sheets = append(newSheets.Sheets,sheetInfo{
+			Name: sh.Name,
+			Desc: sh.Desc,
+			Scale: sh.Scale,
+		})
+	}
+
+	err := json.NewEncoder(w).Encode(newSheets)
+	if err != nil {
+		serverError(w,"failed to marshal json: %v",err)
+		return
+	}
+}
 // RegisterRoutes setup the routes
 func (s *Server) RegisterRoutes(r *httptreemux.TreeMux) {
 
-	group := r.NewGroup(GenPath(ParamsKeySheetname))
-	log.Infof("registering: GET  /:sheetname/info/:lat/:lng")
+	r.GET("/sheets",s.SheetInfoHandler)
+	log.Infof("registering: GET  /sheets")
+	group := r.NewGroup(GenPath("sheets",ParamsKeySheetname))
+	log.Infof("registering: GET  /sheets/:sheetname/info/:lat/:lng")
 	group.GET(GenPath("info", ParamsKeyLat, ParamsKeyLng), s.GridInfoHandler)
-	log.Infof("registering: GET  /:sheetname/info/:mdgid")
+	log.Infof("registering: GET  /sheets/:sheetname/info/:mdgid")
 	group.GET(GenPath("info", "mdgid", ParamsKeyMDGID), s.GridInfoHandler)
 	if s.Queue != nil {
-		log.Infof("registering: POST /:sheetname/mdgid")
+		log.Infof("registering: POST /sheets/:sheetname/mdgid")
 		group.POST("/mdgid", s.QueueHandler)
 	}
 }
