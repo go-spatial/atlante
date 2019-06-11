@@ -2,11 +2,47 @@
 
 This directory contains Dockerfiles suitable for production and development.
 
+## Docker Hub
+
+atlante is hosted on Docker Hub at https://hub.docker.com/r/gospatial/atlante
+
+``` console
+docker pull gospatial/atlante
+
+# Command Line Interface help
+docker run --rm -it gospatial/atlante -h
+
+# run with the current directory mounted
+docker run --rm -v "$(pwd)":/mnt -it gospatial/atlante --help
+
+# Mount local directory as `/mnt`, using `./config.toml`
+docker run --rm -v "$(pwd)":/mnt -it gospatial/atlante --config /mnt/config.toml
+
+# test other parameters
+docker run --rm -v "$(pwd)":/mnt -it gospatial/atlante \
+  --config /mnt/config.toml                            \
+  --dpi 144 --sheet sheetIndex -o /mnt
+```
+
+### Example `config.toml`
+
+``` toml
+[[providers]]
+  name     = "providerName"
+  type     = "postgresql"            # Types are defined at maptoolkit⁩/⁨atlante/⁨grids
+  host     = "host.docker.internal"  # Required for macOS, https://docs.docker.com/docker-for-mac/networking
+  # host   = "192.168.1.100"         # You can use IP address or domain (postgis1.example.com)
+  port     = 5432                    # postgresql database port
+  database = "bonn"
+  user     = "tegola"
+  password = ""
+```
+
 # Dockerfile
 
-This docker file will build a container sutiable for running the `atlante` program.
+This [docker file](docker/Dockerfile) will build a container suitable for running the `atlante` program.
 
-To build the conatiner, run the following command from the repo root:
+To build the container, run the following command from the repo root:
 
 ```console
 $ docker build -f docker/Dockerfile -t atlante .
@@ -32,4 +68,4 @@ Use this container in interactive mode with a volume mount so `atlante` can be b
 
 ```console
 $ docker run --rm -v $(pwd):/go/src/github.com/go-spatial/maptoolkit -it atlante-dev /bin/bash
-``` 
+```
