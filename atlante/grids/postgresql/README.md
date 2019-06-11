@@ -40,5 +40,5 @@ The provider expectes there to be at database called grids.
 The `grids` database should have a table called `grid50k`, with the 
 following columns:
 `mdg_id`, `sheet`, `series`, `nrn`, `swlat_dms`, `swlon_dms`, `nelat_dms`, `nelon_dms`,
-`sw_lat`, `swlon`, `nelat`, `nelon`, `country`, `last_edite`, `last_edi_1`
+`swlat`, `swlon`, `nelat`, `nelon`, `country`, `last_edite`, `last_edi_1`,`wkb_geometry`
 

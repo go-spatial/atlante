@@ -5,7 +5,7 @@ The system as the following server end-points.
 1. `GET /sheets/` used to get the currently configured sheets.
 
 Returns
-```json
+```js
 {
    "sheets" : []{
         "name": string,
@@ -15,10 +15,10 @@ Returns
 }
 ```
 
-2. `GET /sheets/${sheet_name}/info/${lat}/${lng}` used to get the grid information for the lat and long values.
+2. `GET /sheets/${sheet_name}/info/${lng}/${lat}` used to get the grid information for the lat and long values.
 
 Returns
-```json
+```js
 {
   "mdgid" : string,
   "sheet_number" : null | number,
@@ -36,7 +36,7 @@ Returns
 3. `GET /sheets/${sheet_name}/info/mdgid/${mdgid-sheet_number}` used to get the grid information for the mdgid
 
 Returns
-```json
+```js
 {
   "mdgid" : string,
   "sheet_number" : null | number,
@@ -55,7 +55,7 @@ Returns
 
 Expected:
 
-```json
+```js
 {
    "mdgid" : string,
    "sheet_number" : null | number,
@@ -63,11 +63,11 @@ Expected:
 ```
 
 Returns:
-```json
+```js
 {
    "mdgid" : string,
    "sheet_number" : null | number,
    "job_id" : number,
-   "status" : "requested" | "started" | "processing" | "compleated",
+   "status" : "requested" | "started" | "processing" | "completed",
 }
 ```
