@@ -30,15 +30,14 @@ func (cs CellSize) String() string {
 		return "unknown"
 	}
 }
+
 const (
-	// CellSize5K returns cell sizes of 5 km 
+	// CellSize5K returns cell sizes of 5 km
 	CellSize5K = 5000
 
 	// CellSize50K returns cell sizes of 50 km
-	CellSize50K  = 50000
+	CellSize50K = 50000
 )
-
-
 
 // Provider returns a grid object that can be used to generate
 // a Map Grid
@@ -61,7 +60,12 @@ func (m *MDGID) AsString() string {
 
 // NewMDGID take a string representing an MDGID with an optional part returning a new MDGID object
 func NewMDGID(m string) *MDGID {
-	idx := strings.IndexByte(strings.TrimSpace(m), ':')
+	trimedID := strings.TrimSpace(m)
+	idx := strings.IndexByte(trimedID, '-')
+	if idx == -1 {
+		// Let's try ':'
+		idx = strings.IndexByte(trimedID, ':')
+	}
 	if idx == -1 || len(m) <= idx {
 		return &MDGID{Id: m}
 	}
