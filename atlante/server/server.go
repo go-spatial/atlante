@@ -131,7 +131,7 @@ var (
 	// DefaultCORSHeaders define the default CORS response headers added to all requests
 	DefaultCORSHeaders = map[string]string{
 		"Access-Control-Allow-Origin":  "*",
-		"Access-Control-Allow-Methods": "GET, OPTIONS",
+		"Access-Control-Allow-Methods": "DELETE, GET, POST, PUT, OPTIONS",
 	}
 )
 
@@ -597,6 +597,8 @@ func (s *Server) SheetInfoHandler(w http.ResponseWriter, request *http.Request, 
 // RegisterRoutes setup the routes
 func (s *Server) RegisterRoutes(r *httptreemux.TreeMux) {
 
+	r.OptionsHandler = corsHandler
+
 	r.GET("/sheets", s.SheetInfoHandler)
 	log.Infof("registering: GET  /sheets")
 	group := r.NewGroup(GenPath("sheets", ParamsKeySheetname))
@@ -608,4 +610,11 @@ func (s *Server) RegisterRoutes(r *httptreemux.TreeMux) {
 		log.Infof("registering: POST /sheets/:sheetname/mdgid")
 		group.POST("/mdgid", s.QueueHandler)
 	}
+}
+
+
+// corsHanlder is used to respond to all OPTIONS requests for registered routes
+func corsHandler(w http.ResponseWriter, r *http.Request, params map[string]string) {
+	setHeaders(map[string]string{},w)
+	return
 }
