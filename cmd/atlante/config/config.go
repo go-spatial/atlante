@@ -2,7 +2,6 @@ package config
 
 import (
 	"fmt"
-	"log"
 	"net/url"
 	"strings"
 
@@ -12,6 +11,7 @@ import (
 	fsmulti "github.com/go-spatial/maptoolkit/atlante/filestore/multi"
 	"github.com/go-spatial/maptoolkit/atlante/grids"
 	"github.com/go-spatial/tegola/dict"
+	"github.com/prometheus/common/log"
 )
 
 var (
@@ -28,16 +28,12 @@ type Provider struct {
 }
 
 // NameGridProvider implements grids.Config interface
-func (pcfg Provider) NameGridProvider(key string) (grids.Provider, error) {
+func (pcfg Provider) NameGridProvider(name string) (grids.Provider, error) {
 
-	skey, err := pcfg.Dicter.String(key, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	p, ok := Providers[skey]
+	name = strings.ToLower(name)
+	p, ok := Providers[name]
 	if !ok {
-		return nil, grids.ErrProviderNotRegistered(skey)
+		return nil, grids.ErrProviderNotRegistered(name)
 	}
 	return p, nil
 
@@ -81,10 +77,11 @@ func LoadConfig(conf config.Config, dpi int, overrideDPI bool) (*atlante.Atlante
 		}
 		prv, err := grids.For(typ, Provider{p})
 		if err != nil {
-			return nil, fmt.Errorf("error registering provider #%v: %v", i, err)
+			return nil, fmt.Errorf("error registering provider (%v -- %v)(#%v): %v", typ, name, i, err)
 		}
 
 		Providers[name] = prv
+		log.Infof("configured grid provider: %v (%v)", name, typ)
 	}
 
 	// filestores
@@ -139,9 +136,9 @@ func LoadConfig(conf config.Config, dpi int, overrideDPI bool) (*atlante.Atlante
 			}
 			fsprv, ok = FileStores[filestoreName]
 			if !ok {
-				log.Println("Known file stores are:")
+				log.Warnln("Known file stores are:")
 				for k := range FileStores {
-					log.Println("\t", k)
+					log.Warnln("\t", k)
 				}
 				return nil, filestore.ErrUnknownProvider(filestoreName)
 			}

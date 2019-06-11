@@ -135,18 +135,6 @@ var (
 	}
 )
 
-/*
-ooooo   ooooo                           .o8                            .oooooo.    .o8           o8o                         .
-`888'   `888'                          "888                           d8P'  `Y8b  "888           `"'                       .o8
- 888     888   .ooooo.   .oooo.    .oooo888   .ooooo.  oooo d8b      888      888  888oooo.     oooo  .ooooo.   .ooooo.  .o888oo
- 888ooooo888  d88' `88b `P  )88b  d88' `888  d88' `88b `888""8P      888      888  d88' `88b    `888 d88' `88b d88' `"Y8   888
- 888     888  888ooo888  .oP"888  888   888  888ooo888  888          888      888  888   888     888 888ooo888 888         888
- 888     888  888    .o d8(  888  888   888  888    .o  888          `88b    d88'  888   888     888 888    .o 888   .o8   888 .
-o888o   o888o `Y8bod8P' `Y888""8o `Y8bod88P" `Y8bod8P' d888b          `Y8bood8P'   `Y8bod8P'     888 `Y8bod8P' `Y8bod8P'   "888"
-                                                                                                 888
-                                                                                             .o. 88P
-																							 `Y888P
-*/
 
 func setHeaders(h map[string]string, w http.ResponseWriter) {
 	// add CORS headers
@@ -165,19 +153,6 @@ func setHeaders(h map[string]string, w http.ResponseWriter) {
 		w.Header().Set(name, val)
 	}
 }
-
-/*
- .oooooo..o                                                          .oooooo.    .o8           o8o                         .
-d8P'    `Y8                                                         d8P'  `Y8b  "888           `"'                       .o8
-Y88bo.       .ooooo.  oooo d8b oooo    ooo  .ooooo.  oooo d8b      888      888  888oooo.     oooo  .ooooo.   .ooooo.  .o888oo
- `"Y8888o.  d88' `88b `888""8P  `88.  .8'  d88' `88b `888""8P      888      888  d88' `88b    `888 d88' `88b d88' `"Y8   888
-     `"Y88b 888ooo888  888       `88..8'   888ooo888  888          888      888  888   888     888 888ooo888 888         888
-oo     .d8P 888    .o  888        `888'    888    .o  888          `88b    d88'  888   888     888 888    .o 888   .o8   888 .
-8""88888P'  `Y8bod8P' d888b        `8'     `Y8bod8P' d888b          `Y8bood8P'   `Y8bod8P'     888 `Y8bod8P' `Y8bod8P'   "888"
-                                                                                               888
-                                                                                           .o. 88P
-																						   `Y888P
-*/
 
 func badRequest(w http.ResponseWriter, reasonFmt string, data ...interface{}) {
 	w.Header().Set(HTTPErrorHeader, fmt.Sprintf(reasonFmt, data...))

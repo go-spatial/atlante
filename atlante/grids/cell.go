@@ -17,11 +17,35 @@ import (
 	"github.com/go-spatial/maptoolkit/mbgl/bounds"
 )
 
+// CellSize is the size of the cell in meters
+type CellSize uint
+
+func (cs CellSize) String() string {
+	switch cs {
+	case CellSize5K:
+		return "5K"
+	case CellSize50K:
+		return "50K"
+	default:
+		return "unknown"
+	}
+}
+const (
+	// CellSize5K returns cell sizes of 5 km 
+	CellSize5K = 5000
+
+	// CellSize50K returns cell sizes of 50 km
+	CellSize50K  = 50000
+)
+
+
+
 // Provider returns a grid object that can be used to generate
 // a Map Grid
 type Provider interface {
 	CellForLatLng(lat, lng float64, srid uint) (*Cell, error)
 	CellForMDGID(mgdID *MDGID) (*Cell, error)
+	CellSize() CellSize
 }
 
 // AsString provides a human readable version of the MDGID

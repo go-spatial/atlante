@@ -251,6 +251,9 @@ func ConfigTLS(sslMode string, sslKey string, sslCert string, sslRootCert string
 	return nil
 }
 
+// CellSize returns the grid cell size
+func(*Provider)CellSize()grids.CellSize { return grids.CellSize50K }
+
 // CellForLatLng returns a grid cell object that matches the cloest grid cell.
 func (p *Provider) CellForLatLng(lat, lng float64, srid uint) (*grids.Cell, error) {
 	const selectQuery = `
@@ -327,6 +330,7 @@ LIMIT 1;
 
 	return p.cellFromRow(row)
 }
+
 
 // cellFromRow parses grid attributes into a girds.Cell struct
 func (p *Provider) cellFromRow(row *pgx.Row) (*grids.Cell, error) {
