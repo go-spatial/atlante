@@ -252,7 +252,7 @@ func ConfigTLS(sslMode string, sslKey string, sslCert string, sslRootCert string
 }
 
 // CellSize returns the grid cell size
-func(*Provider)CellSize()grids.CellSize { return grids.CellSize50K }
+func (*Provider) CellSize() grids.CellSize { return grids.CellSize50K }
 
 // CellForLatLng returns a grid cell object that matches the cloest grid cell.
 func (p *Provider) CellForLatLng(lat, lng float64, srid uint) (*grids.Cell, error) {
@@ -286,13 +286,13 @@ WHERE
         ST_MakePoint($1,$2),
         $3
       ),
-      3857
+      4326
     )
   )
 LIMIT 1;
 `
 
-	row := p.pool.QueryRow(selectQuery, lat, lng, srid)
+	row := p.pool.QueryRow(selectQuery, lng, lat, srid)
 
 	return p.cellFromRow(row)
 }
@@ -330,7 +330,6 @@ LIMIT 1;
 
 	return p.cellFromRow(row)
 }
-
 
 // cellFromRow parses grid attributes into a girds.Cell struct
 func (p *Provider) cellFromRow(row *pgx.Row) (*grids.Cell, error) {
