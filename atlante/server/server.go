@@ -135,7 +135,6 @@ var (
 	}
 )
 
-
 func setHeaders(h map[string]string, w http.ResponseWriter) {
 	// add CORS headers
 	for name, val := range DefaultCORSHeaders {
@@ -159,7 +158,7 @@ func badRequest(w http.ResponseWriter, reasonFmt string, data ...interface{}) {
 	w.WriteHeader(http.StatusBadRequest)
 }
 
-func serverError(w http.ResponseWriter, reasonFmt string, data ...interface{}){
+func serverError(w http.ResponseWriter, reasonFmt string, data ...interface{}) {
 	w.Header().Set(HTTPErrorHeader, fmt.Sprintf(reasonFmt, data...))
 	w.WriteHeader(http.StatusInternalServerError)
 }
@@ -464,7 +463,7 @@ func (s *Server) GridInfoHandler(w http.ResponseWriter, request *http.Request, u
 		// the url?
 		cell, err = sheet.CellForLatLng(lat, lng, srid)
 		if err != nil {
-			badRequest(w, "error getting grid(%v,%v):%v", lat, lng, err)
+			badRequest(w, "error getting grid(%v,%v,srid: %v):%v", lat, lng, srid, err)
 			return
 		}
 		latp, lngp = &lat, &lng
@@ -570,36 +569,37 @@ func (s *Server) QueueHandler(w http.ResponseWriter, request *http.Request, urlP
 // if the job has not be submitted before
 func (s *Server) SheetInfoHandler(w http.ResponseWriter, request *http.Request, urlParams map[string]string) {
 	type sheetInfo struct {
-		Name string `json:"name"`
-		Desc string `json:"desc"`
-		Scale uint `json:"scale"`
+		Name  string `json:"name"`
+		Desc  string `json:"desc"`
+		Scale uint   `json:"scale"`
 	}
 	type sheetsDef struct {
 		Sheets []sheetInfo `json:"sheets"`
 	}
 	var newSheets sheetsDef
 	sheets := s.Atlante.Sheets()
-	newSheets.Sheets = make([]sheetInfo,0, len(sheets))
+	newSheets.Sheets = make([]sheetInfo, 0, len(sheets))
 	for _, sh := range sheets {
-		newSheets.Sheets = append(newSheets.Sheets,sheetInfo{
-			Name: sh.Name,
-			Desc: sh.Desc,
+		newSheets.Sheets = append(newSheets.Sheets, sheetInfo{
+			Name:  sh.Name,
+			Desc:  sh.Desc,
 			Scale: sh.Scale,
 		})
 	}
 
 	err := json.NewEncoder(w).Encode(newSheets)
 	if err != nil {
-		serverError(w,"failed to marshal json: %v",err)
+		serverError(w, "failed to marshal json: %v", err)
 		return
 	}
 }
+
 // RegisterRoutes setup the routes
 func (s *Server) RegisterRoutes(r *httptreemux.TreeMux) {
 
-	r.GET("/sheets",s.SheetInfoHandler)
+	r.GET("/sheets", s.SheetInfoHandler)
 	log.Infof("registering: GET  /sheets")
-	group := r.NewGroup(GenPath("sheets",ParamsKeySheetname))
+	group := r.NewGroup(GenPath("sheets", ParamsKeySheetname))
 	log.Infof("registering: GET  /sheets/:sheetname/info/:lat/:lng")
 	group.GET(GenPath("info", ParamsKeyLat, ParamsKeyLng), s.GridInfoHandler)
 	log.Infof("registering: GET  /sheets/:sheetname/info/:mdgid")
