@@ -6,6 +6,7 @@ import (
 	"sync"
 
 	"github.com/go-spatial/tegola/dict"
+	"github.com/prometheus/common/log"
 )
 
 // ErrProviderTypeExists is returned when the Provider type was already registered.
@@ -68,6 +69,7 @@ func Register(providerType string, init InitFunc, cleanup CleanupFunc) error {
 		init:    init,
 		cleanup: cleanup,
 	}
+	log.Infof("registerd grid provider: %v", providerType)
 	return nil
 }
 
@@ -120,6 +122,9 @@ func For(providerType string, config ProviderConfig) (Provider, error) {
 func Cleanup() {
 	providersLock.Lock()
 	for _, p := range providers {
+		if p.cleanup == nil {
+			continue
+		}
 		p.cleanup()
 	}
 	providers = make(map[string]funcs)
