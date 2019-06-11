@@ -51,7 +51,7 @@ func NewGridProvider(config grids.ProviderConfig) (grids.Provider, error) {
 		return nil, ErrBlankSubprovider
 	}
 
-	log.Infof("Getting provider(%v) from config.", subp)
+	log.Infof("getting provider(%v) from config.", subp)
 	prv, err := config.NameGridProvider(subp)
 	if err != nil {
 		log.Warnf("got error getting provider: %v", err)
