@@ -19,7 +19,7 @@ A grid provider that can connect to a Postgres Database.
 The provider supports the following properties
 
 * `type` (string) : [required] should be 'grid5k'
-* `name` (string) : [required] the name of the provider (this will be normalized to the lowercase version)
+* `name` (string) : [required] the name of the provider (this will be normalized to the lowercase)
 * `host` (string) : [required] the database host
 * `port` (string) : [required] the database post
 * `user` (string) : [required] the user for the database
@@ -29,9 +29,9 @@ The provider supports the following properties
 * `ssl_cert` (string) : [optional] the ssl cert for postgres SSL
 * `ssl_root_cert` (string) : [optional] the ssl root cert
 * `max_connections` (number) : [optional] the max number of connections to keep in the pool
-* `srid` (number) :  [optional](3857) the srid of the data (not used; currently)
-* `edit_data_format` (string): [optional](RFC3339) the data format of the data values in the database
-* `edit_by` (string) :[optional]("") if edit_by is not provided default value to use
+* `srid` (number) :  [optional] (3857) the srid of the data (not used; currently)
+* `edit_data_format` (string): [optional] (RFC3339) the data format of the data values in the database
+* `edit_by` (string) :[optional] ("") if edit_by is not provided default value to use
 
 
 # Expected Table Layout:

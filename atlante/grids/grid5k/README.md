@@ -1,6 +1,6 @@
 # grid5k
 
-A grid provided that cut's 50k grids into 5k grids
+A grid provider that derives 5k grids from a configured 50k grid provider
 
 ```toml
 
