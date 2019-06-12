@@ -36,9 +36,97 @@ The provider supports the following properties
 
 # Expected Table Layout:
 
-The provider expectes there to be at database called grids.
+The provider expects there to be at database called grids.
 The `grids` database should have a table called `grid50k`, with the 
 following columns:
 `mdg_id`, `sheet`, `series`, `nrn`, `swlat_dms`, `swlon_dms`, `nelat_dms`, `nelon_dms`,
 `swlat`, `swlon`, `nelat`, `nelon`, `country`, `last_edite`, `last_edi_1`,`wkb_geometry`
+
+---
+
+## PostGIS notes for `atlante`
+
+The following notes regarding the PostGIS database assume the following `providers` setup.
+
+``` toml
+# config.toml
+[[providers]]
+  name     = "the_database"
+  type     = "postgresql"
+  database = "grids"
+  user     = "tegola"
+```
+
+### Setup the Database
+
+From the shell console
+
+``` bash
+# The provider expects there to be at database called grids.
+createdb grids
+# enter the database to create the TABLE, etc
+psql grids
+```
+
+### Create Tables
+
+From the SQL command line `grids=# `.
+
+``` sql
+-- Enabling PostGIS, From http://postgis.net/install/
+CREATE EXTENSION postgis;  -- Enable PostGIS (includes raster)
+CREATE EXTENSION postgis_topology;  -- Enable Topology
+
+-- CREATE this TABLE
+--   comments include sample data
+CREATE TABLE grid50k (
+  mdg_id      varchar(80),    -- "MDG_ID":"__________"
+  sheet       varchar(80),    -- "SHEET":"_____"
+  series      varchar(80),    -- "SERIES":"____"
+  nrn         varchar(80),    -- "NRN":"__________"
+  swlat_dms   varchar(80),    -- "SWLAT_DMS":"32°30\"0.0'N"
+  swlon_dms   varchar(80),    -- "SWLON_DMS":"117°15\"0.0'W"
+  nelat_dms   varchar(80),    -- "NELAT_DMS":"32°45\"0.0'N"
+  nelon_dms   varchar(80),    -- "NELON_DMS":"117°0\"0.0'W"
+  swlat       real,           -- "SWLAT":32.5
+  swlon       real,           -- "SWLAT":32.5
+  nelat       real,           -- "NELAT":32.75000000000013
+  nelon       real,           -- "NELON":-116.99999999999996
+  country     varchar(80),    -- "COUNTRY":"United States"
+  last_edite  varchar(80),    -- "LAST_EDITE":"couldBeUser_or???"
+  last_edi_1  varchar(80)     -- "LAST_EDI_1":"2018-07-09T00:00:00.000"
+);
+
+-- Schema and permissions
+-- Recall the settings from config.toml
+--   database = "grids"
+--   user     = "tegola"
+CREATE SCHEMA grids;
+GRANT USAGE ON SCHEMA grids TO tegola;
+GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA grids TO tegola;
+SELECT * INTO grids.grid50k FROM grid50k WHERE 1=1;  -- TODO Could be refactored
+```
+
+### Add Data from `.gdb`
+
+From the shell console
+
+``` bash
+# Convert GDB to Shapefile
+mkdir shape  # for output of `ogr2ogr`
+ogr2ogr -f "ESRI Shapefile" shape/data.shp data.gdb/
+
+# Convert Shapefile to SQL into table `grid50k`
+shp2pgsql shape/data.shp grid50k > data.sql
+
+# Put SQL into PostgreSQL via CLI
+psql -d grids -U tegola -f data.sql
+
+# To test, echo back some data from the SCHEMA.TABLE
+psql grids --command="SELECT country    FROM grids.grid50k LIMIT 10;"
+psql grids --command="SELECT nrn        FROM grids.grid50k LIMIT 10;"
+psql grids --command="SELECT sheet      FROM grids.grid50k LIMIT 10;"
+psql grids --command="SELECT last_edite FROM grids.grid50k LIMIT 10;"
+psql grids --command="SELECT last_edi_1 FROM grids.grid50k LIMIT 10;"
+```
 
