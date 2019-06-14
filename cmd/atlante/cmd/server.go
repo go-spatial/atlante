@@ -5,6 +5,8 @@ import (
 	"net/http"
 	"net/url"
 
+	"github.com/go-spatial/maptoolkit/atlante/server/coordinator/logger"
+
 	"github.com/go-spatial/maptoolkit/atlante/queuer"
 	"github.com/prometheus/common/log"
 
@@ -64,11 +66,12 @@ func serverCmdRunE(cmd *cobra.Command, args []string) error {
 
 	// Need to initialize the server
 	srv := server.Server{
-		Hostname: string(conf.Webserver.HostName),
-		Port:     port,
-		Scheme:   string(conf.Webserver.Scheme),
-		Headers:  make(map[string]string),
-		Atlante:  a,
+		Hostname:    string(conf.Webserver.HostName),
+		Port:        port,
+		Scheme:      string(conf.Webserver.Scheme),
+		Headers:     make(map[string]string),
+		Atlante:     a,
+		Coordinator: &logger.Provider{},
 	}
 
 	// Now we need to look to see if a queue has been configured
