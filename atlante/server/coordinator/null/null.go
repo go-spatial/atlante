@@ -24,7 +24,7 @@ func (Provider)NewJob(job *atlante.Job)(jb *coordinator.Job, err error){
 		return nil, coordinator.ErrNilAtlanteJob
 	}
 	jbID := fmt.Sprintf("%v:%v", job.SheetName, job.Cell.Mdgid.AsString())
-	return coordinator.NewJob(jbID,job.Cell.Mdgid),nil
+	return coordinator.NewJob(jbID,job),nil
 }
 
 func (Provider)UpdateField(job *coordinator.Job, fields ...coordinator.FieldValue) error {
@@ -35,8 +35,8 @@ func (Provider) FindJob(job *atlante.Job) (jb *coordinator.Job, found bool){
 	return nil, false
 }
 
-func (Provider) FindJobID(jobid string)(jb *coordinator.Job, err error){
-	return nil, nil
+func (Provider) FindJobID(jobid string)(jb *coordinator.Job, found bool){
+	return nil, false
 }
 
 

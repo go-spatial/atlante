@@ -42,6 +42,9 @@ const (
 	// ParamsKeySheetname is the key used for the sheetname
 	ParamsKeySheetname = URLPlaceholder("sheetname")
 
+	// ParamsKeyJobID is the key used for the jobid
+	ParamsKeyJobID = URLPlaceholder("job_id")
+
 	// HTTPErrorHeader is the name of the X-header where details of the error
 	// is provided.
 	HTTPErrorHeader = "X-HTTP-Error-Description"
@@ -79,10 +82,10 @@ func GenPath(paths ...interface{}) string {
 }
 
 type (
-		jobItem struct {
-			MdgID     string    `json:"mdgid"`
-			MdgIDPart uint32    `json:"sheet_number,omitempty"`
-		}
+	jobItem struct {
+		MdgID     string `json:"mdgid"`
+		MdgIDPart uint32 `json:"sheet_number,omitempty"`
+	}
 
 	// Server is used to serve up grid information, and generate print jobs
 	Server struct {
@@ -388,7 +391,11 @@ func (s *Server) QueueHandler(w http.ResponseWriter, request *http.Request, urlP
 		s.Coordinator = &null.Provider{}
 	}
 
-	var ji jobItem
+	var ji struct {
+		MdgID     string `json:"mdgid"`
+		MdgIDPart uint32 `json:"sheet_number,omitempty"`
+	}
+
 	// Get json body
 	bdy, err := ioutil.ReadAll(request.Body)
 	request.Body.Close()
@@ -449,7 +456,7 @@ func (s *Server) QueueHandler(w http.ResponseWriter, request *http.Request, urlP
 	}
 	s.Coordinator.UpdateField(jb, coordinator.FieldQJobID(qjobid))
 
-	err = json.NewEncoder(w).Encode(ji)
+	err = json.NewEncoder(w).Encode(jb)
 	if err != nil {
 		serverError(w, "failed marshal json: %v", err)
 		return
@@ -485,6 +492,62 @@ func (s *Server) SheetInfoHandler(w http.ResponseWriter, request *http.Request, 
 	}
 }
 
+func (s *Server) JobInfoHandler(w http.ResponseWriter, request *http.Request, urlParams map[string]string) {
+
+	jobid, ok := urlParams[string(ParamsKeyJobID)]
+	if !ok {
+		// We need a sheetnumber.
+		badRequest(w, "missing job_id")
+		return
+	}
+	job, ok := s.Coordinator.FindJobID(jobid)
+	if !ok {
+		w.WriteHeader(http.StatusNotFound)
+		return
+	}
+
+	if err := json.NewEncoder(w).Encode(job); err != nil {
+		serverError(w, "failed to marshal json: %v", err)
+	}
+
+}
+
+func (s *Server) NotificationHandler(w http.ResponseWriter, request *http.Request, urlParams map[string]string) {
+
+	jobid, ok := urlParams[string(ParamsKeyJobID)]
+	if !ok {
+		// We need a sheetnumber.
+		badRequest(w, "missing job_id")
+		return
+	}
+
+	job, ok := s.Coordinator.FindJobID(jobid)
+	if !ok {
+		log.Infof("failed to find job: %v",jobid)
+		w.WriteHeader(http.StatusNotFound)
+		return
+	}
+
+	// Get json body
+	bdy, err := ioutil.ReadAll(request.Body)
+	request.Body.Close()
+	if err != nil {
+		badRequest(w, "error reading body")
+		return
+	}
+
+	var si coordinator.FieldStatus
+	err = json.Unmarshal(bdy, &si)
+	if err != nil {
+		badRequest(w, "unable to unmarshal json: %v", err)
+		return
+	}
+
+	if err := s.Coordinator.UpdateField(job,si); err != nil {
+		serverError(w, "failed to update job %v: %v",jobid, err)
+	}
+}
+
 // RegisterRoutes setup the routes
 func (s *Server) RegisterRoutes(r *httptreemux.TreeMux) {
 
@@ -501,6 +564,12 @@ func (s *Server) RegisterRoutes(r *httptreemux.TreeMux) {
 		log.Infof("registering: POST /sheets/:sheetname/mdgid")
 		group.POST("/mdgid", s.QueueHandler)
 	}
+
+	jgroup := r.NewGroup(GenPath("jobs",ParamsKeyJobID))
+	log.Infof("registering: GET  /jobs/:jobid/status")
+	jgroup.GET("/status", s.JobInfoHandler)
+	log.Infof("registering: POST  /jobs/:jobid/status")
+	jgroup.POST("/status", s.NotificationHandler)
 }
 
 // corsHanlder is used to respond to all OPTIONS requests for registered routes

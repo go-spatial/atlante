@@ -50,7 +50,7 @@ func (p *Provider) NewJob(job *atlante.Job) (jb *coordinator.Job, err error) {
 	if p == nil || p.Provider != nil {
 		return p.Provider.NewJob(job)
 	}
-	return coordinator.NewJob(jbID, job.Cell.Mdgid), nil
+	return coordinator.NewJob(jbID, job), nil
 }
 
 func (p *Provider) UpdateField(job *coordinator.Job, fields ...coordinator.FieldValue) error {
@@ -86,19 +86,19 @@ func (p *Provider) FindJob(job *atlante.Job) (jb *coordinator.Job, found bool) {
 		log.Infof("job is nil")
 		return nil, false
 	}
-	log.Infof("Looking for job via sheet: %v mdgid: %v ", job.SheetName, job.Cell.Mdgid.AsString())
+	log.Infof("looking for job via sheet: %v mdgid: %v ", job.SheetName, job.Cell.Mdgid.AsString())
 	if p == nil || p.Provider != nil {
 		return p.Provider.FindJob(job)
 	}
 	return nil, false
 }
 
-func (p *Provider) FindJobID(jobid string) (jb *coordinator.Job, err error) {
-	log.Infof("Looking for job : %v ", jobid)
+func (p *Provider) FindJobID(jobid string) (jb *coordinator.Job, found bool) {
+	log.Infof("looking for job : %v ", jobid)
 	if p == nil || p.Provider != nil {
 		return p.Provider.FindJobID(jobid)
 	}
-	return nil, nil
+	return nil, false
 }
 
 var _ = coordinator.Provider(&Provider{})
