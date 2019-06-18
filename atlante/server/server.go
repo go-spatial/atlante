@@ -375,7 +375,7 @@ func (s *Server) GridInfoHandler(w http.ResponseWriter, request *http.Request, u
 	}
 
 	// Ask the coordinator for the status:
-	if jb, ok := s.Coordinator.FindJob(&atlante.Job{SheetName: sheetName, Cell: cell}); ok {
+	if jb, ok := s.Coordinator.FindByJob(&atlante.Job{SheetName: sheetName, Cell: cell}); ok {
 		status = jb.Status
 		lastGen = jb.UpdatedAt
 		if jb.UpdatedAt.IsZero() {
@@ -452,6 +452,22 @@ func (s *Server) QueueHandler(w http.ResponseWriter, request *http.Request, urlP
 	}
 
 	// Check the queue to see if there is already a job with these params:
+	if jb, found := s.Coordinator.FindByJob(&qjob); found {
+		switch jb.Status.Status.(type) {
+		default:
+			// do nothing we should enqueue a
+			// new job.
+		case field.Requested, field.Started:
+			// Job is already there just return
+			// info about the old job.
+			err = json.NewEncoder(w).Encode(jb)
+			if err != nil {
+				serverError(w, "failed marshal json: %v", err)
+			}
+			return
+		}
+	}
+
 	jb, err := s.Coordinator.NewJob(&qjob)
 	if err != nil {
 		serverError(w, "failed to get new job from coordinator: %v", err)
@@ -518,7 +534,7 @@ func (s *Server) JobInfoHandler(w http.ResponseWriter, request *http.Request, ur
 		badRequest(w, "missing job_id")
 		return
 	}
-	job, ok := s.Coordinator.FindJobID(jobid)
+	job, ok := s.Coordinator.FindByJobID(jobid)
 	if !ok {
 		w.WriteHeader(http.StatusNotFound)
 		return
@@ -541,7 +557,7 @@ func (s *Server) NotificationHandler(w http.ResponseWriter, request *http.Reques
 		return
 	}
 
-	job, ok := s.Coordinator.FindJobID(jobid)
+	job, ok := s.Coordinator.FindByJobID(jobid)
 	if !ok {
 		log.Infof("failed to find job: %v", jobid)
 		w.WriteHeader(http.StatusNotFound)

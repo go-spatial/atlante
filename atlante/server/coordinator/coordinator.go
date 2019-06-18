@@ -35,11 +35,11 @@ type Provider interface {
 
 	// FindJob will look for a job described by the given atlante.Job (MDGID/SheetName) and return it, or return nil, and a false for
 	// found
-	FindJob(job *atlante.Job) (jb *Job, found bool)
+	FindByJob(job *atlante.Job) (jb *Job, found bool)
 
 	// FindJobID will attempt to locate the job by the given jobId, if a job is found non-nil job will be returned. If an error
 	// occurs then err will be non-nil. If job is not found, the both jb and err will be nil
-	FindJobID(jobid string) (jb *Job, found bool)
+	FindByJobID(jobid string) (jb *Job, found bool)
 
 	// UpdateField will attempt to update the job field info for the given job.
 	UpdateField(job *Job, fields ...field.Value) error

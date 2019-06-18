@@ -267,7 +267,7 @@ INSERT INTO jobs(
 	sheet_name,
 	bounds
 )
-VALUES($1,$2,$3,ST_GeometryFromText($4))
+VALUES($1,$2,$3,ST_GeometryFromText($4,$5))
 RETURNING id;
 `
 
@@ -289,6 +289,7 @@ RETURNING id;
 		job.Cell.Mdgid.Part,
 		job.SheetName,
 		bounds,
+		4326,
 	)
 	if err := row.Scan(&id); err != nil {
 		return nil, err
@@ -370,7 +371,7 @@ VALUES($1,$2,$3);
 	return nil
 }
 
-func (p *Provider) FindJob(job *atlante.Job) (jb *coordinator.Job, found bool) {
+func (p *Provider) FindByJob(job *atlante.Job) (jb *coordinator.Job, found bool) {
 
 	const selectQuery = `
 SELECT 
@@ -434,7 +435,7 @@ ORDER BY jobstatus.id desc limit 1;
 	return cjb, true
 }
 
-func (p *Provider) FindJobID(jobid string) (jb *coordinator.Job, found bool) {
+func (p *Provider) FindByJobID(jobid string) (jb *coordinator.Job, found bool) {
 
 	const selectQuery = `
 SELECT 

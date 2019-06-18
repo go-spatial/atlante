@@ -108,7 +108,7 @@ func For(notifierType string, config Config) (Provider, error) {
 	return n.init(config)
 }
 
-// From is like for but assumes that the config has a ConfigKeyType value informing the type
+// From is like For but assumes that the config has a ConfigKeyType value informing the type
 // of provider being configured
 func From(config Config) (Provider, error) {
 	cType, err := config.String(ConfigKeyType, nil)

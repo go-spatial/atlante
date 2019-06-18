@@ -1,4 +1,4 @@
-CREATE EXTENSION postgis;
+CREATE EXTENSION IF NOT EXISTS postgis ;
 
 CREATE TABLE jobs (
     id SERIAL PRIMARY KEY,
@@ -7,7 +7,7 @@ CREATE TABLE jobs (
     sheet_name TEXT NOT NULL,
     queue_id TEXT,
     job_data TEXT,
-    bounds GEOMETRY,
+    bounds geometry(Polygon, 4326) NOT NULL,
     created TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
@@ -19,7 +19,7 @@ CREATE INDEX ON jobs (sheet_name);
 
 CREATE INDEX ON jobs (queue_id);
 
-CREATE INDEX bounds_polygon_idx ON bounds USING GIST (bounds);
+CREATE INDEX bounds_polygon_idx ON jobs USING GIST (bounds);
 
 
 CREATE TABLE statuses (

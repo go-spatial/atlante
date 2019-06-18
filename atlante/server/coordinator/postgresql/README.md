@@ -33,7 +33,7 @@ The provider supports the following properties
 The following options are used to specify the sql that is used to manage the 
 database. (note this can be brittle.)
 
-* `query_new_job` : the sql is run to create a new job.
+* `query_new_job` (string): the sql is run to create a new job.
 
 Default SQL:
 
@@ -45,7 +45,7 @@ INSERT INTO jobs(
 	sheet_name,
 	bounds
 )
-VALUES($1,$2,$3,ST_GeometryFromText($4))
+VALUES($1,$2,$3,ST_GeometryFromText($4, $5))
 RETURNING id;
 
 ```
@@ -54,8 +54,9 @@ RETURNING id;
     * $2 will be a sheet number (uint32)
     * $3 will be the sheet name (string)
     * $4 will be wkt of the bounds of the grid
+    * $5 will be the srid -- hardcode to 4326 for now
 
-* `query_update_queue_job_id` : the sql is run to update the queue job id.
+* `query_update_queue_job_id` (string): the sql is run to update the queue job id.
 Default SQL:
 
 ```sql
@@ -69,7 +70,7 @@ WHERE id=$1
     * $1 will be the jobid (int)
     * $2 will be the queue_id (string)
 
-* `query_update_job_data` : the sql is run to update the job data
+* `query_update_job_data` (string): the sql is run to update the job data
 Default SQL:
 
 ```sql
@@ -83,7 +84,7 @@ WHERE id=$1
     * $2 will be the job_data (string)
 
 
-* `query_insert_status` : the sql is run to insert a new status for a job
+* `query_insert_status` (string): the sql is run to insert a new status for a job
 
 ```sql
 
@@ -99,7 +100,7 @@ VALUES($1,$2,$3);
     * $2 will be the status (string)
     * $3 will be the description (string)
 
-* `query_select_job_id` : the sql is used to find job for a job_id
+* `query_select_job_id` (string): the sql is used to find job for a job_id
 
 ```sql
 SELECT 
@@ -122,7 +123,7 @@ ORDER BY jobstatus.id desc limit 1;
     The system is expect the sql to return zero or one row only.
 
 
-* `query_select_mdgid_sheetname` : the sql is used to find jobs for an mdgid/sheetname 
+* `query_select_mdgid_sheetname` (string): the sql is used to find jobs for an mdgid/sheetname 
 
 ```sql
 SELECT 
@@ -144,3 +145,5 @@ ORDER BY jobstatus.id desc limit 1;
 
     The list order is the order in which the items need to occure.
     The system is expect the sql to return zero or one row only.
+
+Create sqls for the original tables can be found in the [docs/jobs.sql folder.](doc/jobs.sql)

@@ -3,6 +3,7 @@ package http
 import (
 	"bytes"
 	"encoding/json"
+	"io/ioutil"
 	"net/http"
 	"strings"
 	"text/template"
@@ -39,7 +40,7 @@ func initFunc(cfg notifiers.Config) (notifiers.Provider, error) {
 	log.Infof("configured notifier %v", TYPE)
 	return &Provider{
 		contentType: contentType,
-		url:         t,
+		urlTpl:      t,
 	}, nil
 }
 
@@ -49,7 +50,7 @@ func init() {
 
 type Provider struct {
 	contentType string
-	url         *template.Template
+	urlTpl      *template.Template
 }
 
 func (p *Provider) NewEmitter(jobid string) (notifiers.Emitter, error) {
@@ -59,7 +60,7 @@ func (p *Provider) NewEmitter(jobid string) (notifiers.Emitter, error) {
 	}{
 		JobID: jobid,
 	}
-	if err := p.url.Execute(&str, ctx); err != nil {
+	if err := p.urlTpl.Execute(&str, ctx); err != nil {
 		return nil, err
 	}
 
@@ -86,9 +87,19 @@ func (e *emitter) Emit(se field.StatusEnum) error {
 	buff := bytes.NewBuffer(bdy)
 	// Don't care about the response
 	log.Infof("posting to %v:%s", e.url, string(bdy))
-	_, err = http.Post(e.url, e.contentType, buff)
+	resp, err := http.Post(e.url, e.contentType, buff)
 	if err != nil {
 		log.Warnf("error posting to (%v): %v", e.url, err)
+	}
+	// If the status code was a Client Error or a Server Error we should log
+	// the code and body.
+	if resp.StatusCode >= 400 {
+		codetype := "client error"
+		if resp.StatusCode >= 500 {
+			codetype = "server error"
+		}
+		bdy, _ := ioutil.ReadAll(resp.Body)
+		log.Infof("%v (%v): %v", codetype, resp.StatusCode, bdy)
 	}
 	return err
 }

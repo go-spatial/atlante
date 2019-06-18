@@ -7,18 +7,17 @@ import (
 	"strings"
 )
 
-/*
-type Status enum {
-	Requested,
-	Started,
-	Processing {
-		Description string `json:"description"`
-	},
-	Failed {
-		Error  error `json:"error"`
-	},
-}
-*/
+const (
+	requested  = "requested"
+	completed  = "completed"
+	started    = "started"
+	processing = "processing"
+	failed     = "failed"
+
+	errorKey       = "error"
+	descriptionKey = "description"
+	statusKey      = "status"
+)
 
 type (
 
@@ -52,13 +51,6 @@ type (
 	Completed struct{}
 )
 
-var (
-	// StatusStarted helper for a started status
-	StatusStarted = Started{}
-	// StatusRequested helper for a requested status
-	StatusRequested = Requested{}
-)
-
 func (s Status) String() string { return s.Status.String() }
 func (s Status) field()         {}
 
@@ -85,25 +77,25 @@ func (s Status) MarshalJSON() ([]byte, error) {
 	switch senum := s.Status.(type) {
 	case Started:
 		jsonval = sentinalEnum{
-			Type: "started",
+			Type: started,
 		}
 	case Requested:
 		jsonval = sentinalEnum{
-			Type: "requested",
+			Type: requested,
 		}
 	case Processing:
 		jsonval = processingEnum{
-			Type:        "processing",
+			Type:        processing,
 			Description: senum.Description,
 		}
 	case Failed:
 		jsonval = failedEnum{
-			Type:  "failed",
+			Type:  failed,
 			Error: senum.Error.Error(),
 		}
 	case Completed:
 		jsonval = sentinalEnum{
-			Type: "completed",
+			Type: completed,
 		}
 	default:
 		return []byte{}, fmt.Errorf("Unknown type %t", s.Status)
@@ -119,32 +111,32 @@ func (s *Status) UnmarshalJSON(b []byte) error {
 		return err
 	}
 	var typ string
-	if err := json.Unmarshal(obj["status"], &typ); err != nil {
+	if err := json.Unmarshal(obj[statusKey], &typ); err != nil {
 		return err
 	}
 
 	switch typ {
-	case "started":
+	case started:
 		s.Status = Started{}
-	case "requested":
+	case requested:
 		s.Status = Requested{}
-	case "processing":
+	case processing:
 		var p Processing
-		if err := json.Unmarshal(obj["description"], &p.Description); err != nil {
+		if err := json.Unmarshal(obj[descriptionKey], &p.Description); err != nil {
 			return nil
 		}
 		s.Status = p
-	case "failed":
+	case failed:
 
 		var errStr string
-		if err := json.Unmarshal(obj["error"], &errStr); err != nil {
+		if err := json.Unmarshal(obj[errorKey], &errStr); err != nil {
 			return nil
 		}
 		s.Status = Failed{
 			Error: errors.New(errStr),
 		}
 
-	case "completed":
+	case completed:
 		s.Status = Completed{}
 
 	default:
@@ -154,34 +146,34 @@ func (s *Status) UnmarshalJSON(b []byte) error {
 	return nil
 }
 
-func NewStatusFor(s, desc string) (StatusEnum, error) {
-	switch strings.ToLower(s) {
-	case "started":
+func NewStatusFor(status, desc string) (StatusEnum, error) {
+	switch strings.ToLower(status) {
+	case started:
 		return Started{}, nil
-	case "requested":
+	case requested:
 		return Requested{}, nil
-	case "completed":
+	case completed:
 		return Completed{}, nil
-	case "processing":
+	case processing:
 		return Processing{Description: desc}, nil
-	case "failed":
+	case failed:
 		return Failed{Error: errors.New(desc)}, nil
 	default:
-		return nil, fmt.Errorf("Unknown status type: %v", s)
+		return nil, fmt.Errorf("Unknown status type: %v", status)
 	}
 }
 
 func (Requested) statusenum()    {}
-func (Requested) String() string { return "requested" }
+func (Requested) String() string { return requested }
 
 func (Started) statusenum()    {}
-func (Started) String() string { return "started" }
+func (Started) String() string { return started }
 
 func (p Processing) statusenum()    {}
-func (p Processing) String() string { return "processing:" + p.Description }
+func (p Processing) String() string { return processing + ":" + p.Description }
 
 func (f Failed) statusenum()    {}
-func (f Failed) String() string { return "failed:" + f.Error.Error() }
+func (f Failed) String() string { return failed + ":" + f.Error.Error() }
 
 func (Completed) statusenum()    {}
-func (Completed) String() string { return "completed" }
+func (Completed) String() string { return completed }
