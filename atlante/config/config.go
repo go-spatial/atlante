@@ -20,6 +20,8 @@ type Config struct {
 	// Webserver is the configuration for the webserver
 	Webserver Webserver `toml:"webserver"`
 
+	Notifier env.Dict `toml:"notifier"`
+
 	Providers []env.Dict `toml:"providers"`
 	Sheets    []Sheet    `toml:"sheets"`
 
@@ -38,11 +40,13 @@ type Config struct {
 // Webserver represents the config values for the webserver potion
 // of the application.
 type Webserver struct {
-	HostName env.String        `toml:"hostname"`
-	Port     env.String        `toml:"port"`
-	Scheme   env.String        `toml:"scheme"`
-	Headers  map[string]string `toml:"headers"`
-	Queue    env.Dict          `toml:"queue"`
+	HostName              env.String        `toml:"hostname"`
+	Port                  env.String        `toml:"port"`
+	Scheme                env.String        `toml:"scheme"`
+	Headers               map[string]string `toml:"headers"`
+	Queue                 env.Dict          `toml:"queue"`
+	DisableNotificationEP bool              `toml:"disable_notification_endpoint"`
+	Coordinator           env.Dict          `toml:"coordinator"`
 }
 
 // Sheet models a sheet in the config file
@@ -53,7 +57,6 @@ type Sheet struct {
 	DPI          env.Int      `toml:"dpi"`
 	Template     env.String   `toml:"template"`
 	Style        env.String   `toml:"style"`
-	Notifier     env.String   `toml:"notifier"`
 	Description  env.String   `toml:"description"`
 }
 

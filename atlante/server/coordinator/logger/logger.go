@@ -6,6 +6,8 @@ import (
 	"github.com/gdey/errors"
 	"github.com/go-spatial/maptoolkit/atlante"
 	"github.com/go-spatial/maptoolkit/atlante/server/coordinator"
+	"github.com/go-spatial/maptoolkit/atlante/server/coordinator/field"
+	"github.com/go-spatial/tegola/dict"
 	"github.com/prometheus/common/log"
 )
 
@@ -18,15 +20,20 @@ const (
 )
 
 func initFunc(cfg coordinator.Config) (coordinator.Provider, error) {
-	var pName string
-	if pName, _ = cfg.String(ConfigKeyProvider, &pName); pName == "" {
-		return &Provider{}, nil
+	var (
+		pConfig dict.Dicter
+		err     error
+	)
+	pConfig, err = cfg.Map(ConfigKeyProvider)
+	if err != nil {
+		return &Provider{}, err
 	}
-	subProvider, err := cfg.CoordinatorFor(pName)
+
+	subProvider, err := coordinator.From(pConfig)
 	if err != nil {
 		return nil, err
 	}
-	log.Infof("initalizing log coordinator with: %v ", pName)
+	log.Infof("initalizing log coordinator with: %T ", subProvider)
 	return &Provider{
 		Provider: subProvider,
 	}, nil
@@ -53,7 +60,7 @@ func (p *Provider) NewJob(job *atlante.Job) (jb *coordinator.Job, err error) {
 	return coordinator.NewJob(jbID, job), nil
 }
 
-func (p *Provider) UpdateField(job *coordinator.Job, fields ...coordinator.FieldValue) error {
+func (p *Provider) UpdateField(job *coordinator.Job, fields ...field.Value) error {
 	if job == nil {
 		log.Infof("job is nil")
 		return coordinator.ErrNilJob
@@ -61,17 +68,24 @@ func (p *Provider) UpdateField(job *coordinator.Job, fields ...coordinator.Field
 
 	log.Infof("update fields in job: %v", job.JobID)
 	for i, f := range fields {
-		switch field := f.(type) {
-		case coordinator.FieldQJobID:
-			log.Infof("update q job id to: %v", string(field))
-		case coordinator.FieldStatus:
-			if field.Description != "" {
-				log.Infof("update status to: %s —— %s", field.Status, field.Description)
-			} else {
-				log.Infof("update status to: %s", field.Status)
+		switch fld := f.(type) {
+		case field.QJobID:
+			log.Infof("update q job id to: %v", string(fld))
+		case field.Status:
+			switch status := fld.Status.(type) {
+			case field.Requested:
+				log.Infof("update status to requested")
+			case field.Started:
+				log.Infof("update status to started")
+			case field.Processing:
+				log.Infof("update status to processing %v", status.Description)
+			case field.Failed:
+				log.Infof("update status to failed - reason %v", status.Error)
+			default:
+				log.Infof("unknown status: %t", status)
 			}
 		default:
-			log.Infof("unkown field[%v] %t", i, field)
+			log.Infof("unkown field[%v] %t", i, fld)
 			return errors.String("unknown field type")
 		}
 	}

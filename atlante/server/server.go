@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/go-spatial/maptoolkit/atlante/server/coordinator/field"
 	"github.com/go-spatial/maptoolkit/atlante/server/coordinator/null"
 
 	"github.com/go-spatial/maptoolkit/atlante/server/coordinator"
@@ -82,11 +83,6 @@ func GenPath(paths ...interface{}) string {
 }
 
 type (
-	jobItem struct {
-		MdgID     string `json:"mdgid"`
-		MdgIDPart uint32 `json:"sheet_number,omitempty"`
-	}
-
 	// Server is used to serve up grid information, and generate print jobs
 	Server struct {
 		// HostName is the name of the host to use for construction of URLS.
@@ -113,6 +109,9 @@ type (
 
 		// Coordinator  is a Coordinator Provider for managing jobs
 		Coordinator coordinator.Provider
+
+		// DisableNotificationEP will disable the job notification end points from being registered.
+		DisableNotificationEP bool
 	}
 )
 
@@ -156,7 +155,9 @@ func setHeaders(h map[string]string, w http.ResponseWriter) {
 }
 
 func badRequest(w http.ResponseWriter, reasonFmt string, data ...interface{}) {
-	w.Header().Set(HTTPErrorHeader, fmt.Sprintf(reasonFmt, data...))
+	str := fmt.Sprintf(reasonFmt, data...)
+	log.Infof("got error: %v", str)
+	w.Header().Set(HTTPErrorHeader, str)
 	w.WriteHeader(http.StatusBadRequest)
 }
 
@@ -165,7 +166,7 @@ func serverError(w http.ResponseWriter, reasonFmt string, data ...interface{}) {
 	w.WriteHeader(http.StatusInternalServerError)
 }
 
-func encodeCellAsJSON(w io.Writer, cell *grids.Cell, pdf string, lat, lng *float64, lastGen time.Time, Status coordinator.Status) {
+func encodeCellAsJSON(w io.Writer, cell *grids.Cell, pdf string, lat, lng *float64, lastGen time.Time, status field.Status) {
 	// Build out the geojson
 	const geoJSONFmt = `{"type":"FeatureCollection","features":[{"type":"Feature","properties":{"objectid":"%v"},"geometry":{"type":"Polygon","coordinates":[[[%v,%v],[%v, %v],[%v, %v],[%v, %v],[%v, %v]]]}}]}`
 	mdgid := cell.GetMdgid()
@@ -173,6 +174,7 @@ func encodeCellAsJSON(w io.Writer, cell *grids.Cell, pdf string, lat, lng *float
 	jsonCell := struct {
 		MDGID      string          `json:"mdgid"`
 		Part       *uint32         `json:"sheet_number,omitempty"`
+		JobStatus  field.Status    `json:"status"`
 		PDF        string          `json:"pdf_url"`
 		LastGen    string          `json:"last_generated,omitempty"` // RFC 3339 format
 		LastEdited string          `json:"last_edited,omitempty"`    // RFC 3339 format
@@ -183,12 +185,16 @@ func encodeCellAsJSON(w io.Writer, cell *grids.Cell, pdf string, lat, lng *float
 		GeoJSON    json.RawMessage `json:"geo_json"`
 	}{
 		MDGID:     mdgid.Id,
-		LastGen:   lastGen.Format(time.RFC3339),
+		JobStatus: status,
 		Lat:       lat,
 		Lng:       lng,
 		PDF:       pdf,
 		Series:    cell.GetSeries(),
 		SheetName: cell.GetSheet(),
+	}
+
+	if !lastGen.IsZero() {
+		jsonCell.LastGen = lastGen.Format(time.RFC3339)
 	}
 	pubdate, err := cell.PublicationDate()
 	if err != nil && !pubdate.IsZero() {
@@ -212,7 +218,10 @@ func encodeCellAsJSON(w io.Writer, cell *grids.Cell, pdf string, lat, lng *float
 		),
 	)
 	// Encoding the cell into the json
-	json.NewEncoder(w).Encode(jsonCell)
+	err = json.NewEncoder(w).Encode(jsonCell)
+	if err != nil {
+		log.Warnf("failed to encode jsonCell: %v", err)
+	}
 }
 
 // GetHostName returns determines the hostname:port to return based on the following hierarchy
@@ -290,7 +299,7 @@ func (s *Server) GridInfoHandler(w http.ResponseWriter, request *http.Request, u
 		// We will get this from the filestore
 		lastGen time.Time
 
-		status = coordinator.StatusUnknown
+		status field.Status
 	)
 
 	sheetName, ok := urlParams[string(ParamsKeySheetname)]
@@ -310,6 +319,7 @@ func (s *Server) GridInfoHandler(w http.ResponseWriter, request *http.Request, u
 
 	// check to see if the mdgid key was given.
 	if mdgidStr, ok := urlParams[string(ParamsKeyMDGID)]; ok {
+		log.Infof("MDGID route %v", mdgidStr)
 		mdgid = grids.NewMDGID(mdgidStr)
 		cell, err = sheet.CellForMDGID(mdgid)
 		if err != nil {
@@ -368,6 +378,9 @@ func (s *Server) GridInfoHandler(w http.ResponseWriter, request *http.Request, u
 	if jb, ok := s.Coordinator.FindJob(&atlante.Job{SheetName: sheetName, Cell: cell}); ok {
 		status = jb.Status
 		lastGen = jb.UpdatedAt
+		if jb.UpdatedAt.IsZero() {
+			lastGen = jb.EnqueuedAt
+		}
 	}
 
 	// content type
@@ -454,7 +467,12 @@ func (s *Server) QueueHandler(w http.ResponseWriter, request *http.Request, urlP
 		badRequest(w, "failed to queue job: %v", err)
 		return
 	}
-	s.Coordinator.UpdateField(jb, coordinator.FieldQJobID(qjobid))
+	jbData, _ := qjob.Base64Marshal()
+	s.Coordinator.UpdateField(jb,
+		field.QJobID(qjobid),
+		field.JobData(jbData),
+		field.Status{field.Requested{}},
+	)
 
 	err = json.NewEncoder(w).Encode(jb)
 	if err != nil {
@@ -514,16 +532,18 @@ func (s *Server) JobInfoHandler(w http.ResponseWriter, request *http.Request, ur
 
 func (s *Server) NotificationHandler(w http.ResponseWriter, request *http.Request, urlParams map[string]string) {
 
+	log.Infof("Got a post to Notification: %v", urlParams)
 	jobid, ok := urlParams[string(ParamsKeyJobID)]
 	if !ok {
 		// We need a sheetnumber.
+		log.Infof("Missing job_id: %v", urlParams)
 		badRequest(w, "missing job_id")
 		return
 	}
 
 	job, ok := s.Coordinator.FindJobID(jobid)
 	if !ok {
-		log.Infof("failed to find job: %v",jobid)
+		log.Infof("failed to find job: %v", jobid)
 		w.WriteHeader(http.StatusNotFound)
 		return
 	}
@@ -536,16 +556,19 @@ func (s *Server) NotificationHandler(w http.ResponseWriter, request *http.Reques
 		return
 	}
 
-	var si coordinator.FieldStatus
+	var si field.Status
+	log.Infof("Body: %s", bdy)
 	err = json.Unmarshal(bdy, &si)
 	if err != nil {
 		badRequest(w, "unable to unmarshal json: %v", err)
 		return
 	}
+	log.Infof("Status: %v", si)
 
-	if err := s.Coordinator.UpdateField(job,si); err != nil {
-		serverError(w, "failed to update job %v: %v",jobid, err)
+	if err := s.Coordinator.UpdateField(job, si); err != nil {
+		serverError(w, "failed to update job %v: %v", jobid, err)
 	}
+	w.WriteHeader(http.StatusNoContent)
 }
 
 // RegisterRoutes setup the routes
@@ -558,18 +581,20 @@ func (s *Server) RegisterRoutes(r *httptreemux.TreeMux) {
 	group := r.NewGroup(GenPath("sheets", ParamsKeySheetname))
 	log.Infof("registering: GET  /sheets/:sheetname/info/:lng/:lat")
 	group.GET(GenPath("info", ParamsKeyLng, ParamsKeyLat), s.GridInfoHandler)
-	log.Infof("registering: GET  /sheets/:sheetname/info/:mdgid")
+	log.Infof("registering: GET  /sheets/:sheetname/info/mdgid/:mdgid")
 	group.GET(GenPath("info", "mdgid", ParamsKeyMDGID), s.GridInfoHandler)
 	if s.Queue != nil {
 		log.Infof("registering: POST /sheets/:sheetname/mdgid")
 		group.POST("/mdgid", s.QueueHandler)
 	}
 
-	jgroup := r.NewGroup(GenPath("jobs",ParamsKeyJobID))
+	jgroup := r.NewGroup(GenPath("jobs", ParamsKeyJobID))
 	log.Infof("registering: GET  /jobs/:jobid/status")
 	jgroup.GET("/status", s.JobInfoHandler)
-	log.Infof("registering: POST  /jobs/:jobid/status")
-	jgroup.POST("/status", s.NotificationHandler)
+	if !s.DisableNotificationEP {
+		log.Infof("registering: POST  /jobs/:jobid/status")
+		jgroup.POST("/status", s.NotificationHandler)
+	}
 }
 
 // corsHanlder is used to respond to all OPTIONS requests for registered routes

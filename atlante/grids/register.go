@@ -69,7 +69,7 @@ func Register(providerType string, init InitFunc, cleanup CleanupFunc) error {
 		init:    init,
 		cleanup: cleanup,
 	}
-	log.Infof("registerd grid provider: %v", providerType)
+	log.Infof("registered grid provider: %v", providerType)
 	return nil
 }
 

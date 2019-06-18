@@ -20,6 +20,9 @@ func (err ErrProviderTypeExists) Error() string {
 const (
 	// ErrNoProvidersRegistered is returned when no coordinators are registered with the system
 	ErrNoProvidersRegistered = errors.String("no coordinator providers registered")
+
+	// ConfigKeyType is the name for the config key
+	ConfigKeyType = "type"
 )
 
 // ErrUnknownProvider is returned when a requested queuer is not registered
@@ -32,7 +35,6 @@ func (err ErrUnknownProvider) Error() string {
 // Config is the interface that is passed to the queue provider to configure them
 type Config interface {
 	dict.Dicter
-	CoordinatorFor(key string)(Provider, error)
 }
 
 // InitFunc initilizes a queue provider given a config
@@ -113,6 +115,16 @@ func For(providerType string, config Config) (Provider, error) {
 		return nil, ErrUnknownProvider(providerType)
 	}
 	return p.init(config)
+}
+
+// From is like for but assumes that the config has a ConfigKeyType value informing the type
+// of provider being configured
+func From(config Config) (Provider, error) {
+	cType, err := config.String(ConfigKeyType, nil)
+	if err != nil {
+		return nil, err
+	}
+	return For(cType, config)
 }
 
 // Cleanup should be called when the system is shutting down. This gives weach provider

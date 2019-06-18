@@ -10,6 +10,7 @@ import (
 	"github.com/go-spatial/maptoolkit/atlante/filestore"
 	"github.com/go-spatial/maptoolkit/atlante/grids"
 	"github.com/go-spatial/maptoolkit/atlante/internal/urlutil"
+	"github.com/go-spatial/maptoolkit/atlante/notifiers"
 )
 
 // Sheet describes a map sheet
@@ -34,6 +35,8 @@ type Sheet struct {
 
 	// Description of the sheet
 	Desc string
+
+	Emitter notifiers.Emitter
 }
 
 // NewSheet returns a new sheet

@@ -8,30 +8,30 @@ import (
 	"github.com/go-spatial/tegola/dict"
 )
 
-type ErrNotifierAlreadyExists string
+type ErrAlreadyExists string
 
-func (err ErrNotifierAlreadyExists) Error() string {
+func (err ErrAlreadyExists) Error() string {
 	return "notifier (" + string(err) + ") already exists"
 }
-func (err ErrNotifierAlreadyExists) Cause() error { return nil }
+func (err ErrAlreadyExists) Cause() error { return nil }
 
 const (
-	ErrNoNotifiersRegistered = errors.String("no notifiers registered")
-	ErrKey                   = errors.String("bad key provided")
+	ErrNoneRegistered = errors.String("no notifiers registered")
+	ErrKey            = errors.String("bad key provided")
+
+	// ConfigKeyType is the name for the config key
+	ConfigKeyType = "type"
 )
 
-type NotifierConfiger interface {
+type Config interface {
 	dict.Dicter
-	// NamedNotifierProvider returns a configured Notifer for the provided key.
-	// if the named provider does not exist ErrNoNotifiersRegistered will be returned
-	NamedNotifierProvider(name string) (Notifier, error)
 }
 
 /*****************************************************************************/
 
 // InitFunc initilizes a notifier given the config.
 // InitFunc should validate the config, and report any errors.
-type InitFunc func(NotifierConfiger) (Notifer, error)
+type InitFunc func(Config) (Provider, error)
 
 // CleanupFunc is called when the system is shutting down.
 // this allows the provider do any needed cleanup.
@@ -56,9 +56,9 @@ func Register(notifierType string, init InitFunc, cleanup CleanupFunc) error {
 		notifiers = make(map[string]funcs)
 	}
 	if _, ok := notifiers[notifierType]; ok {
-		return ErrNotifierAlreadyExists(notifierType)
+		return ErrAlreadyExists(notifierType)
 	}
-	notifiers[notiferType] = funcs{
+	notifiers[notifierType] = funcs{
 		init:    init,
 		cleanup: cleanup,
 	}
@@ -70,7 +70,7 @@ func Unregister(notifierType string) {
 	notifiersLock.Lock()
 	defer notifiersLock.Unlock()
 
-	n, ok := notifiers[notifiersType]
+	n, ok := notifiers[notifierType]
 	if !ok {
 		return // nothing to do.
 	}
@@ -95,17 +95,27 @@ func Registered() (n []string) {
 }
 
 // For function returns a configured provider of the given type, and provided the correct config.
-func For(notifierType string, config NotifierConfig) (Notifier, error) {
+func For(notifierType string, config Config) (Provider, error) {
 	notifiersLock.RLock()
 	defer notifiersLock.RUnlock()
 	if notifiers == nil {
-		return nil, ErrNoNotifiersRegistered
+		return nil, ErrNoneRegistered
 	}
 	n, ok := notifiers[notifierType]
 	if !ok {
-		return nil, ErrNotifierNotRegistered(notifierType)
+		return nil, ErrNoneRegistered
 	}
 	return n.init(config)
+}
+
+// From is like for but assumes that the config has a ConfigKeyType value informing the type
+// of provider being configured
+func From(config Config) (Provider, error) {
+	cType, err := config.String(ConfigKeyType, nil)
+	if err != nil {
+		return nil, err
+	}
+	return For(cType, config)
 }
 
 // Cleanup should be called when the system is shutting down. This given each provider
