@@ -5,11 +5,13 @@ import (
 	"net/url"
 	"strings"
 
+	"github.com/gdey/errors"
 	"github.com/go-spatial/maptoolkit/atlante"
 	"github.com/go-spatial/maptoolkit/atlante/config"
 	"github.com/go-spatial/maptoolkit/atlante/filestore"
 	fsmulti "github.com/go-spatial/maptoolkit/atlante/filestore/multi"
 	"github.com/go-spatial/maptoolkit/atlante/grids"
+	"github.com/go-spatial/maptoolkit/atlante/notifiers"
 	"github.com/go-spatial/tegola/dict"
 	"github.com/prometheus/common/log"
 )
@@ -59,6 +61,15 @@ func LoadConfig(conf config.Config, dpi int, overrideDPI bool) (*atlante.Atlante
 
 	var ok bool
 	var a atlante.Atlante
+
+	// Notifier
+	if conf.Notifier != nil {
+		note, err := notifiers.From(notifiers.Config(conf.Notifier))
+		if err != nil {
+			return nil, errors.String(fmt.Sprintf("notifier: %v", err))
+		}
+		a.Notifier = note
+	}
 
 	// Loop through providers creating a provider type mapping.
 	for i, p := range conf.Providers {

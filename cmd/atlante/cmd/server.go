@@ -5,6 +5,9 @@ import (
 	"net/http"
 	"net/url"
 
+	"github.com/go-spatial/maptoolkit/atlante/server/coordinator"
+	crdnull "github.com/go-spatial/maptoolkit/atlante/server/coordinator/null"
+
 	"github.com/go-spatial/maptoolkit/atlante/queuer"
 	"github.com/prometheus/common/log"
 
@@ -64,11 +67,29 @@ func serverCmdRunE(cmd *cobra.Command, args []string) error {
 
 	// Need to initialize the server
 	srv := server.Server{
-		Hostname: string(conf.Webserver.HostName),
-		Port:     port,
-		Scheme:   string(conf.Webserver.Scheme),
-		Headers:  make(map[string]string),
-		Atlante:  a,
+		Hostname:              string(conf.Webserver.HostName),
+		Port:                  port,
+		Scheme:                string(conf.Webserver.Scheme),
+		Headers:               make(map[string]string),
+		Atlante:               a,
+		Coordinator:           coordinator.Provider(crdnull.Provider{}),
+		DisableNotificationEP: conf.Webserver.DisableNotificationEP,
+	}
+
+	// Setup Coordinator
+	if conf.Webserver.Coordinator != nil {
+		var cType string = crdnull.TYPE
+		cType, _ = conf.Webserver.Coordinator.String(coordinator.ConfigKeyType, &cType)
+		srv.Coordinator, err = coordinator.For(cType, coordinator.Config(conf.Webserver.Coordinator))
+		if err != nil {
+			if _, ok := err.(coordinator.ErrUnknownProvider); ok {
+				log.Infoln("known coordinator providers:")
+				for _, p := range coordinator.Registered() {
+					log.Infoln("\t", p)
+				}
+			}
+			return err
+		}
 	}
 
 	// Now we need to look to see if a queue has been configured

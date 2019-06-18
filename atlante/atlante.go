@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"image/png"
 	"io"
-	"log"
 	"os"
 	"path/filepath"
 	"strings"
@@ -17,9 +16,13 @@ import (
 	fsmulti "github.com/go-spatial/maptoolkit/atlante/filestore/multi"
 	"github.com/go-spatial/maptoolkit/atlante/grids"
 	"github.com/go-spatial/maptoolkit/atlante/internal/resolution"
+	"github.com/go-spatial/maptoolkit/atlante/notifiers"
+	_ "github.com/go-spatial/maptoolkit/atlante/notifiers/http"
+	"github.com/go-spatial/maptoolkit/atlante/server/coordinator/field"
 	"github.com/go-spatial/maptoolkit/mbgl/bounds"
 	"github.com/go-spatial/maptoolkit/mbgl/image"
 	"github.com/go-spatial/maptoolkit/svg2pdf"
+	"github.com/prometheus/common/log"
 )
 
 // ImgStruct is a wrapper around an image that makes the image available to the
@@ -182,6 +185,10 @@ func GeneratePDF(ctx context.Context, sheet *Sheet, grid *grids.Cell, filenames 
 		return ErrNilGrid
 	}
 
+	if sheet.Emitter != nil {
+		sheet.Emitter.Emit(field.Started{})
+	}
+
 	// TODO(gdey): use MdgID once we move to partial templates system
 	// grp := grid.MdgID.String(), an empty group is current directory
 	grp := ""
@@ -202,7 +209,7 @@ func GeneratePDF(ctx context.Context, sheet *Sheet, grid *grids.Cell, filenames 
 		}
 	}
 
-	log.Println("filenames: ", filenames.IMG, filenames.SVG, filenames.PDF)
+	log.Infoln("filenames: ", filenames.IMG, filenames.SVG, filenames.PDF)
 
 	const tilesize = 4096 / 2
 
@@ -226,8 +233,8 @@ func GeneratePDF(ctx context.Context, sheet *Sheet, grid *grids.Cell, filenames 
 	prj := bounds.ESPG3857
 	width, height := grid.WidthHeightForZoom(zoom)
 	latLngCenterPt := grid.CenterPtForZoom(zoom)
-	log.Println("width", width, "height", height)
-	log.Println("zoom", zoom, "Scale", sheet.Scale, "dpi", sheet.DPI, "ground measure", nground)
+	log.Infoln("width", width, "height", height)
+	log.Infoln("zoom", zoom, "Scale", sheet.Scale, "dpi", sheet.DPI, "ground measure", nground)
 
 	centerPt := bounds.LatLngToPoint(prj, latLngCenterPt[0], latLngCenterPt[1], zoom, tilesize)
 	dstimg, err := image.New(
@@ -258,6 +265,11 @@ func GeneratePDF(ctx context.Context, sheet *Sheet, grid *grids.Cell, filenames 
 		img.Close()
 	}()
 
+	if sheet.Emitter != nil {
+		sheet.Emitter.Emit(field.Processing{
+			Description: fmt.Sprintf("intermediate file: %v ", filenames.SVG),
+		})
+	}
 	file, err := multiWriter.Writer(filenames.SVG, true)
 	defer file.Close()
 
@@ -271,7 +283,7 @@ func GeneratePDF(ctx context.Context, sheet *Sheet, grid *grids.Cell, filenames 
 		Grid:          grid,
 	})
 	if err != nil {
-		log.Printf("error trying to fillout sheet template")
+		log.Warnf("error trying to fillout sheet template")
 		return err
 	}
 
@@ -289,6 +301,11 @@ func GeneratePDF(ctx context.Context, sheet *Sheet, grid *grids.Cell, filenames 
 	pdffn := assetsWriter.Path(filenames.PDF)
 	svgfn := assetsWriter.Path(filenames.SVG)
 
+	if sheet.Emitter != nil {
+		sheet.Emitter.Emit(field.Processing{
+			Description: fmt.Sprintf("file: %v ", filenames.PDF),
+		})
+	}
 	if err = svg2pdf.GeneratePDF(svgfn, pdffn, 2028, 2607); err != nil {
 		return err
 	}
@@ -318,6 +335,8 @@ type Atlante struct {
 	workDirectory string
 	sLock         sync.RWMutex
 	sheets        map[string]*Sheet
+	Notifier      notifiers.Provider
+	JobID         string
 }
 
 func (a *Atlante) Shutdown() {}
@@ -366,7 +385,6 @@ func (a *Atlante) GeneratePDFLatLng(ctx context.Context, sheetName string, lat, 
 	if err != nil {
 		return nil, err
 	}
-
 	err = GeneratePDF(ctx, provider, cell, filenames)
 	return filenames, err
 
@@ -377,7 +395,21 @@ func (a *Atlante) generatePDF(ctx context.Context, sheet *Sheet, grid *grids.Cel
 	if err != nil {
 		return nil, err
 	}
+	if a.Notifier != nil && a.JobID != "" {
+		sheet.Emitter, err = a.Notifier.NewEmitter(a.JobID)
+		if err != nil {
+			sheet.Emitter = nil
+			log.Warnf("Failed to init emitter: %v", err)
+		}
+	}
 	err = GeneratePDF(ctx, sheet, grid, filenames)
+	if sheet.Emitter != nil {
+		if err != nil {
+			sheet.Emitter.Emit(field.Failed{Error: err})
+		} else {
+			sheet.Emitter.Emit(field.Completed{})
+		}
+	}
 	return filenames, err
 }
 
@@ -387,6 +419,7 @@ func (a *Atlante) GeneratePDFJob(ctx context.Context, job Job, filenameTemplate 
 	if err != nil {
 		return nil, err
 	}
+	a.JobID = job.MetaData["job_id"]
 	return a.generatePDF(ctx, sheet, cell, filenameTemplate)
 }
 

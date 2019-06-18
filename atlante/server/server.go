@@ -12,6 +12,11 @@ import (
 	"strings"
 	"time"
 
+	"github.com/go-spatial/maptoolkit/atlante/server/coordinator/field"
+	"github.com/go-spatial/maptoolkit/atlante/server/coordinator/null"
+
+	"github.com/go-spatial/maptoolkit/atlante/server/coordinator"
+
 	"github.com/go-spatial/maptoolkit/atlante/filestore"
 	"github.com/go-spatial/maptoolkit/atlante/queuer"
 
@@ -37,6 +42,9 @@ const (
 	ParamsKeyLng = URLPlaceholder("lng")
 	// ParamsKeySheetname is the key used for the sheetname
 	ParamsKeySheetname = URLPlaceholder("sheetname")
+
+	// ParamsKeyJobID is the key used for the jobid
+	ParamsKeyJobID = URLPlaceholder("job_id")
 
 	// HTTPErrorHeader is the name of the X-header where details of the error
 	// is provided.
@@ -75,19 +83,6 @@ func GenPath(paths ...interface{}) string {
 }
 
 type (
-	jobItem struct {
-		ID    int    `json:"-"`
-		JobID string `json:"job_id"`
-		// QJobID is the job id returned by the queue when
-		// the item was enqueued
-		QJobID    string    `json:"-"`
-		MdgID     string    `json:"mdgid"`
-		MdgIDPart uint32    `json:"sheet_number,omitempty"`
-		Status    string    `json:"status,omitempty"`
-		EnquedAt  time.Time `json:"enqued_at,omitempty"`
-		UpdatedAt time.Time `json:"updated_at,omitempty"`
-	}
-
 	// Server is used to serve up grid information, and generate print jobs
 	Server struct {
 		// HostName is the name of the host to use for construction of URLS.
@@ -111,6 +106,12 @@ type (
 		// jobsDB is the database (sqlite) containing the jobs we have sent to be processed
 		// this is for job tracking
 		jobsDB *sql.DB
+
+		// Coordinator  is a Coordinator Provider for managing jobs
+		Coordinator coordinator.Provider
+
+		// DisableNotificationEP will disable the job notification end points from being registered.
+		DisableNotificationEP bool
 	}
 )
 
@@ -154,7 +155,9 @@ func setHeaders(h map[string]string, w http.ResponseWriter) {
 }
 
 func badRequest(w http.ResponseWriter, reasonFmt string, data ...interface{}) {
-	w.Header().Set(HTTPErrorHeader, fmt.Sprintf(reasonFmt, data...))
+	str := fmt.Sprintf(reasonFmt, data...)
+	log.Infof("got error: %v", str)
+	w.Header().Set(HTTPErrorHeader, str)
 	w.WriteHeader(http.StatusBadRequest)
 }
 
@@ -163,7 +166,7 @@ func serverError(w http.ResponseWriter, reasonFmt string, data ...interface{}) {
 	w.WriteHeader(http.StatusInternalServerError)
 }
 
-func encodeCellAsJSON(w io.Writer, cell *grids.Cell, pdf string, lat, lng *float64, lastGen time.Time) {
+func encodeCellAsJSON(w io.Writer, cell *grids.Cell, pdf string, lat, lng *float64, lastGen time.Time, status field.Status) {
 	// Build out the geojson
 	const geoJSONFmt = `{"type":"FeatureCollection","features":[{"type":"Feature","properties":{"objectid":"%v"},"geometry":{"type":"Polygon","coordinates":[[[%v,%v],[%v, %v],[%v, %v],[%v, %v],[%v, %v]]]}}]}`
 	mdgid := cell.GetMdgid()
@@ -171,6 +174,7 @@ func encodeCellAsJSON(w io.Writer, cell *grids.Cell, pdf string, lat, lng *float
 	jsonCell := struct {
 		MDGID      string          `json:"mdgid"`
 		Part       *uint32         `json:"sheet_number,omitempty"`
+		JobStatus  field.Status    `json:"status"`
 		PDF        string          `json:"pdf_url"`
 		LastGen    string          `json:"last_generated,omitempty"` // RFC 3339 format
 		LastEdited string          `json:"last_edited,omitempty"`    // RFC 3339 format
@@ -181,12 +185,16 @@ func encodeCellAsJSON(w io.Writer, cell *grids.Cell, pdf string, lat, lng *float
 		GeoJSON    json.RawMessage `json:"geo_json"`
 	}{
 		MDGID:     mdgid.Id,
-		LastGen:   lastGen.Format(time.RFC3339),
+		JobStatus: status,
 		Lat:       lat,
 		Lng:       lng,
 		PDF:       pdf,
 		Series:    cell.GetSeries(),
 		SheetName: cell.GetSheet(),
+	}
+
+	if !lastGen.IsZero() {
+		jsonCell.LastGen = lastGen.Format(time.RFC3339)
 	}
 	pubdate, err := cell.PublicationDate()
 	if err != nil && !pubdate.IsZero() {
@@ -210,131 +218,10 @@ func encodeCellAsJSON(w io.Writer, cell *grids.Cell, pdf string, lat, lng *float
 		),
 	)
 	// Encoding the cell into the json
-	json.NewEncoder(w).Encode(jsonCell)
-}
-
-// CreateJobDB will create the job tracking database
-func CreateJobDB(filename string) (*sql.DB, error) {
-	database, err := sql.Open("sqlite3", filename)
+	err = json.NewEncoder(w).Encode(jsonCell)
 	if err != nil {
-		return nil, err
+		log.Warnf("failed to encode jsonCell: %v", err)
 	}
-	statement, err := database.Prepare(`
-	CREATE TABLE IF NOT EXISTS jobs (
-		id INTEGER PRIMARY KEY, 
-		job_id TEXT, 
-		mdgid TEXT,
-		status TEXT,
-		enqued_at TEXT,
-		updated_at TEXT,
-		qjob_id TEXT,
-		jobobj TEXT
-	)
-`)
-	if err != nil {
-		return nil, err
-	}
-	statement.Exec()
-	statement, err = database.Prepare(`CREATE UNIQUE INDEX idx_job_id ON jobs (job_id);`)
-	if err != nil {
-		return nil, err
-	}
-	statement.Exec()
-	statement, err = database.Prepare(`CREATE UNIQUE INDEX idx_qjob_id ON jobs (qjob_id);`)
-	if err != nil {
-		return nil, err
-	}
-	statement.Exec()
-	return database, nil
-}
-
-func (s *Server) findJobItem(mdgidstr string) (jbs []jobItem, err error) {
-	database := s.jobsDB
-	if database == nil {
-		return nil, nil
-	}
-	mdgid := grids.NewMDGID(mdgidstr)
-	const selectSQL = `
-	SELECT  
-		id,
-		job_id,
-		qjob_id,
-		status,
-		enqued_at,
-		updated_at
-	FROM 
-		jobs
-	WHERE 
-		mdgid=?
-	ORDER BY id DESC
-	`
-	rows, err := database.Query(selectSQL, mdgid.AsString())
-	if err != nil {
-		return jbs, err
-	}
-
-	for rows.Next() {
-		var enquedat, updatedat string
-		ji := jobItem{MdgID: mdgid.Id}
-		if mdgid.Part != 0 {
-			ji.MdgIDPart = mdgid.Part
-		}
-		err = rows.Scan(
-			&ji.ID,
-			&ji.JobID,
-			&ji.QJobID,
-			&ji.Status,
-			&enquedat,
-			&updatedat,
-		)
-		if err != nil {
-			return []jobItem{}, err
-		}
-		ji.EnquedAt, err = time.Parse(time.RFC3339, enquedat)
-		if err != nil {
-			log.Warnf("failed to parse enqued at from db: %v for id: %v", enquedat, ji.ID)
-		}
-		ji.UpdatedAt, err = time.Parse(time.RFC3339, updatedat)
-		if err != nil {
-			log.Warnf("failed to parse updated at from db: %v for id: %v", updatedat, ji.ID)
-		}
-		jbs = append(jbs, ji)
-	}
-	return jbs, nil
-}
-
-// TODO(gdey): job management
-func (s *Server) addJobItem(ji *jobItem) (*jobItem, error) {
-	if s == nil || ji == nil {
-		return nil, fmt.Errorf("server or jobItem is nil")
-	}
-	database := s.jobsDB
-	if database == nil {
-		return nil, fmt.Errorf("jobDB not initilized")
-	}
-	const insertSQL = `
-	INSERT INTO jobs (
-		job_id, 
-		qjob_id,
-		mdgid,
-		status, 
-		enqued_at
-	) VALUES (?, ?, ?, ?, ?)
-	`
-	enqueded := ji.EnquedAt.Format(time.RFC3339)
-	stm, err := database.Prepare(insertSQL)
-	if err != nil {
-		return nil, err
-	}
-	mdgid := grids.MDGID{
-		Id:   ji.MdgID,
-		Part: ji.MdgIDPart,
-	}
-	_, err = stm.Exec(ji.ID, ji.JobID, mdgid.AsString, ji.Status, enqueded)
-	if err != nil {
-		return nil, err
-	}
-	return ji, nil
 }
 
 // GetHostName returns determines the hostname:port to return based on the following hierarchy
@@ -408,8 +295,11 @@ func (s *Server) GridInfoHandler(w http.ResponseWriter, request *http.Request, u
 
 		// We will fill this out later
 		pdfURL string
+
 		// We will get this from the filestore
 		lastGen time.Time
+
+		status field.Status
 	)
 
 	sheetName, ok := urlParams[string(ParamsKeySheetname)]
@@ -429,6 +319,7 @@ func (s *Server) GridInfoHandler(w http.ResponseWriter, request *http.Request, u
 
 	// check to see if the mdgid key was given.
 	if mdgidStr, ok := urlParams[string(ParamsKeyMDGID)]; ok {
+		log.Infof("MDGID route %v", mdgidStr)
 		mdgid = grids.NewMDGID(mdgidStr)
 		cell, err = sheet.CellForMDGID(mdgid)
 		if err != nil {
@@ -483,6 +374,15 @@ func (s *Server) GridInfoHandler(w http.ResponseWriter, request *http.Request, u
 		}
 	}
 
+	// Ask the coordinator for the status:
+	if jb, ok := s.Coordinator.FindByJob(&atlante.Job{SheetName: sheetName, Cell: cell}); ok {
+		status = jb.Status
+		lastGen = jb.UpdatedAt
+		if jb.UpdatedAt.IsZero() {
+			lastGen = jb.EnqueuedAt
+		}
+	}
+
 	// content type
 	w.Header().Add("Content-Type", "application/json")
 
@@ -491,7 +391,7 @@ func (s *Server) GridInfoHandler(w http.ResponseWriter, request *http.Request, u
 	w.Header().Add("Pragma", "no-cache")
 	w.Header().Add("Expires", "0")
 
-	encodeCellAsJSON(w, cell, pdfURL, latp, lngp, lastGen)
+	encodeCellAsJSON(w, cell, pdfURL, latp, lngp, lastGen, status)
 }
 
 // QueueHandler takes a job from a post and enqueues it on the configured queue
@@ -500,9 +400,16 @@ func (s *Server) QueueHandler(w http.ResponseWriter, request *http.Request, urlP
 	// TODO(gdey): this initial version will not do job tracking.
 	// meaning every request to the handler will get a job enqued into the
 	// queueing system.
+	if s.Coordinator == nil {
+		s.Coordinator = &null.Provider{}
+	}
+
+	var ji struct {
+		MdgID     string `json:"mdgid"`
+		MdgIDPart uint32 `json:"sheet_number,omitempty"`
+	}
 
 	// Get json body
-	var ji jobItem
 	bdy, err := ioutil.ReadAll(request.Body)
 	request.Body.Close()
 	if err != nil {
@@ -528,10 +435,6 @@ func (s *Server) QueueHandler(w http.ResponseWriter, request *http.Request, urlP
 
 	sheetName = s.Atlante.NormalizeSheetName(sheetName, false)
 
-	// ji is now going to be what get's returned
-	ji.EnquedAt = time.Now()
-	ji.JobID = fmt.Sprintf("%v:%v", sheetName, mdgid.AsString())
-
 	sheet, err := s.Atlante.SheetFor(sheetName)
 	if err != nil {
 		badRequest(w, "error getting sheet(%v):%v", sheetName, err)
@@ -546,19 +449,48 @@ func (s *Server) QueueHandler(w http.ResponseWriter, request *http.Request, urlP
 	qjob := atlante.Job{
 		Cell:      cell,
 		SheetName: sheetName,
-		MetaData: map[string]string{
-			"job_id": ji.JobID,
-		},
 	}
-	// TODO(gdye):Ignoring the returned job id for now. Will need it when we
-	// have the job management
-	_, err = s.Queue.Enqueue(ji.JobID, &qjob)
+
+	// Check the queue to see if there is already a job with these params:
+	if jb, found := s.Coordinator.FindByJob(&qjob); found {
+		switch jb.Status.Status.(type) {
+		default:
+			// do nothing we should enqueue a
+			// new job.
+		case field.Requested, field.Started:
+			// Job is already there just return
+			// info about the old job.
+			err = json.NewEncoder(w).Encode(jb)
+			if err != nil {
+				serverError(w, "failed marshal json: %v", err)
+			}
+			return
+		}
+	}
+
+	jb, err := s.Coordinator.NewJob(&qjob)
+	if err != nil {
+		serverError(w, "failed to get new job from coordinator: %v", err)
+		return
+	}
+	// Fill out the Metadata with JobID
+	qjob.MetaData = map[string]string{
+		"job_id": jb.JobID,
+	}
+
+	qjobid, err := s.Queue.Enqueue(jb.JobID, &qjob)
 	if err != nil {
 		badRequest(w, "failed to queue job: %v", err)
 		return
 	}
+	jbData, _ := qjob.Base64Marshal()
+	s.Coordinator.UpdateField(jb,
+		field.QJobID(qjobid),
+		field.JobData(jbData),
+		field.Status{field.Requested{}},
+	)
 
-	err = json.NewEncoder(w).Encode(ji)
+	err = json.NewEncoder(w).Encode(jb)
 	if err != nil {
 		serverError(w, "failed marshal json: %v", err)
 		return
@@ -594,6 +526,67 @@ func (s *Server) SheetInfoHandler(w http.ResponseWriter, request *http.Request, 
 	}
 }
 
+func (s *Server) JobInfoHandler(w http.ResponseWriter, request *http.Request, urlParams map[string]string) {
+
+	jobid, ok := urlParams[string(ParamsKeyJobID)]
+	if !ok {
+		// We need a sheetnumber.
+		badRequest(w, "missing job_id")
+		return
+	}
+	job, ok := s.Coordinator.FindByJobID(jobid)
+	if !ok {
+		w.WriteHeader(http.StatusNotFound)
+		return
+	}
+
+	if err := json.NewEncoder(w).Encode(job); err != nil {
+		serverError(w, "failed to marshal json: %v", err)
+	}
+
+}
+
+func (s *Server) NotificationHandler(w http.ResponseWriter, request *http.Request, urlParams map[string]string) {
+
+	log.Infof("Got a post to Notification: %v", urlParams)
+	jobid, ok := urlParams[string(ParamsKeyJobID)]
+	if !ok {
+		// We need a sheetnumber.
+		log.Infof("Missing job_id: %v", urlParams)
+		badRequest(w, "missing job_id")
+		return
+	}
+
+	job, ok := s.Coordinator.FindByJobID(jobid)
+	if !ok {
+		log.Infof("failed to find job: %v", jobid)
+		w.WriteHeader(http.StatusNotFound)
+		return
+	}
+
+	// Get json body
+	bdy, err := ioutil.ReadAll(request.Body)
+	request.Body.Close()
+	if err != nil {
+		badRequest(w, "error reading body")
+		return
+	}
+
+	var si field.Status
+	log.Infof("Body: %s", bdy)
+	err = json.Unmarshal(bdy, &si)
+	if err != nil {
+		badRequest(w, "unable to unmarshal json: %v", err)
+		return
+	}
+	log.Infof("Status: %v", si)
+
+	if err := s.Coordinator.UpdateField(job, si); err != nil {
+		serverError(w, "failed to update job %v: %v", jobid, err)
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
 // RegisterRoutes setup the routes
 func (s *Server) RegisterRoutes(r *httptreemux.TreeMux) {
 
@@ -604,17 +597,24 @@ func (s *Server) RegisterRoutes(r *httptreemux.TreeMux) {
 	group := r.NewGroup(GenPath("sheets", ParamsKeySheetname))
 	log.Infof("registering: GET  /sheets/:sheetname/info/:lng/:lat")
 	group.GET(GenPath("info", ParamsKeyLng, ParamsKeyLat), s.GridInfoHandler)
-	log.Infof("registering: GET  /sheets/:sheetname/info/:mdgid")
+	log.Infof("registering: GET  /sheets/:sheetname/info/mdgid/:mdgid")
 	group.GET(GenPath("info", "mdgid", ParamsKeyMDGID), s.GridInfoHandler)
 	if s.Queue != nil {
 		log.Infof("registering: POST /sheets/:sheetname/mdgid")
 		group.POST("/mdgid", s.QueueHandler)
 	}
-}
 
+	jgroup := r.NewGroup(GenPath("jobs", ParamsKeyJobID))
+	log.Infof("registering: GET  /jobs/:jobid/status")
+	jgroup.GET("/status", s.JobInfoHandler)
+	if !s.DisableNotificationEP {
+		log.Infof("registering: POST  /jobs/:jobid/status")
+		jgroup.POST("/status", s.NotificationHandler)
+	}
+}
 
 // corsHanlder is used to respond to all OPTIONS requests for registered routes
 func corsHandler(w http.ResponseWriter, r *http.Request, params map[string]string) {
-	setHeaders(map[string]string{},w)
+	setHeaders(map[string]string{}, w)
 	return
 }
