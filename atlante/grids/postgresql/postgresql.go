@@ -12,7 +12,6 @@ import (
 	"github.com/go-spatial/maptoolkit/atlante/grids"
 	"github.com/go-spatial/tegola"
 	"github.com/jackc/pgx"
-	"github.com/prometheus/common/log"
 )
 
 // Name is the name of the provider type
@@ -376,7 +375,6 @@ func (p *Provider) cellFromRow(row *pgx.Row) (*grids.Cell, error) {
 		return nil, err
 	}
 
-	log.Infof("Calling new edit info: %v %v", editedBy, editedAt)
 	byStr, edAt, err := p.newEditInfo(editedBy, editedAt)
 	if err != nil {
 		return nil, err
@@ -413,7 +411,6 @@ func (p *Provider) newEditInfo(by, date sql.NullString) (strBy string, edtAt tim
 	if date.Valid {
 		edtAt, err = time.Parse(p.editedDateFormat, date.String)
 		if err != nil {
-			log.Warnf("failed to parse date: %v -- %v", date.String, err)
 			return strBy, edtAt, err
 		}
 	}
