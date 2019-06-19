@@ -104,7 +104,8 @@ func (sheet *Sheet) HeightInPoints(dpi uint) float64 {
 		mm = DefaultHeightMM
 	}
 	mm = sheet.Height
-	return mm * float64(dpi) / mm2inch
+	// mm2inch is inches/mm , dpi is points/inches
+	return mm * float64(dpi) * mm2inch
 }
 
 // WidthInPoints returns the height in points given the dpi (dots per inch)
@@ -115,7 +116,8 @@ func (sheet *Sheet) WidthInPoints(dpi uint) float64 {
 		mm = DefaultWidthMM
 	}
 	mm = sheet.Width
-	return mm * float64(dpi) / mm2inch
+	// mm2inch is inches/mm , dpi is points/inches
+	return mm * float64(dpi) * mm2inch
 }
 
 // NormalizeSheetName will return a normalized version of the sheetname, or if the sheet
