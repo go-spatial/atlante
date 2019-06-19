@@ -32,6 +32,90 @@ The provider supports the following properties
 * `srid` (number) :  [optional] (3857) the srid of the data (not used; currently)
 * `edit_data_format` (string): [optional] (RFC3339) the data format of the data values in the database
 * `edit_by` (string) :[optional] ("") if edit_by is not provided default value to use
+* `scale` (number) :  The scale of the grid in meters, e.g. 5000, 50000, 250000
+
+## SQL Properties
+
+These properties allow one to redefine the sql used to retrieve the grid
+There are two one for mdgid, the other for lng/lat values
+* `query_mdgid` (string) : [optional] the sql used to retrieve the grid values for an mdgid
+
+Original sql
+
+```sql
+SELECT
+  mdg_id,
+  sheet,
+  series,
+  nrn,
+
+  swlat_dms,
+  swlon_dms AS swlng_dms,
+  nelat_dms,
+  nelon_dms AS nelng_dms,
+
+  swlat,
+  swlon AS swlng,
+  nelat,
+  nelon AS nelng,
+
+  country,
+  last_edite AS edited_by,
+  last_edi_1 AS edited_at
+FROM
+  grids.grid50K
+WHERE
+	mdg_id = $1
+LIMIT 1;
+`
+```
+
+** `$1` is the mdgid value
+
+* `query_lnglat` (string) : [optional] the sql used to retrieve the grid values for an lng/lat pair
+
+Original sql
+
+```sql
+SELECT
+  mdg_id,
+  sheet,
+  series,
+  nrn,
+
+  swlat_dms,
+  swlon_dms AS swlng_dms,
+  nelat_dms,
+  nelon_dms AS nelng_dms,
+
+  swlat,
+  swlon AS swlng,
+  nelat,
+  nelon AS nelng,
+
+  country,
+  last_edite AS edited_by,
+  last_edi_1 AS edited_at
+FROM
+  grids.grid50K
+WHERE
+  ST_Intersects(
+    wkb_geometry,
+    ST_Transform(
+      ST_SetSRID(
+        ST_MakePoint($1,$2),
+        $3
+      ),
+      4326
+    )
+  )
+LIMIT 1;
+```
+** `$1` is the Lng value
+
+** `$2` is the lat value
+
+** `$3` is the srid
 
 
 # Expected Table Layout:
