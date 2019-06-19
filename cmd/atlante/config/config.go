@@ -182,6 +182,13 @@ func LoadConfig(conf config.Config, dpi int, overrideDPI bool) (*atlante.Atlante
 		if err != nil {
 			return nil, fmt.Errorf("error trying to create sheet %v: %v", i, err)
 		}
+		if sheet.Height != 0 {
+			sht.Height = float64(sheet.Height)
+		}
+		if sheet.Width != 0 {
+			sht.Width = float64(sheet.Width)
+		}
+
 		err = a.AddSheet(sht)
 		if err != nil {
 			return nil, fmt.Errorf("error trying to add sheet %v: %v", i, err)

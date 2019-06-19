@@ -13,6 +13,15 @@ import (
 	"github.com/go-spatial/maptoolkit/atlante/notifiers"
 )
 
+const (
+	// DefaultHeightMM is the default mm height if a height is not given
+	DefaultHeightMM = 28.16667
+	// DefaultWidthMM is the default mm width if a width is not given
+	DefaultWidthMM = 36.20833
+
+	mm2inch = 1 / 25.4
+)
+
 // Sheet describes a map sheet
 type Sheet struct {
 	Name string
@@ -37,6 +46,10 @@ type Sheet struct {
 	Desc string
 
 	Emitter notifiers.Emitter
+	// Width of the canvas in mm
+	Width float64
+	// Height of the canvas in mm
+	Height float64
 }
 
 // NewSheet returns a new sheet
@@ -73,12 +86,38 @@ func NewSheet(name string, provider grids.Provider, dpi uint, desc string, style
 		svgTemplate:         t,
 		Filestore:           fs,
 		Desc:                desc,
+		Height:              DefaultHeightMM,
+		Width:               DefaultWidthMM,
 	}, nil
 }
 
 // Execute the sheets template
 func (sheet *Sheet) Execute(wr io.Writer, tplContext GridTemplateContext) error {
 	return sheet.svgTemplate.Execute(wr, tplContext)
+}
+
+// HeightInPoints returns the height in points given the dpi (dots per inch)
+func (sheet *Sheet) HeightInPoints(dpi uint) float64 {
+	var mm float64
+	if sheet == nil {
+		// return the default points
+		mm = DefaultHeightMM
+	}
+	mm = sheet.Height
+	// mm2inch is inches/mm , dpi is points/inches
+	return mm * float64(dpi) * mm2inch
+}
+
+// WidthInPoints returns the height in points given the dpi (dots per inch)
+func (sheet *Sheet) WidthInPoints(dpi uint) float64 {
+	var mm float64
+	if sheet == nil {
+		// return the default points
+		mm = DefaultWidthMM
+	}
+	mm = sheet.Width
+	// mm2inch is inches/mm , dpi is points/inches
+	return mm * float64(dpi) * mm2inch
 }
 
 // NormalizeSheetName will return a normalized version of the sheetname, or if the sheet

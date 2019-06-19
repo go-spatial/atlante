@@ -58,6 +58,8 @@ type Sheet struct {
 	Template     env.String   `toml:"template"`
 	Style        env.String   `toml:"style"`
 	Description  env.String   `toml:"description"`
+	Width        env.Float    `toml:"width"`
+	Height       env.Float    `toml:"height"`
 }
 
 // Validate will validate the config and make sure the is valid
