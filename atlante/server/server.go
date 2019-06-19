@@ -198,12 +198,6 @@ func encodeCellAsJSON(w io.Writer, cell *grids.Cell, pdf string, lat, lng *float
 	if !lastGen.IsZero() {
 		jsonCell.LastGen = lastGen.Format(time.RFC3339)
 	}
-	/*
-		pubdate, err := cell.PublicationDate()
-		if err != nil && !pubdate.IsZero() {
-			jsonCell.LastEdited = pubdate.Format(time.RFC3339)
-		}
-	*/
 	if cell.Edited != nil {
 		edited := cell.Edited
 		at, _ := ptypes.Timestamp(edited.Date)
