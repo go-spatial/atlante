@@ -416,6 +416,7 @@ ORDER BY jobstatus.id desc limit 1;
 		&updated,
 	); err != nil {
 		log.Warnf("got error finding job %v-%v-%v: %v -- \n%v", mdgid, sheetNumber, sheetName, err, selectQuery)
+		log.Warnf("%t", err)
 		return nil, false
 	}
 	s, err := field.NewStatusFor(status, desc)

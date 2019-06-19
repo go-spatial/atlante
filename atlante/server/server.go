@@ -14,6 +14,7 @@ import (
 
 	"github.com/go-spatial/maptoolkit/atlante/server/coordinator/field"
 	"github.com/go-spatial/maptoolkit/atlante/server/coordinator/null"
+	"github.com/golang/protobuf/ptypes"
 
 	"github.com/go-spatial/maptoolkit/atlante/server/coordinator"
 
@@ -173,14 +174,15 @@ func encodeCellAsJSON(w io.Writer, cell *grids.Cell, pdf string, lat, lng *float
 
 	jsonCell := struct {
 		MDGID      string          `json:"mdgid"`
-		Part       *uint32         `json:"sheet_number,omitempty"`
+		Part       *uint32         `json:"sheet_number"`
 		JobStatus  field.Status    `json:"status"`
 		PDF        string          `json:"pdf_url"`
-		LastGen    string          `json:"last_generated,omitempty"` // RFC 3339 format
-		LastEdited string          `json:"last_edited,omitempty"`    // RFC 3339 format
+		LastGen    string          `json:"last_generated"` // RFC 3339 format
+		LastEdited string          `json:"last_edited"`    // RFC 3339 format
+		EditedBy   string          `json:"edited_by"`
 		Series     string          `json:"series"`
-		Lat        *float64        `json:"lat,omitempty"`
-		Lng        *float64        `json:"lng,omitempty"`
+		Lat        *float64        `json:"lat"`
+		Lng        *float64        `json:"lng"`
 		SheetName  string          `json:"sheet_name"`
 		GeoJSON    json.RawMessage `json:"geo_json"`
 	}{
@@ -196,10 +198,19 @@ func encodeCellAsJSON(w io.Writer, cell *grids.Cell, pdf string, lat, lng *float
 	if !lastGen.IsZero() {
 		jsonCell.LastGen = lastGen.Format(time.RFC3339)
 	}
-	pubdate, err := cell.PublicationDate()
-	if err != nil && !pubdate.IsZero() {
-		jsonCell.LastEdited = pubdate.Format(time.RFC3339)
+	/*
+		pubdate, err := cell.PublicationDate()
+		if err != nil && !pubdate.IsZero() {
+			jsonCell.LastEdited = pubdate.Format(time.RFC3339)
+		}
+	*/
+	if cell.Edited != nil {
+		edited := cell.Edited
+		at, _ := ptypes.Timestamp(edited.Date)
+		jsonCell.LastEdited = at.Format(time.RFC3339)
+		jsonCell.EditedBy = edited.By
 	}
+
 	if mdgid.Part != 0 {
 		jsonCell.Part = &mdgid.Part
 	}
@@ -218,7 +229,7 @@ func encodeCellAsJSON(w io.Writer, cell *grids.Cell, pdf string, lat, lng *float
 		),
 	)
 	// Encoding the cell into the json
-	err = json.NewEncoder(w).Encode(jsonCell)
+	err := json.NewEncoder(w).Encode(jsonCell)
 	if err != nil {
 		log.Warnf("failed to encode jsonCell: %v", err)
 	}
