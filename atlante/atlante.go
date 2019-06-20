@@ -306,7 +306,10 @@ func GeneratePDF(ctx context.Context, sheet *Sheet, grid *grids.Cell, filenames 
 			Description: fmt.Sprintf("file: %v ", filenames.PDF),
 		})
 	}
-	if err = svg2pdf.GeneratePDF(svgfn, pdffn, sheet.HeightInPoints(72), sheet.WidthInPoints(72)); err != nil {
+	widthpts, heightpts := float64(sheet.WidthInPoints(72)), float64(sheet.HeightInPoints(72))
+	log.Infof("pdf %v,%v", widthpts, heightpts)
+	if err = svg2pdf.GeneratePDF(svgfn, pdffn, heightpts, widthpts); err != nil {
+		log.Warnf("error generating pdf: %v", err)
 		return err
 	}
 
