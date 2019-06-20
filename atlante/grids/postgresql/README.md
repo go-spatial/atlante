@@ -37,10 +37,10 @@ The provider supports the following properties
 ## SQL Properties
 
 These properties allow one to redefine the sql used to retrieve the grid
-There are two one for mdgid, the other for lng/lat values
+There are two, one for mdgid, the other for lng/lat values
 * `query_mdgid` (string) : [optional] the sql used to retrieve the grid values for an mdgid
 
-Original sql
+Example SQL for a 50k grid
 
 ```sql
 SELECT
@@ -74,7 +74,7 @@ LIMIT 1;
 
 * `query_lnglat` (string) : [optional] the sql used to retrieve the grid values for an lng/lat pair
 
-Original sql
+Example SQL for a 50k grid
 
 ```sql
 SELECT
