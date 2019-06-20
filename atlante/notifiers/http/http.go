@@ -90,6 +90,7 @@ func (e *emitter) Emit(se field.StatusEnum) error {
 	resp, err := http.Post(e.url, e.contentType, buff)
 	if err != nil {
 		log.Warnf("error posting to (%v): %v", e.url, err)
+		return err
 	}
 	// If the status code was a Client Error or a Server Error we should log
 	// the code and body.

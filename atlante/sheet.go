@@ -2,6 +2,7 @@ package atlante
 
 import (
 	"io"
+	math "math"
 	"net/url"
 	"sort"
 	"strings"
@@ -19,7 +20,8 @@ const (
 	// DefaultWidthMM is the default mm width if a width is not given
 	DefaultWidthMM = 36.20833
 
-	mm2inch = 1 / 25.4
+	// inchPerMM is the number of inches in a mm
+	inchPerMM = 1 / 25.4
 )
 
 // Sheet describes a map sheet
@@ -96,28 +98,28 @@ func (sheet *Sheet) Execute(wr io.Writer, tplContext GridTemplateContext) error 
 	return sheet.svgTemplate.Execute(wr, tplContext)
 }
 
+func mmToPoint(mm float64, dpi uint) uint64 {
+	inch := mm * inchPerMM
+	return uint64(math.Round(inch * float64(dpi)))
+}
+
 // HeightInPoints returns the height in points given the dpi (dots per inch)
-func (sheet *Sheet) HeightInPoints(dpi uint) float64 {
-	var mm float64
+func (sheet *Sheet) HeightInPoints(dpi uint) uint64 {
 	if sheet == nil {
 		// return the default points
-		mm = DefaultHeightMM
+		return mmToPoint(DefaultHeightMM, dpi)
 	}
-	mm = sheet.Height
-	// mm2inch is inches/mm , dpi is points/inches
-	return mm * float64(dpi) * mm2inch
+	return mmToPoint(sheet.Height, dpi)
 }
 
 // WidthInPoints returns the height in points given the dpi (dots per inch)
-func (sheet *Sheet) WidthInPoints(dpi uint) float64 {
-	var mm float64
+func (sheet *Sheet) WidthInPoints(dpi uint) uint64 {
 	if sheet == nil {
 		// return the default points
-		mm = DefaultWidthMM
+		return mmToPoint(DefaultWidthMM, dpi)
 	}
-	mm = sheet.Width
 	// mm2inch is inches/mm , dpi is points/inches
-	return mm * float64(dpi) * mm2inch
+	return mmToPoint(sheet.Width, dpi)
 }
 
 // NormalizeSheetName will return a normalized version of the sheetname, or if the sheet
