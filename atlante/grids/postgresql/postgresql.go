@@ -27,6 +27,9 @@ type Provider struct {
 	srid             uint
 	editedBy         string
 	editedDateFormat string
+	cellSize         grids.CellSize
+	queryLngLat      string
+	queryMDGID       string
 }
 
 const (
@@ -75,6 +78,14 @@ const (
 	ConfigKeyEditDateFormat = "edit_date_format"
 	// ConfigKeyEditBy who the default user for edit_by should be
 	ConfigKeyEditBy = "edit_by"
+
+	// ConfigKeyScale is the scale of this provider
+	ConfigKeyScale = "scale"
+
+	// ConfigKeyQueryMDGID is the sql for getting grid values from a MDGID.
+	ConfigKeyQueryMDGID = "query_mdgid"
+	// ConfigKeyQueryLngLat is the sql for getting grid values from a lng lat value.
+	ConfigKeyQueryLngLat = "query_lnglat"
 )
 
 // ErrInvalidSSLMode is returned when something is wrong with SSL configuration
@@ -146,6 +157,11 @@ func NewGridProvider(config grids.ProviderConfig) (grids.Provider, error) {
 		return nil, err
 	}
 
+	var scale uint
+	if scale, err = config.Uint(ConfigKeyScale, nil); err != nil {
+		return nil, err
+	}
+
 	editedBy := DefaultEditBy
 	if editedBy, err = config.String(ConfigKeyEditBy, &editedBy); err != nil {
 		return nil, err
@@ -155,6 +171,11 @@ func NewGridProvider(config grids.ProviderConfig) (grids.Provider, error) {
 	if editedDateFormat, err = config.String(ConfigKeyEditBy, &editedDateFormat); err != nil {
 		return nil, err
 	}
+
+	var queryLngLat string
+	queryLngLat, _ = config.String(ConfigKeyQueryLngLat, &queryLngLat)
+	var queryMDGID string
+	queryMDGID, _ = config.String(ConfigKeyQueryMDGID, &queryMDGID)
 
 	connConfig := pgx.ConnConfig{
 		Host:     host,
@@ -182,6 +203,9 @@ func NewGridProvider(config grids.ProviderConfig) (grids.Provider, error) {
 		srid:             uint(srid),
 		editedBy:         editedBy,
 		editedDateFormat: editedDateFormat,
+		cellSize:         grids.CellSize(scale),
+		queryLngLat:      queryLngLat,
+		queryMDGID:       queryMDGID,
 	}
 	if p.pool, err = pgx.NewConnPool(p.config); err != nil {
 		return nil, fmt.Errorf("Failed while creating connection pool: %v", err)
@@ -252,7 +276,12 @@ func ConfigTLS(sslMode string, sslKey string, sslCert string, sslRootCert string
 }
 
 // CellSize returns the grid cell size
-func (*Provider) CellSize() grids.CellSize { return grids.CellSize50K }
+func (p *Provider) CellSize() grids.CellSize {
+	if p == nil {
+		return grids.CellSize50K
+	}
+	return p.cellSize
+}
 
 // CellForLatLng returns a grid cell object that matches the cloest grid cell.
 func (p *Provider) CellForLatLng(lat, lng float64, srid uint) (*grids.Cell, error) {
@@ -291,8 +320,12 @@ WHERE
   )
 LIMIT 1;
 `
+	query := selectQuery
+	if p.queryLngLat != "" {
+		query = p.queryLngLat
+	}
 
-	row := p.pool.QueryRow(selectQuery, lng, lat, srid)
+	row := p.pool.QueryRow(query, lng, lat, srid)
 
 	return p.cellFromRow(row)
 }
@@ -326,7 +359,12 @@ WHERE
 LIMIT 1;
 `
 
-	row := p.pool.QueryRow(selectQuery, mdgid.Id)
+	query := selectQuery
+	if p.queryMDGID != "" {
+		query = p.queryMDGID
+	}
+
+	row := p.pool.QueryRow(query, mdgid.Id)
 
 	return p.cellFromRow(row)
 }

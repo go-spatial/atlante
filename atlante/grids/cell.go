@@ -27,7 +27,7 @@ func (cs CellSize) String() string {
 	case CellSize50K:
 		return "50K"
 	default:
-		return "unknown"
+		return fmt.Sprintf("%vm", uint(cs))
 	}
 }
 
@@ -37,6 +37,9 @@ const (
 
 	// CellSize50K returns cell sizes of 50 km
 	CellSize50K = 50000
+
+	// CellSize250K returns cell sizes of 250 km
+	CellSize250K = 250000
 )
 
 // Provider returns a grid object that can be used to generate
