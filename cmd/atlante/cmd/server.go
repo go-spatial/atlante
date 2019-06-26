@@ -90,6 +90,7 @@ func serverCmdRunE(cmd *cobra.Command, args []string) error {
 			}
 			return err
 		}
+		log.Infof("configured coordinator %v", cType)
 	}
 
 	// Now we need to look to see if a queue has been configured
@@ -108,6 +109,7 @@ func serverCmdRunE(cmd *cobra.Command, args []string) error {
 				return err
 			}
 		}
+		log.Infof("configured queue %v", qType)
 	}
 
 	for name, value := range conf.Webserver.Headers {

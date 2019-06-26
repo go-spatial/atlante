@@ -29,7 +29,7 @@ const (
 type ErrUnknownProvider string
 
 func (err ErrUnknownProvider) Error() string {
-	return fmt.Sprintf("error unknown queue provider %v", string(err))
+	return fmt.Sprintf("error unknown coordinator provider %v", string(err))
 }
 
 // Config is the interface that is passed to the queue provider to configure them
