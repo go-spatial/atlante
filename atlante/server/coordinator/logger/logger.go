@@ -115,4 +115,9 @@ func (p *Provider) FindByJobID(jobid string) (jb *coordinator.Job, found bool) {
 	return nil, false
 }
 
+func (p *Provider) Jobs(uint) ([]*coordinator.Job, error) {
+	log.Infof("getting all jobs")
+	return nil, nil
+}
+
 var _ = coordinator.Provider(&Provider{})

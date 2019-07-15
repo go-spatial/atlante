@@ -44,6 +44,8 @@ type (
 	}
 	// Failed is the status of a job that failed
 	Failed struct {
+		// The Error to send to the user
+		Description string `json:"description"`
 		// Error as to why it failed
 		Error error `json:"error"`
 	}
@@ -57,45 +59,71 @@ func (s Status) field()         {}
 // MarshalJSON implements the json.Marshaler interface
 func (s Status) MarshalJSON() ([]byte, error) {
 
+	const (
+		stageRequested  = 0
+		stageStarted    = 1
+		stageProcessing = 2
+		stageFailed     = 3
+		stageCompleted  = 3
+		totalStages     = 3
+	)
+
 	if s.Status == nil {
 		return json.Marshal(nil)
 	}
 
 	type sentinalEnum struct {
-		Type string `json:"status"`
+		Type  string `json:"status"`
+		Stage int    `json:"stage"`
+		Total int    `json:"total"`
 	}
 	type processingEnum struct {
 		Type        string `json:"status"`
+		Stage       int    `json:"stage"`
+		Total       int    `json:"total"`
 		Description string `json:"description"`
 	}
 	type failedEnum struct {
-		Type  string `json:"status"`
-		Error string `json:"error"`
+		Type        string `json:"status"`
+		Stage       int    `json:"stage"`
+		Total       int    `json:"total"`
+		Description string `json:"description"`
+		Error       string `json:"error"`
 	}
 
 	var jsonval interface{}
 	switch senum := s.Status.(type) {
 	case Started:
 		jsonval = sentinalEnum{
-			Type: started,
+			Type:  started,
+			Stage: stageStarted,
+			Total: totalStages,
 		}
 	case Requested:
 		jsonval = sentinalEnum{
-			Type: requested,
+			Type:  requested,
+			Stage: stageRequested,
+			Total: totalStages,
 		}
 	case Processing:
 		jsonval = processingEnum{
 			Type:        processing,
+			Stage:       stageProcessing,
+			Total:       totalStages,
 			Description: senum.Description,
 		}
 	case Failed:
 		jsonval = failedEnum{
 			Type:  failed,
+			Stage: stageFailed,
+			Total: totalStages,
 			Error: senum.Error.Error(),
 		}
 	case Completed:
 		jsonval = sentinalEnum{
-			Type: completed,
+			Type:  completed,
+			Stage: stageCompleted,
+			Total: totalStages,
 		}
 	default:
 		return []byte{}, fmt.Errorf("Unknown type %t", s.Status)

@@ -550,6 +550,18 @@ func (s *Server) JobInfoHandler(w http.ResponseWriter, request *http.Request, ur
 	}
 
 }
+func (s *Server) JobsHandler(w http.ResponseWriter, request *http.Request, urlParams map[string]string) {
+	// Hardcode 100 limit for now.
+	jobs, err := s.Coordinator.Jobs(100)
+	if err != nil {
+		serverError(w, "failed to get jobs: %v", err)
+		return
+	}
+	err = json.NewEncoder(w).Encode(jobs)
+	if err != nil {
+		serverError(w, "failed to marshal json: %v", err)
+	}
+}
 
 func (s *Server) NotificationHandler(w http.ResponseWriter, request *http.Request, urlParams map[string]string) {
 
@@ -609,6 +621,8 @@ func (s *Server) RegisterRoutes(r *httptreemux.TreeMux) {
 		group.POST("/mdgid", s.QueueHandler)
 	}
 
+	log.Infof("registering: GET  /jobs")
+	r.GET("/jobs", s.JobsHandler)
 	jgroup := r.NewGroup(GenPath("jobs", ParamsKeyJobID))
 	log.Infof("registering: GET  /jobs/:jobid/status")
 	jgroup.GET("/status", s.JobInfoHandler)
