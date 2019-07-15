@@ -167,27 +167,27 @@ func serverError(w http.ResponseWriter, reasonFmt string, data ...interface{}) {
 	w.WriteHeader(http.StatusInternalServerError)
 }
 
-func encodeCellAsJSON(w io.Writer, cell *grids.Cell, pdf string, lat, lng *float64, lastGen time.Time, status field.Status) {
+func encodeCellAsJSON(w io.Writer, cell *grids.Cell, pdf string, lat, lng *float64, lastGen time.Time, jobs []*coordinator.Job) {
 	// Build out the geojson
 	const geoJSONFmt = `{"type":"FeatureCollection","features":[{"type":"Feature","properties":{"objectid":"%v"},"geometry":{"type":"Polygon","coordinates":[[[%v,%v],[%v, %v],[%v, %v],[%v, %v],[%v, %v]]]}}]}`
 	mdgid := cell.GetMdgid()
 
 	jsonCell := struct {
-		MDGID      string          `json:"mdgid"`
-		Part       *uint32         `json:"sheet_number"`
-		JobStatus  field.Status    `json:"status"`
-		PDF        string          `json:"pdf_url"`
-		LastGen    string          `json:"last_generated"` // RFC 3339 format
-		LastEdited string          `json:"last_edited"`    // RFC 3339 format
-		EditedBy   string          `json:"edited_by"`
-		Series     string          `json:"series"`
-		Lat        *float64        `json:"lat"`
-		Lng        *float64        `json:"lng"`
-		SheetName  string          `json:"sheet_name"`
-		GeoJSON    json.RawMessage `json:"geo_json"`
+		MDGID      string             `json:"mdgid"`
+		Part       *uint32            `json:"sheet_number"`
+		Jobs       []*coordinator.Job `json:"jobs"`
+		PDF        string             `json:"pdf_url"`
+		LastGen    string             `json:"last_generated"` // RFC 3339 format
+		LastEdited string             `json:"last_edited"`    // RFC 3339 format
+		EditedBy   string             `json:"edited_by"`
+		Series     string             `json:"series"`
+		Lat        *float64           `json:"lat"`
+		Lng        *float64           `json:"lng"`
+		SheetName  string             `json:"sheet_name"`
+		GeoJSON    json.RawMessage    `json:"geo_json"`
 	}{
 		MDGID:     mdgid.Id,
-		JobStatus: status,
+		Jobs:      jobs,
 		Lat:       lat,
 		Lng:       lng,
 		PDF:       pdf,
@@ -303,8 +303,6 @@ func (s *Server) GridInfoHandler(w http.ResponseWriter, request *http.Request, u
 
 		// We will get this from the filestore
 		lastGen time.Time
-
-		status field.Status
 	)
 
 	sheetName, ok := urlParams[string(ParamsKeySheetname)]
@@ -380,10 +378,13 @@ func (s *Server) GridInfoHandler(w http.ResponseWriter, request *http.Request, u
 	}
 
 	// Ask the coordinator for the status:
-	if jb, ok := s.Coordinator.FindByJob(&atlante.Job{SheetName: sheetName, Cell: cell}); ok {
-		status = jb.Status
+	jobs := s.Coordinator.FindByJob(&atlante.Job{SheetName: sheetName, Cell: cell})
+	for _, jb := range jobs {
+		if !lastGen.IsZero() {
+			continue
+		}
 		lastGen = jb.UpdatedAt
-		if jb.UpdatedAt.IsZero() {
+		if lastGen.IsZero() {
 			lastGen = jb.EnqueuedAt
 		}
 	}
@@ -396,7 +397,7 @@ func (s *Server) GridInfoHandler(w http.ResponseWriter, request *http.Request, u
 	w.Header().Add("Pragma", "no-cache")
 	w.Header().Add("Expires", "0")
 
-	encodeCellAsJSON(w, cell, pdfURL, latp, lngp, lastGen, status)
+	encodeCellAsJSON(w, cell, pdfURL, latp, lngp, lastGen, jobs)
 }
 
 // QueueHandler takes a job from a post and enqueues it on the configured queue
@@ -457,7 +458,11 @@ func (s *Server) QueueHandler(w http.ResponseWriter, request *http.Request, urlP
 	}
 
 	// Check the queue to see if there is already a job with these params:
-	if jb, found := s.Coordinator.FindByJob(&qjob); found {
+	jobs := s.Coordinator.FindByJob(&qjob)
+
+	if len(jobs) > 0 {
+		// Let's just check the latest job.
+		jb := jobs[0]
 		switch jb.Status.Status.(type) {
 		default:
 			// do nothing we should enqueue a
@@ -465,8 +470,7 @@ func (s *Server) QueueHandler(w http.ResponseWriter, request *http.Request, urlP
 		case field.Requested, field.Started:
 			// Job is already there just return
 			// info about the old job.
-			err = json.NewEncoder(w).Encode(jb)
-			if err != nil {
+			if err = json.NewEncoder(w).Encode(jb); err != nil {
 				serverError(w, "failed marshal json: %v", err)
 			}
 			return
@@ -495,8 +499,7 @@ func (s *Server) QueueHandler(w http.ResponseWriter, request *http.Request, urlP
 		field.Status{field.Requested{}},
 	)
 
-	err = json.NewEncoder(w).Encode(jb)
-	if err != nil {
+	if err = json.NewEncoder(w).Encode(jb); err != nil {
 		serverError(w, "failed marshal json: %v", err)
 		return
 	}

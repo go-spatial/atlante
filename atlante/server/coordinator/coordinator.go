@@ -33,13 +33,13 @@ type Provider interface {
 	// If there is already a job in the system then it should return that job, otherwise it should return a new job
 	NewJob(job *atlante.Job) (jb *Job, err error)
 
-	// FindJob will look for a job described by the given atlante.Job (MDGID/SheetName) and return it, or return nil, and a false for
-	// found
-	FindByJob(job *atlante.Job) (jb *Job, found bool)
+	// FindJob will look for a jobs described by the given atlante.Job (MDGID/SheetName), this should return only the latest
+	// two jobs.
+	FindByJob(job *atlante.Job) (jobs []*Job)
 
 	// FindJobID will attempt to locate the job by the given jobId, if a job is found non-nil job will be returned. If an error
 	// occurs then err will be non-nil. If job is not found, the both jb and err will be nil
-	FindByJobID(jobid string) (jb *Job, found bool)
+	FindByJobID(jobid string) (jobs *Job, found bool)
 
 	// UpdateField will attempt to update the job field info for the given job.
 	UpdateField(job *Job, fields ...field.Value) error

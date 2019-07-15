@@ -134,9 +134,18 @@ SELECT
     jobstatus.description,
     jobstatus.created as updated
 FROM jobs AS job
-JOIN statuses AS jobstatus ON job.id = jobstatus.job_id
+LEFT JOIN
+( -- find the most recent job status if it exists
+	SELECT DISTINCT ON (job_id)
+	*
+	FROM
+	   statuses
+	ORDER BY
+	   job_id, id DESC
+) AS jobstatus ON jobstatus.job_id = job.id
 WHERE job.mdgid = $1 AND job.sheet_number = $2 AND job.sheet_name = $3
-ORDER BY jobstatus.id desc limit 1;
+ORDER BY jobstatus.id desc 
+LIMIT 2
 ```
 
     * $1 will be the mdgid (string)
@@ -144,6 +153,41 @@ ORDER BY jobstatus.id desc limit 1;
     * $3 will be the sheet name (string)
 
     The list order is the order in which the items need to occure.
-    The system is expect the sql to return zero or one row only.
+    The system is expect the sql to return zero or more rows.
+
+Create sqls for the original tables can be found in the [docs/jobs.sql folder.](doc/jobs.sql)
+
+* `query_select_all_jobs` (string): the sql is used to find all jobs 
+
+```sql
+SELECT 
+	job.id,
+    job.mdgid,
+    job.sheet_number,
+    job.sheet_name,
+    job.queue_id,
+    job.created as enqueued,
+    jobstatus.status,
+    jobstatus.description,
+    jobstatus.created as updated
+FROM jobs AS job
+LEFT JOIN
+( -- find the most recent job status if it exists
+	SELECT DISTINCT ON (job_id)
+	*
+	FROM 
+	   statuses
+	ORDER BY
+	   job_id, id DESC
+) AS jobstatus ON jobstatus.job_id = job.id
+ORDER BY jobstatus.id desc
+{{limit}}
+;
+```
+
+    * `{{limit}}` will be replaced by `LIMIT xxx`
+
+    The list order is the order in which the items need to occure.
+    The system is expect the sql to return zero or more rows.
 
 Create sqls for the original tables can be found in the [docs/jobs.sql folder.](doc/jobs.sql)
