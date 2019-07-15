@@ -6,7 +6,9 @@ import (
 	"fmt"
 	"io/ioutil"
 	"strconv"
+	"strings"
 	"sync"
+	"text/template"
 	"time"
 
 	"github.com/go-spatial/geom"
@@ -37,6 +39,7 @@ type Provider struct {
 	QueryInsertStatus         string
 	QuerySelectMDGIDSheetName string
 	QuerySelectJobID          string
+	QuerySelectAllJobs        string
 }
 
 const (
@@ -190,6 +193,7 @@ func initFunc(config coordinator.Config) (coordinator.Provider, error) {
 	p.QueryInsertStatus, _ = config.String("query_insert_status", &emptystr)
 	p.QuerySelectMDGIDSheetName, _ = config.String("query_select_mdgid_sheetname", &emptystr)
 	p.QuerySelectJobID, _ = config.String("query_select_job_id", &emptystr)
+	p.QuerySelectAllJobs, _ = config.String("query_select_all_jobs", &emptystr)
 
 	// track the provider so we can clean it up later
 	pLock.Lock()
@@ -360,7 +364,7 @@ VALUES($1,$2,$3);
 					query,
 					job.JobID,
 					"failed",
-					status.Error.Error(),
+					status.Description,
 				)
 			}
 		}
@@ -499,6 +503,119 @@ ORDER BY jobstatus.id desc limit 1;
 		EnqueuedAt: enqueued,
 		UpdatedAt:  updated,
 	}, true
+}
+
+func genAllSQL(primarySQL, defaultSQL string, limit uint) (string, error) {
+	if primarySQL == "" {
+		primarySQL = defaultSQL
+	}
+	var lmt = func() string { return "" }
+	if limit != 0 {
+		lmtstr := fmt.Sprintf("limit %v", limit)
+		lmt = func() string { return lmtstr }
+	}
+	tmpl, err := template.New("allsql").Funcs(
+		map[string]interface{}{
+			"limit": lmt,
+		},
+	).Parse(primarySQL)
+	if err != nil {
+		return "", err
+	}
+	var str strings.Builder
+
+	err = tmpl.Execute(&str, struct{}{})
+	if err != nil {
+		return "", err
+	}
+	return str.String(), nil
+}
+
+// Jobs returns the jobs that the provider knows about, if limit is not zero it will
+// be used to limit the number of jobs returned to that limit.  Jobs will be returned
+// from newest to oldest
+func (p *Provider) Jobs(limit uint) (jobs []*coordinator.Job, err error) {
+	const selectQuery = `
+SELECT 
+	job.id,
+    job.mdgid,
+    job.sheet_number,
+    job.sheet_name,
+    job.queue_id,
+    job.created as enqueued,
+    jobstatus.status,
+    jobstatus.description,
+    jobstatus.created as updated
+FROM jobs AS job
+LEFT JOIN
+( -- find the most recent job status if it exists
+	SELECT DISTINCT ON (job_id)
+	*
+	FROM 
+	   statuses
+	ORDER BY
+	   job_id, id DESC
+) AS jobstatus ON jobstatus.job_id = job.id
+ORDER BY jobstatus.id desc
+{{limit}}
+;
+`
+	var (
+		jobid       int
+		mdgid       string
+		sheetNumber int
+		sheetName   string
+		queueID     string
+		enqueued    time.Time
+		status      string
+		desc        string
+		updated     time.Time
+	)
+
+	query, err := genAllSQL(p.QuerySelectAllJobs, selectQuery, limit)
+	if err != nil {
+		return nil, err
+	}
+
+	rows, err := p.pool.Query(query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		if err := rows.Scan(
+			&jobid,
+			&mdgid,
+			&sheetNumber,
+			&sheetName,
+			&queueID,
+			&enqueued,
+			&status,
+			&desc,
+			&updated,
+		); err != nil {
+			return nil, err
+		}
+		s, err := field.NewStatusFor(status, desc)
+		if err != nil {
+			return nil, err
+		}
+		jobs = append(
+			jobs,
+			&coordinator.Job{
+				JobID:      fmt.Sprintf("%v", jobid),
+				QJobID:     queueID,
+				MdgID:      mdgid,
+				MdgIDPart:  uint32(sheetNumber),
+				SheetName:  sheetName,
+				Status:     field.Status{s},
+				EnqueuedAt: enqueued,
+				UpdatedAt:  updated,
+			},
+		)
+	}
+	return jobs, nil
 }
 
 // Close will close the provider's database connection

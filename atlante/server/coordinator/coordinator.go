@@ -43,6 +43,11 @@ type Provider interface {
 
 	// UpdateField will attempt to update the job field info for the given job.
 	UpdateField(job *Job, fields ...field.Value) error
+
+	// Jobs returns the currently known jobs in the system. If limit is not 0
+	// then the number of jobs will be limited to that number of jobs. Jobs, should
+	// be sorted newest request job to oldest
+	Jobs(limit uint) ([]*Job, error)
 }
 
 // NewJob is a helper function that will create a new job object with basic fields filled in.

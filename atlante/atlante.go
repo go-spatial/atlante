@@ -33,9 +33,12 @@ type ImgStruct struct {
 	intermediate bool
 	// Have we generated the file?
 	// This will allow us to generate the file only when requested
-	generated bool
-	lck       sync.Mutex
-	image     *image.Image
+	generated                 bool
+	lck                       sync.Mutex
+	image                     *image.Image
+	startGenerationCallBack   func()
+	endGenerationCallBack     func()
+	generationFailureCallBack func(err error)
 }
 
 // Height returns the height of the image
@@ -91,6 +94,16 @@ func (img *ImgStruct) generateImage() (fn string, err error) {
 	if img.generated {
 		return img.filename, nil
 	}
+	if img.startGenerationCallBack != nil {
+		img.startGenerationCallBack()
+	}
+	if img.generationFailureCallBack != nil {
+		defer func() {
+			if err != nil {
+				img.generationFailureCallBack(err)
+			}
+		}()
+	}
 
 	file, err := img.filestore.Writer(img.filename, img.intermediate)
 	if err != nil {
@@ -110,6 +123,9 @@ func (img *ImgStruct) generateImage() (fn string, err error) {
 		return "", err
 	}
 	// Clean up the backing store.
+	if img.endGenerationCallBack != nil {
+		img.endGenerationCallBack()
+	}
 	img.generated = true
 	return img.filename, nil
 }
@@ -185,9 +201,7 @@ func GeneratePDF(ctx context.Context, sheet *Sheet, grid *grids.Cell, filenames 
 		return ErrNilGrid
 	}
 
-	if sheet.Emitter != nil {
-		sheet.Emitter.Emit(field.Started{})
-	}
+	sheet.Emit(field.Started{})
 
 	// TODO(gdey): use MdgID once we move to partial templates system
 	// grp := grid.MdgID.String(), an empty group is current directory
@@ -202,7 +216,9 @@ func GeneratePDF(ctx context.Context, sheet *Sheet, grid *grids.Cell, filenames 
 	if sheet.Filestore != nil {
 		shWriter, err := sheet.Filestore.FileWriter(grp)
 		if err != nil {
-			return fmt.Errorf("failed to create sheed filestore writer: %v", err)
+			err = fmt.Errorf("failed to create sheet filestore writer: %v", err)
+			sheet.EmitError("internal error", err)
+			return err
 		}
 		if shWriter != nil {
 			multiWriter.Writers = append(multiWriter.Writers, shWriter)
@@ -260,16 +276,25 @@ func GeneratePDF(ctx context.Context, sheet *Sheet, grid *grids.Cell, filenames 
 		image:        dstimg,
 		filestore:    multiWriter,
 		intermediate: true,
+		startGenerationCallBack: func() {
+			sheet.Emit(field.Processing{
+				Description: fmt.Sprintf("intermediate file: %v", filenames.IMG),
+			})
+		},
+		generationFailureCallBack: func(err error) {
+			sheet.EmitError(
+				fmt.Sprintf("failed to generate intermediate file: %v", filenames.IMG),
+				err,
+			)
+		},
 	}
 	defer func() {
 		img.Close()
 	}()
 
-	if sheet.Emitter != nil {
-		sheet.Emitter.Emit(field.Processing{
-			Description: fmt.Sprintf("intermediate file: %v ", filenames.SVG),
-		})
-	}
+	sheet.Emit(field.Processing{
+		Description: fmt.Sprintf("intermediate file: %v ", filenames.SVG),
+	})
 	file, err := multiWriter.Writer(filenames.SVG, true)
 	defer file.Close()
 
@@ -283,6 +308,7 @@ func GeneratePDF(ctx context.Context, sheet *Sheet, grid *grids.Cell, filenames 
 		Grid:          grid,
 	})
 	if err != nil {
+		sheet.EmitError("template processing failure", err)
 		log.Warnf("error trying to fillout sheet template")
 		return err
 	}
@@ -301,15 +327,15 @@ func GeneratePDF(ctx context.Context, sheet *Sheet, grid *grids.Cell, filenames 
 	pdffn := assetsWriter.Path(filenames.PDF)
 	svgfn := assetsWriter.Path(filenames.SVG)
 
-	if sheet.Emitter != nil {
-		sheet.Emitter.Emit(field.Processing{
-			Description: fmt.Sprintf("file: %v ", filenames.PDF),
-		})
-	}
+	sheet.Emit(field.Processing{
+		Description: fmt.Sprintf("generate file: %v ", filenames.PDF),
+	})
+
 	widthpts, heightpts := float64(sheet.WidthInPoints(72)), float64(sheet.HeightInPoints(72))
 	log.Infof("pdf %v,%v", widthpts, heightpts)
 	if err = svg2pdf.GeneratePDF(svgfn, pdffn, heightpts, widthpts); err != nil {
 		log.Warnf("error generating pdf: %v", err)
+		sheet.EmitError("generate pdf failed", err)
 		return err
 	}
 
@@ -317,6 +343,7 @@ func GeneratePDF(ctx context.Context, sheet *Sheet, grid *grids.Cell, filenames 
 		// Don't want the assets writer
 		wrts, err := multiWriter.Writers[1].Writer(filenames.PDF, false)
 		if err != nil {
+			sheet.EmitError("generate pdf failed", err)
 			return err
 		}
 		// nil writer move on.
@@ -327,11 +354,13 @@ func GeneratePDF(ctx context.Context, sheet *Sheet, grid *grids.Cell, filenames 
 		// Copy the pdf over
 		pdffile, err := os.Open(pdffn)
 		if err != nil {
+			sheet.EmitError("generate pdf failed", err)
 			return err
 		}
 		io.Copy(wrts, pdffile)
 	}
-	return err
+	sheet.Emit(field.Completed{})
+	return nil
 }
 
 type Atlante struct {

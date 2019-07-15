@@ -12,6 +12,7 @@ import (
 	"github.com/go-spatial/maptoolkit/atlante/grids"
 	"github.com/go-spatial/maptoolkit/atlante/internal/urlutil"
 	"github.com/go-spatial/maptoolkit/atlante/notifiers"
+	"github.com/go-spatial/maptoolkit/atlante/server/coordinator/field"
 )
 
 const (
@@ -120,6 +121,25 @@ func (sheet *Sheet) WidthInPoints(dpi uint) uint64 {
 	}
 	// mm2inch is inches/mm , dpi is points/inches
 	return mmToPoint(sheet.Width, dpi)
+}
+
+// Emit will emit an notifier event if the notifier is not nil.
+func (sheet *Sheet) Emit(status field.StatusEnum) error {
+	if sheet == nil || sheet.Emitter == nil {
+		return nil
+	}
+	return sheet.Emitter.Emit(status)
+}
+
+// EmitError will emit a notifier event for a failed processing job
+func (sheet *Sheet) EmitError(desc string, err error) error {
+	if sheet == nil || sheet.Emitter == nil || err == nil {
+		return nil
+	}
+	return sheet.Emitter.Emit(field.Failed{
+		Description: desc,
+		Error:       err,
+	})
 }
 
 // NormalizeSheetName will return a normalized version of the sheetname, or if the sheet

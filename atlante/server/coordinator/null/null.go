@@ -40,5 +40,8 @@ func (Provider) FindByJob(job *atlante.Job) (jb *coordinator.Job, found bool) {
 func (Provider) FindByJobID(jobid string) (jb *coordinator.Job, found bool) {
 	return nil, false
 }
+func (Provider) Jobs(uint) ([]*coordinator.Job, error) {
+	return nil, nil
+}
 
 var _ = coordinator.Provider(Provider{})
