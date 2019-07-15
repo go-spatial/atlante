@@ -375,7 +375,7 @@ VALUES($1,$2,$3);
 	return nil
 }
 
-func (p *Provider) FindByJob(job *atlante.Job) (jb *coordinator.Job, found bool) {
+func (p *Provider) FindByJob(job *atlante.Job) (jobs []*coordinator.Job) {
 
 	const selectQuery = `
 SELECT 
@@ -386,16 +386,25 @@ SELECT
     jobstatus.description,
     jobstatus.created as updated
 FROM jobs AS job
-JOIN statuses AS jobstatus ON job.id = jobstatus.job_id
+LEFT JOIN
+( -- find the most recent job status if it exists
+	SELECT DISTINCT ON (job_id)
+	*
+	FROM
+	   statuses
+	ORDER BY
+	   job_id, id DESC
+) AS jobstatus ON jobstatus.job_id = job.id
 WHERE job.mdgid = $1 AND job.sheet_number = $2 AND job.sheet_name = $3
-ORDER BY jobstatus.id desc limit 1;
+ORDER BY jobstatus.id desc 
+LIMIT 2;
 	`
 	query := selectQuery
 	if p.QuerySelectMDGIDSheetName != "" {
 		query = p.QuerySelectMDGIDSheetName
 	}
 	if job == nil {
-		return nil, false
+		return nil
 	}
 	mdgid := job.Cell.Mdgid.Id
 	sheetNumber := job.Cell.Mdgid.Part
@@ -410,33 +419,42 @@ ORDER BY jobstatus.id desc limit 1;
 		updated  time.Time
 	)
 
-	row := p.pool.QueryRow(query, mdgid, sheetNumber, sheetName)
-	if err := row.Scan(
-		&jobid,
-		&queueID,
-		&enqueued,
-		&status,
-		&desc,
-		&updated,
-	); err != nil {
-		log.Warnf("got error finding job %v-%v-%v: %v -- \n%v", mdgid, sheetNumber, sheetName, err, selectQuery)
-		return nil, false
-	}
-	s, err := field.NewStatusFor(status, desc)
+	rows, err := p.pool.Query(query, mdgid, sheetNumber, sheetName)
 	if err != nil {
-		log.Warnf("jobid(%v) got bad status from database:%v -- %v", jobid, s, err)
+		log.Errorf("postgresql: unable to preform query: %v", err)
+		return nil
 	}
-	cjb := &coordinator.Job{
-		JobID:      fmt.Sprintf("%v", jobid),
-		QJobID:     queueID,
-		MdgID:      mdgid,
-		MdgIDPart:  uint32(sheetNumber),
-		SheetName:  sheetName,
-		Status:     field.Status{s},
-		EnqueuedAt: enqueued,
-		UpdatedAt:  updated,
+	defer rows.Close()
+	for rows.Next() {
+		if err := rows.Scan(
+			&jobid,
+			&queueID,
+			&enqueued,
+			&status,
+			&desc,
+			&updated,
+		); err != nil {
+			log.Warnf("postgresql: got error finding job %v-%v-%v: %v -- \n%v", mdgid, sheetNumber, sheetName, err, selectQuery)
+			return nil
+		}
+		s, err := field.NewStatusFor(status, desc)
+		if err != nil {
+			log.Warnf("postgressql: jobid(%v) got bad status from database:%v -- %v", jobid, s, err)
+			continue
+		}
+		jobs = append(jobs, &coordinator.Job{
+			JobID:      fmt.Sprintf("%v", jobid),
+			QJobID:     queueID,
+			MdgID:      mdgid,
+			MdgIDPart:  uint32(sheetNumber),
+			SheetName:  sheetName,
+			Status:     field.Status{s},
+			EnqueuedAt: enqueued,
+			UpdatedAt:  updated,
+		})
 	}
-	return cjb, true
+	return jobs
+
 }
 
 func (p *Provider) FindByJobID(jobid string) (jb *coordinator.Job, found bool) {
@@ -530,6 +548,9 @@ func genAllSQL(primarySQL, defaultSQL string, limit uint) (string, error) {
 	}
 	return str.String(), nil
 }
+
+// JobsByMDGID retuns the jobs that the provider knows about, that match the the given
+// MDGID.
 
 // Jobs returns the jobs that the provider knows about, if limit is not zero it will
 // be used to limit the number of jobs returned to that limit.  Jobs will be returned

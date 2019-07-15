@@ -33,8 +33,8 @@ func (Provider) UpdateField(job *coordinator.Job, fields ...field.Value) error {
 	return nil
 }
 
-func (Provider) FindByJob(job *atlante.Job) (jb *coordinator.Job, found bool) {
-	return nil, false
+func (Provider) FindByJob(job *atlante.Job) (jobs []*coordinator.Job) {
+	return nil
 }
 
 func (Provider) FindByJobID(jobid string) (jb *coordinator.Job, found bool) {
