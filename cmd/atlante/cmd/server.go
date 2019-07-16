@@ -96,7 +96,7 @@ func serverCmdRunE(cmd *cobra.Command, args []string) error {
 	// Now we need to look to see if a queue has been configured
 	if conf.Webserver.Queue != nil {
 		qType, _ := conf.Webserver.Queue.String(queuer.ConfigKeyType, nil)
-		if qType != "none" || qType != "" {
+		if qType != "none" && qType != "" {
 			// Configure the queue
 			srv.Queue, err = queuer.For(qType, conf.Webserver.Queue)
 			if err != nil {
@@ -116,7 +116,7 @@ func serverCmdRunE(cmd *cobra.Command, args []string) error {
 		// cast to string
 		val := fmt.Sprintf("%v", value)
 		if val == "" {
-			fmt.Fprintln(cmd.OutOrStderr(), "warning, webserver.header (%v) has no configured value, ignoring", name)
+			fmt.Fprintf(cmd.OutOrStderr(), "warning, webserver.header (%v) has no configured value, ignoring\n", name)
 		}
 		srv.Headers[name] = val
 	}

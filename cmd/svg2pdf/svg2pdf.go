@@ -18,7 +18,7 @@ func init() {
 func main() {
 	flag.Parse()
 	if flag.NArg() != 2 {
-		fmt.Println("incorrect number of args (%d)", flag.NArg())
+		fmt.Printf("incorrect number of args (%d)", flag.NArg())
 		os.Exit(1)
 	}
 

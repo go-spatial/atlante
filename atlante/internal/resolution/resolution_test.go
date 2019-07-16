@@ -31,26 +31,32 @@ func TestZoom(t *testing.T) {
 				"San Deigo, US": {
 					earthCircumfrence: MercatorEarthCircumference,
 					lat:               32.715736,
+					zoom:              13.281348714459781,
 				},
 				"New York, US": tcase{
 					earthCircumfrence: MercatorEarthCircumference,
 					lat:               40.785091,
+					zoom:              13.129229242614507,
 				},
 				"Umeå, Sweden": tcase{
 					earthCircumfrence: MercatorEarthCircumference,
 					lat:               63.825848,
+					zoom:              12.34973052323617,
 				},
 				"Luleå, Norrbotten, Sweden": tcase{
 					earthCircumfrence: MercatorEarthCircumference,
 					lat:               65.584816,
+					zoom:              12.255970484637578,
 				},
 				"Port Stephens, Falkland Islands": tcase{
 					earthCircumfrence: MercatorEarthCircumference,
 					lat:               -52.094273,
+					zoom:              12.827715254340175,
 				},
 				"Nakuru, Kenya": tcase{
 					earthCircumfrence: MercatorEarthCircumference,
 					lat:               -0.303099,
+					zoom:              13.53052931740004,
 				},
 			},
 		},
