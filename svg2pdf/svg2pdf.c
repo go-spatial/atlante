@@ -5,7 +5,7 @@
 #include <cairo-ps.h>
 
 int svg2pdf_file(const char * inFile, const char * outFile,
-		double height, double width) {
+		double width, double height) {
 	cairo_t * cr;
 	cairo_surface_t * surface;
 	RsvgHandle * handle;
@@ -53,7 +53,7 @@ int svg2pdf_file(const char * inFile, const char * outFile,
 
 	// set handle options
 
-	surface = cairo_pdf_surface_create(outFile, height, width);
+	surface = cairo_pdf_surface_create(outFile, width, height);
 	cairo_status_t status = cairo_surface_status(surface);
 	if (status != CAIRO_STATUS_SUCCESS) {
 #if DEBUG
