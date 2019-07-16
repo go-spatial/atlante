@@ -100,7 +100,7 @@ func (e *emitter) Emit(se field.StatusEnum) error {
 			codetype = "server error"
 		}
 		bdy, _ := ioutil.ReadAll(resp.Body)
-		log.Infof("%v (%v): %v", codetype, resp.StatusCode, bdy)
+		log.Infof("%v (%v): %s", codetype, resp.StatusCode, bdy)
 	}
 	return err
 }
