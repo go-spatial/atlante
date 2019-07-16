@@ -16,10 +16,10 @@ import (
 )
 
 const (
-	// DefaultHeightMM is the default mm height if a height is not given
-	DefaultHeightMM = 28.16667
 	// DefaultWidthMM is the default mm width if a width is not given
-	DefaultWidthMM = 36.20833
+	DefaultWidthMM = 841 // A0 width
+	// DefaultHeightMM is the default mm height if a height is not given
+	DefaultHeightMM = 1189 // A0 height
 
 	// inchPerMM is the number of inches in a mm
 	inchPerMM = 1 / 25.4
