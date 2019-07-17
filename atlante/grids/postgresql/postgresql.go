@@ -208,7 +208,7 @@ func NewGridProvider(config grids.ProviderConfig) (grids.Provider, error) {
 		queryMDGID:       queryMDGID,
 	}
 	if p.pool, err = pgx.NewConnPool(p.config); err != nil {
-		return nil, fmt.Errorf("Failed while creating connection pool: %v", err)
+		return nil, fmt.Errorf("failed while creating connection pool: %v", err)
 	}
 
 	// track the provider so we can clean it up later
