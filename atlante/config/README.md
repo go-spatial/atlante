@@ -14,11 +14,12 @@
 
 The webserver has the following properties
 
-* `hostname`          (string) : [optional] ("") the hostname
-* `port`              (string) : [optional] (":8080") the port
-* `scheme`            (string) : [optional] ("http") the scheme to use
-* `webserver.headers` (table)  : [optional] additional headers to add to each response
-* `webserver.queue`   (table)  : [optional] the queue to use to send jobs to workers
+* `hostname`              (string) : [optional] ("") the hostname
+* `port`                  (string) : [optional] (":8080") the port
+* `scheme`                (string) : [optional] ("http") the scheme to use
+* `webserver.coordinator` (table)  : [optional] the coordinator and it's config that will manage job information
+* `webserver.headers`     (table)  : [optional] additional headers to add to each response
+* `webserver.queue`       (table)  : [optional] the queue to use to send jobs to workers
 
 ## Sheets
 
