@@ -8,7 +8,6 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/gdey/errors"
 	cfgaws "github.com/go-spatial/maptoolkit/atlante/config/aws"
 
 	"github.com/aws/aws-sdk-go/aws"
@@ -191,7 +190,7 @@ func (p Provider) PathURL(group string, filepth string, isIntermediate bool) (*u
 			Filepath:       filepth,
 			IsIntermediate: isIntermediate,
 			FilestoreType:  TYPE,
-			Err:            errors.String("file does not exist"),
+			Err:            filestore.ErrFileDoesNotExist,
 		}
 	}
 
