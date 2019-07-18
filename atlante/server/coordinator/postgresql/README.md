@@ -4,7 +4,7 @@ A coorinator provider that can connect to a Postgres Database.
 
 ```toml
 
-[[webserver.coordinator]]
+[webserver.coordinator]
     type = "postresql"
     host = "docker.for.mac.localhost"
     database = "management"
@@ -17,16 +17,16 @@ A coorinator provider that can connect to a Postgres Database.
 
 The provider supports the following properties
 
-* `type` (string) : [required] should be 'grid5k'
-* `name` (string) : [required] the name of the provider (this will be normalized to the lowercase)
-* `host` (string) : [required] the database host
-* `port` (string) : [required] the database post
-* `user` (string) : [required] the user for the database
-* `password` (string) : [required] the user password
-* `ssl_mode` (string) : [optional] the ssl mode for postgres SSL
-* `ssl_key` (string) : [optional] the ssl key for postgres SSL
-* `ssl_cert` (string) : [optional] the ssl cert for postgres SSL
-* `ssl_root_cert` (string) : [optional] the ssl root cert
+* `type`            (string) : [required] should always be 'postgresql'
+* `name`            (string) : [required] the name of the provider (this will be normalized to the lowercase)
+* `host`            (string) : [required] the database host
+* `port`            (string) : [required] the database post
+* `user`            (string) : [required] the user for the database
+* `password`        (string) : [required] the user password
+* `ssl_mode`        (string) : [optional] the ssl mode for postgres SSL
+* `ssl_key`         (string) : [optional] the ssl key for postgres SSL
+* `ssl_cert`        (string) : [optional] the ssl cert for postgres SSL
+* `ssl_root_cert`   (string) : [optional] the ssl root cert
 * `max_connections` (number) : [optional] the max number of connections to keep in the pool
 
 ## SQL options.

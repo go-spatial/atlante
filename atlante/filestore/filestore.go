@@ -5,8 +5,6 @@ import (
 	"log"
 	"net/url"
 	"sync"
-
-	"github.com/gdey/errors"
 )
 
 const (
@@ -14,32 +12,11 @@ const (
 	ConfigKeyName = "name"
 	// ConfigKeyType is the config key type for the type of a filestore entry
 	ConfigKeyType = "type"
-
-	// ErrUnsupportedOperation is returned when the files store does not support
-	// the operation for the fileapth or type.
-	ErrUnsupportedOperation = errors.String("unsupported operation")
 )
 
 type timeout interface {
 	Timeout() bool
 }
-
-// ErrPath records the error and the operation and file that caused it.
-// timeout errors should have a Timeout() bool on it.
-type ErrPath struct {
-	Filepath       string
-	IsIntermediate bool
-	FilestoreType  string
-	Err            error
-}
-
-// Timeout reports if the error represents a timeout
-func (err ErrPath) Timeout() bool {
-	t, ok := err.Err.(timeout)
-	return ok && t.Timeout()
-}
-
-func (err ErrPath) Error() string { return err.Err.Error() }
 
 // FileWriter returns a writer object
 type FileWriter interface {

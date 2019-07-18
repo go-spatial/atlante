@@ -368,9 +368,14 @@ func (s *Server) GridInfoHandler(w http.ResponseWriter, request *http.Request, u
 		gf := s.Atlante.FilenamesForCell(sheetName, cell)
 		url, err := pather.PathURL(mdgid.AsString(), gf.PDF, false)
 		if err != nil {
-			if err != filestore.ErrUnsupportedOperation {
-				log.Warnf("filestore error: %v", err)
+			if err == filestore.ErrUnsupportedOperation {
+				// no opt
+			} else if e, ok := err.(filestore.ErrPath); ok && e.Err == filestore.ErrFileDoesNotExist {
+				// no opt
+			} else {
+				log.Warnf("filestore error: %v", e)
 			}
+			url = nil
 		}
 		if url != nil {
 			pdfURL = url.String()

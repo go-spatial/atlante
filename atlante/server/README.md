@@ -22,6 +22,21 @@ Returns
 {
   "mdgid" : string,
   "sheet_number" : null | number,
+  "jobs" : []{
+     "mdgid" : string, // the mdgid 
+     "sheet_number" : null | number, // the sheet number.
+     "sheet_name" : string, // the sheet name
+     "status" : {
+        "status" : "requested" | "started" | "processing" | "completed" | "failed",
+        "stage" : number (0-3), // which stage the job is at
+        "total" : number (3),   // the total number of stages
+         // description will represent different things depending on status.
+         //  for requested, started, completed it will always be empty
+         //  for processing it will be the item being processed
+         //  for failed it will be the reason it failed
+        "description" : string, 
+     },
+  },
   "pdf_url":  null | url, // if null, pdf has not be generated
   "last_generated" :  null | date, // last time the pdf was generated
   "last_edited" : date,  // last time the data was edited
@@ -40,6 +55,21 @@ Returns
 {
   "mdgid" : string,
   "sheet_number" : null | number,
+  "jobs" : []{
+     "mdgid" : string, // the mdgid 
+     "sheet_number" : null | number, // the sheet number.
+     "sheet_name" : string, // the sheet name
+     "status" : {
+        "status" : "requested" | "started" | "processing" | "completed" | "failed",
+        "stage" : number (0-3), // which stage the job is at
+        "total" : number (3),   // the total number of stages
+         // description will represent different things depending on status.
+         //  for requested, started, completed it will always be empty
+         //  for processing it will be the item being processed
+         //  for failed it will be the reason it failed
+        "description" : string, 
+     },
+  },
   "pdf_url":  null | url, // if null, pdf has not be generated
   "last_generated" :  null | date, // last time the pdf was generated
   "last_edited" : date,  // last time the data was edited
@@ -71,3 +101,67 @@ Returns:
    "status" : "requested" | "started" | "processing" | "completed",
 }
 ```
+
+5. `GET /jobs` will return the latest 100 jobs
+
+Returns:
+
+```js
+  [{
+     "mdgid" : string, // the mdgid 
+     "sheet_number" : null | number, // the sheet number.
+     "sheet_name" : string, // the sheet name
+     "status" : {
+        "status" : "requested" | "started" | "processing" | "completed" | "failed",
+        "stage" : number (0-3), // which stage the job is at
+        "total" : number (3),   // the total number of stages
+         // description will represent different things depending on status.
+         //  for requested, started, completed it will always be empty
+         //  for processing it will be the item being processed
+         //  for failed it will be the reason it failed
+        "description" : string, 
+     },
+  }
+  //...
+  ]
+
+```
+6. `GET /jobs/%{job_id}/status` will return the status of the job
+
+Returns:
+
+```js
+  {
+     "mdgid" : string, // the mdgid 
+     "sheet_number" : null | number, // the sheet number.
+     "sheet_name" : string, // the sheet name
+     "status" : {
+        "status" : "requested" | "started" | "processing" | "completed" | "failed",
+        "stage" : number (0-3), // which stage the job is at
+        "total" : number (3),   // the total number of stages
+         // description will represent different things depending on status.
+         //  for requested, started, completed it will always be empty
+         //  for processing it will be the item being processed
+         //  for failed it will be the reason it failed
+        "description" : string, 
+     },
+  },
+
+```
+
+7. `POST /jobs/%{job_id}/status` post status updates for jobs
+
+Expected:
+
+```js
+{
+        "status" : "requested" | "started" | "processing" | "completed" | "failed",
+         // description will represent different things depending on status.
+         //  for requested, started, completed it will always be empty
+         //  for processing it will be the item being processed
+         //  for failed it will be the reason it failed
+        "description" : string, 
+}
+```
+
+No content is retuned unless there is an error.

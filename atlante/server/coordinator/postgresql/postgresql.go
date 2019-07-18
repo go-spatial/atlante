@@ -504,7 +504,6 @@ ORDER BY jobstatus.id desc limit 1;
 		&desc,
 		&updated,
 	); err != nil {
-		log.Warnf("got error finding job %v: %v -- \n%v", id, err, selectQuery)
 		return nil, false
 	}
 	s, err := field.NewStatusFor(status, desc)
