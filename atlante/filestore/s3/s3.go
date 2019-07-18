@@ -169,13 +169,13 @@ func (p Provider) bucketPath(group, filepth string, isIntermediate bool) (bucket
 }
 
 // PathURL will get a pre-signed URL from aws for supported files.
-func (p Provider) PathURL(group string, filepth string, isIntermediate bool) (*url.URL, error) {
+func (p Provider) PathURL(group string, filepth string, isIntermediate bool) (urlinfo filestore.URLInfo, err error) {
 	if p.s3 == nil {
-		return nil, filestore.ErrUnsupportedOperation
+		return urlinfo, filestore.ErrUnsupportedOperation
 	}
 	// We don't support intermediate files for this operation
 	if !p.intermediate && isIntermediate {
-		return nil, filestore.ErrUnsupportedOperation
+		return urlinfo, filestore.ErrUnsupportedOperation
 	}
 	bucket, key := p.bucketPath(group, filepth, isIntermediate)
 	abucket, akey := aws.String(bucket), aws.String(key)
@@ -185,8 +185,9 @@ func (p Provider) PathURL(group string, filepth string, isIntermediate bool) (*u
 		Bucket: abucket,
 		Key:    akey,
 	}
-	if _, err := p.s3.HeadObject(headObjInput); err != nil {
-		return nil, filestore.ErrPath{
+	headObject, err := p.s3.HeadObject(headObjInput)
+	if err != nil {
+		return urlinfo, filestore.ErrPath{
 			Filepath:       filepth,
 			IsIntermediate: isIntermediate,
 			FilestoreType:  TYPE,
@@ -200,9 +201,14 @@ func (p Provider) PathURL(group string, filepth string, isIntermediate bool) (*u
 	})
 	urlStr, err := req.Presign(p.urlTimeout)
 	if err != nil {
-		return nil, err
+		return urlinfo, err
 	}
-	return url.Parse(urlStr)
+	urlinfo.URL, err = url.Parse(urlStr)
+	if err != nil {
+		return urlinfo, err
+	}
+	urlinfo.LastModified = headObject.LastModified
+	return urlinfo, nil
 }
 
 var _ filestore.Pather = Provider{}
