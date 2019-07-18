@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/gdey/errors"
 	"github.com/go-spatial/maptoolkit/atlante/grids"
 	"github.com/go-spatial/tegola"
 	"github.com/jackc/pgx"
@@ -176,6 +177,12 @@ func NewGridProvider(config grids.ProviderConfig) (grids.Provider, error) {
 	queryLngLat, _ = config.String(ConfigKeyQueryLngLat, &queryLngLat)
 	var queryMDGID string
 	queryMDGID, _ = config.String(ConfigKeyQueryMDGID, &queryMDGID)
+	if (queryLngLat != "" || queryMDGID != "") && (queryLngLat == "" || queryMDGID == "") {
+		if queryLngLat == "" {
+			return nil, errors.String("error " + ConfigKeyQueryLngLat + " not set, when " + ConfigKeyQueryMDGID + " is set")
+		}
+		return nil, errors.String("error " + ConfigKeyQueryMDGID + " not set, when " + ConfigKeyQueryLngLat + " is set")
+	}
 
 	connConfig := pgx.ConnConfig{
 		Host:     host,
