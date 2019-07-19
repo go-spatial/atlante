@@ -10,10 +10,19 @@ env:
   # DOCKER_PASSWORD
   - secure: E9Dm2qF36jvCiqTZm5Bi2Z7J0n/FC8+JMUpzazzPrAfTCRjhExqwu9JMT1DN+sZOjyS3SCxA02zrudhMVMiOgOI77j3pGc86GrUnN+esQUunq5SJEPcmlSn3kOqwA7/90gCayAtEkXAyKnutb21vPUFLVZ4U/5w6deLDDbml5HVlaxTM4LrpSiQ/wlGCS5WzAxItrGYSFuSrqaXUgav/IdRPPcS1yni5h9NdG1BxZ89+ltje6Lf3LqbuCPdS1qkPr9JDj2QnNRDcjFLrn/TBVSK4/f/wZeZrhvBlJNiiqTwS3hfkucBHxNg/Nspw5JkMuigOKji5efPkumGv6E7b27dhzB6wF8YaG8TWefDkAenLwdI0ic6hQJEoQJcHdRCtDBSnPykTn7WCC4bjKKVC30VHoEz2AxNCasXmV/VNXIJMFwqyhm4kpSlVgLFJ/Y5InkPHPsfi02XQpQfP35lGWaKm1Ry2X2FluGEpne7us4e0h0C3MumX64DxW6FpnZTybh5dRdb4XZk1qKG+Km/VqTbxu+na+Sj97UARVlpX+Zxln3zgccdyRYsN5Dqijx+QmTvhaUE1qnbh4/JZYqW7wt9B1e7daRn/27Vq9V8Y9ZjFJFcwCUGKs2JtAz/5fVEx8WqnpR5WGdJ2djaU+3ZH+DKh4gfb2vcACcd8CT1wJdI=
 
+jobs:
+  include:
+    - stage: deploy_docker
+      script:
+        - docker build -f docker/Dockerfile -t ${DOCKERHUB_ORG}/${DOCKERHUB_REPO} .
+        - echo "$DOCKER_PASSWORD" | docker login --username "$DOCKER_USER" --password-stdin
+        - docker push ${DOCKERHUB_ORG}/${DOCKERHUB_REPO}:latest
+
+
 stages:
-  - name: script
+  - name: deploy_docker
     # require the branch name to be master (note for PRs this is the base branch name)
-    if: branch = master
+    if: branch = master AND NOT (type = pull_request)
 
 services:
 - docker
@@ -21,7 +30,3 @@ services:
 before_install:
 - git lfs pull
 
-script:
-- docker build -f docker/Dockerfile -t ${DOCKERHUB_ORG}/${DOCKERHUB_REPO} .
-- echo "$DOCKER_PASSWORD" | docker login --username "$DOCKER_USER" --password-stdin
-- docker push ${DOCKERHUB_ORG}/${DOCKERHUB_REPO}:latest
