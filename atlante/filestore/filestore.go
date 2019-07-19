@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/url"
 	"sync"
+	"time"
 )
 
 const (
@@ -32,12 +33,34 @@ type Provider interface {
 	FileWriter(group string) (FileWriter, error)
 }
 
+// URLInfo encodes the url that can be used to get the file and the LastModified time of that url.
+type URLInfo struct {
+	URL          *url.URL
+	LastModified *time.Time
+}
+
+// String returns the string reprenstation of the URL
+func (urlinfo URLInfo) String() string {
+	if urlinfo.URL == nil {
+		return ""
+	}
+	return urlinfo.URL.String()
+}
+
+// TimeString returns the LastModified time formated according to RFC3339
+func (urlinfo URLInfo) TimeString() string {
+	if urlinfo.LastModified == nil || urlinfo.LastModified.IsZero() {
+		return ""
+	}
+	return urlinfo.LastModified.Format(time.RFC3339)
+}
+
 // Pather returns a url to the given file, the filestore supports external urls.
 // If the file does not exist return nil for the url, and a ErrPath. This can
 // be used for timeout as well. If the filestore does not support PathURLs
 // (i.e. because of configuration) then return nil for the url and a ErrUnsupportedOperation
 type Pather interface {
-	PathURL(group string, filepath string, isIntermediate bool) (*url.URL, error)
+	PathURL(group string, filepath string, isIntermediate bool) (URLInfo, error)
 }
 
 // globalWaitGroupPipe is used by pipe to keep the process running

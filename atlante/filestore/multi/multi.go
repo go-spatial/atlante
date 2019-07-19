@@ -2,7 +2,6 @@ package multi
 
 import (
 	"io"
-	"net/url"
 
 	"github.com/gdey/errors"
 	"github.com/go-spatial/maptoolkit/atlante/filestore"
@@ -168,7 +167,7 @@ func (t FileWriter) Writer(fpath string, isIntermediate bool) (io.WriteCloser, e
 
 // PathURL will go through each of the filestore looking for the first filestore that
 // support the Pather interface and has the file and returns that url
-func (p Provider) PathURL(group string, filepath string, isIntermediate bool) (*url.URL, error) {
+func (p Provider) PathURL(group string, filepath string, isIntermediate bool) (filestore.URLInfo, error) {
 	var firstError error
 	// Search through our filestores and find the first one that supportes the
 	// pather interface and has a url for it.
@@ -188,15 +187,15 @@ func (p Provider) PathURL(group string, filepath string, isIntermediate bool) (*
 			}
 			continue
 		}
-		if furl == nil {
+		if furl.URL == nil {
 			continue
 		}
 		return furl, nil
 	}
 	if firstError != nil {
-		return nil, firstError
+		return filestore.URLInfo{}, firstError
 	}
-	return nil, filestore.ErrUnsupportedOperation
+	return filestore.URLInfo{}, filestore.ErrUnsupportedOperation
 }
 
 var _ filestore.Provider = Provider{}

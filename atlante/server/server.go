@@ -167,7 +167,7 @@ func serverError(w http.ResponseWriter, reasonFmt string, data ...interface{}) {
 	w.WriteHeader(http.StatusInternalServerError)
 }
 
-func encodeCellAsJSON(w io.Writer, cell *grids.Cell, pdf string, lat, lng *float64, lastGen time.Time, jobs []*coordinator.Job) {
+func encodeCellAsJSON(w io.Writer, cell *grids.Cell, pdf filestore.URLInfo, lat, lng *float64, jobs []*coordinator.Job) {
 	// Build out the geojson
 	const geoJSONFmt = `{"type":"FeatureCollection","features":[{"type":"Feature","properties":{"objectid":"%v"},"geometry":{"type":"Polygon","coordinates":[[[%v,%v],[%v, %v],[%v, %v],[%v, %v],[%v, %v]]]}}]}`
 	mdgid := cell.GetMdgid()
@@ -190,14 +190,12 @@ func encodeCellAsJSON(w io.Writer, cell *grids.Cell, pdf string, lat, lng *float
 		Jobs:      jobs,
 		Lat:       lat,
 		Lng:       lng,
-		PDF:       pdf,
+		PDF:       pdf.String(),
+		LastGen:   pdf.TimeString(),
 		Series:    cell.GetSeries(),
 		SheetName: cell.GetSheet(),
 	}
 
-	if !lastGen.IsZero() {
-		jsonCell.LastGen = lastGen.Format(time.RFC3339)
-	}
 	if cell.Edited != nil {
 		edited := cell.Edited
 		at, _ := ptypes.Timestamp(edited.Date)
@@ -299,10 +297,7 @@ func (s *Server) GridInfoHandler(w http.ResponseWriter, request *http.Request, u
 		latp, lngp *float64
 
 		// We will fill this out later
-		pdfURL string
-
-		// We will get this from the filestore
-		lastGen time.Time
+		pdfURL filestore.URLInfo
 	)
 
 	sheetName, ok := urlParams[string(ParamsKeySheetname)]
@@ -366,7 +361,7 @@ func (s *Server) GridInfoHandler(w http.ResponseWriter, request *http.Request, u
 	// Figure out the PDF URL
 	if pather, ok := sheet.Filestore.(filestore.Pather); ok {
 		gf := s.Atlante.FilenamesForCell(sheetName, cell)
-		url, err := pather.PathURL(mdgid.AsString(), gf.PDF, false)
+		pdfURL, err = pather.PathURL(mdgid.AsString(), gf.PDF, false)
 		if err != nil {
 			if err == filestore.ErrUnsupportedOperation {
 				// no opt
@@ -375,24 +370,11 @@ func (s *Server) GridInfoHandler(w http.ResponseWriter, request *http.Request, u
 			} else {
 				log.Warnf("filestore error: %v", e)
 			}
-			url = nil
-		}
-		if url != nil {
-			pdfURL = url.String()
 		}
 	}
 
 	// Ask the coordinator for the status:
 	jobs := s.Coordinator.FindByJob(&atlante.Job{SheetName: sheetName, Cell: cell})
-	for _, jb := range jobs {
-		if !lastGen.IsZero() {
-			continue
-		}
-		lastGen = jb.UpdatedAt
-		if lastGen.IsZero() {
-			lastGen = jb.EnqueuedAt
-		}
-	}
 
 	// content type
 	w.Header().Add("Content-Type", "application/json")
@@ -402,7 +384,7 @@ func (s *Server) GridInfoHandler(w http.ResponseWriter, request *http.Request, u
 	w.Header().Add("Pragma", "no-cache")
 	w.Header().Add("Expires", "0")
 
-	encodeCellAsJSON(w, cell, pdfURL, latp, lngp, lastGen, jobs)
+	encodeCellAsJSON(w, cell, pdfURL, latp, lngp, jobs)
 }
 
 // QueueHandler takes a job from a post and enqueues it on the configured queue
