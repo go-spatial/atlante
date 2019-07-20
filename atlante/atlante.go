@@ -21,6 +21,7 @@ import (
 	"github.com/go-spatial/maptoolkit/atlante/server/coordinator/field"
 	"github.com/go-spatial/maptoolkit/mbgl/bounds"
 	"github.com/go-spatial/maptoolkit/mbgl/image"
+	mbgl "github.com/go-spatial/maptoolkit/mbgl/image"
 	"github.com/go-spatial/maptoolkit/svg2pdf"
 	"github.com/prometheus/common/log"
 )
@@ -35,7 +36,7 @@ type ImgStruct struct {
 	// This will allow us to generate the file only when requested
 	generated                 bool
 	lck                       sync.Mutex
-	image                     *image.Image
+	image                     *mbgl.Image
 	startGenerationCallBack   func()
 	endGenerationCallBack     func()
 	generationFailureCallBack func(err error)

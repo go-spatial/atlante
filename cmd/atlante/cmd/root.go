@@ -149,7 +149,7 @@ func rootCmdRun(cmd *cobra.Command, args []string) error {
 	// Check to see if JOB is set, if it is decode it into a job struct.
 	generatedFiles, err := rootCmdParseArgs(ctx, a)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "error generating pdf\n")
+		fmt.Fprintf(cmd.OutOrStderr(), "error generating pdf\n")
 		eerr := ErrExitWith{
 			Err:       err,
 			ShowUsage: true,

@@ -9,7 +9,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/gdey/errors"
 	"github.com/go-spatial/maptoolkit/atlante/grids"
 	"github.com/go-spatial/tegola"
 	"github.com/jackc/pgx"
@@ -88,13 +87,6 @@ const (
 	// ConfigKeyQueryLngLat is the sql for getting grid values from a lng lat value.
 	ConfigKeyQueryLngLat = "query_lnglat"
 )
-
-// ErrInvalidSSLMode is returned when something is wrong with SSL configuration
-type ErrInvalidSSLMode string
-
-func (e ErrInvalidSSLMode) Error() string {
-	return fmt.Sprintf("postgis: invalid ssl mode (%v)", string(e))
-}
 
 func init() {
 	grids.Register(Name, NewGridProvider, Cleanup)
@@ -179,9 +171,9 @@ func NewGridProvider(config grids.ProviderConfig) (grids.Provider, error) {
 	queryMDGID, _ = config.String(ConfigKeyQueryMDGID, &queryMDGID)
 	if (queryLngLat != "" || queryMDGID != "") && (queryLngLat == "" || queryMDGID == "") {
 		if queryLngLat == "" {
-			return nil, errors.String("error " + ConfigKeyQueryLngLat + " not set, when " + ConfigKeyQueryMDGID + " is set")
+			return nil, ErrMissingQueryMDGID
 		}
-		return nil, errors.String("error " + ConfigKeyQueryMDGID + " not set, when " + ConfigKeyQueryLngLat + " is set")
+		return nil, ErrMissingQueryLngLat
 	}
 
 	connConfig := pgx.ConnConfig{

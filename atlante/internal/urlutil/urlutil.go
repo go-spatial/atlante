@@ -53,12 +53,6 @@ func (e ErrFileNotExists) Error() string {
 	return fmt.Sprintf("file at location (%v) not found!", e.Filename)
 }
 
-// ReaderCloser is an io.Reader with a close method
-type ReaderCloser interface {
-	io.Reader
-	Close() error
-}
-
 // noCloserReader is a simple wraper to provide a Close method to Readers
 // that does nothing, but allows the object to fullfil the ReaderCloser interface.
 type noCloserReader struct {
@@ -73,7 +67,7 @@ func (ncr noCloserReader) Close() error { return nil }
 
 // NewReader will create a reader for the apporiate type of file described by
 // the url provided.
-func NewReader(location *url.URL) (ReaderCloser, error) {
+func NewReader(location *url.URL) (io.ReadCloser, error) {
 
 	if location == nil {
 		return nil, errors.New("nil url provided")
