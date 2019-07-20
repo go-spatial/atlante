@@ -522,6 +522,8 @@ ORDER BY jobstatus.id desc limit 1;
 	}, true
 }
 
+// genAllSQL retuns the all sql (primarySQL if it's not empty otherwise defaultSQL) that results from running the provided
+// sql through a template processor
 func genAllSQL(primarySQL, defaultSQL string, limit uint) (string, error) {
 	if primarySQL == "" {
 		primarySQL = defaultSQL

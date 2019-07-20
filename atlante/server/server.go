@@ -53,6 +53,9 @@ const (
 
 	// JobFileName is the filename  of the sqlite job tracking db
 	JobFileName = "jobs.db"
+
+	// MaxJobs returns the max number of jobs to return
+	MaxJobs = 100
 )
 
 // GenPath take a set of compontents and constructs a url
@@ -171,6 +174,9 @@ func encodeCellAsJSON(w io.Writer, cell *grids.Cell, pdf filestore.URLInfo, lat,
 	// Build out the geojson
 	const geoJSONFmt = `{"type":"FeatureCollection","features":[{"type":"Feature","properties":{"objectid":"%v"},"geometry":{"type":"Polygon","coordinates":[[[%v,%v],[%v, %v],[%v, %v],[%v, %v],[%v, %v]]]}}]}`
 	mdgid := cell.GetMdgid()
+	if jobs == nil {
+		jobs = []*coordinator.Job{}
+	}
 
 	jsonCell := struct {
 		MDGID      string             `json:"mdgid"`
@@ -540,12 +546,18 @@ func (s *Server) JobInfoHandler(w http.ResponseWriter, request *http.Request, ur
 	}
 
 }
+
+// JobsHandler is a http handler for the jobs end-point
 func (s *Server) JobsHandler(w http.ResponseWriter, request *http.Request, urlParams map[string]string) {
 	// Hardcode 100 limit for now.
-	jobs, err := s.Coordinator.Jobs(100)
+	jobs, err := s.Coordinator.Jobs(MaxJobs)
 	if err != nil {
 		serverError(w, "failed to get jobs: %v", err)
 		return
+	}
+	// Make sure we always encode an empty array.
+	if jobs == nil {
+		jobs = []*coordinator.Job{}
 	}
 	err = json.NewEncoder(w).Encode(jobs)
 	if err != nil {
