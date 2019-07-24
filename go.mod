@@ -10,7 +10,7 @@ require (
 	github.com/dimfeld/httptreemux v5.0.1+incompatible
 	github.com/gdey/errors v0.0.0-20190426172550-8ebd5bc891fb
 	github.com/gdey/tbltest v0.0.0-20180914212833-1865222d591f // indirect
-	github.com/go-spatial/geom v0.0.0-20190319224731-c03a62f3a74a
+	github.com/go-spatial/geom v0.0.0-20190706003858-2760310199f5
 	github.com/go-spatial/tegola v0.9.0
 	github.com/gogo/protobuf v1.2.1
 	github.com/golang/protobuf v1.3.1

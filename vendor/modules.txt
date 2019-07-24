@@ -52,11 +52,15 @@ github.com/aws/aws-sdk-go/private/protocol/query/queryutil
 github.com/dimfeld/httptreemux
 # github.com/gdey/errors v0.0.0-20190426172550-8ebd5bc891fb
 github.com/gdey/errors
-# github.com/go-spatial/geom v0.0.0-20190319224731-c03a62f3a74a
+# github.com/go-spatial/geom v0.0.0-20190706003858-2760310199f5
 github.com/go-spatial/geom
 github.com/go-spatial/geom/spherical
+github.com/go-spatial/geom/encoding/wkb
 github.com/go-spatial/geom/encoding/wkt
 github.com/go-spatial/geom/slippy
+github.com/go-spatial/geom/encoding/wkb/internal/consts
+github.com/go-spatial/geom/encoding/wkb/internal/decode
+github.com/go-spatial/geom/encoding/wkb/internal/encode
 github.com/go-spatial/geom/cmp
 # github.com/go-spatial/tegola v0.9.0
 github.com/go-spatial/tegola/dict
