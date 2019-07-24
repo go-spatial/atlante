@@ -7,6 +7,10 @@ import (
 )
 
 const (
+
+	// ErrInvalidType is returned when the type is not known
+	ErrInvalidType = errors.String("invalid type")
+
 	// ErrMissingQueryMDGID is returned when the QueryLngLat is specified but not QueryMDGID
 	ErrMissingQueryMDGID = errors.String("error " + ConfigKeyQueryLngLat + " not set, when " + ConfigKeyQueryMDGID + " is set")
 

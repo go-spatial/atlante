@@ -360,7 +360,7 @@ type DMS struct {
 
 // String returns the string representation.
 func (dms DMS) String() string {
-	return fmt.Sprintf("%d°%d'%f\"%v", dms.Degree, dms.Minute, dms.Second, dms.Hemisphere)
+	return fmt.Sprintf("%d°%d'%f\"%c", dms.Degree, dms.Minute, dms.Second, dms.Hemisphere)
 }
 
 func toDMS(v float64) (d int64, m int64, s float64) {
