@@ -24,6 +24,8 @@ github.com/go-kit/kit v0.8.0/go.mod h1:xBxKIO96dXMWWy0MnWVtmwkA9/13aqxPnvrjFYMA2
 github.com/go-logfmt/logfmt v0.3.0/go.mod h1:Qt1PoO58o5twSAckw1HlFXLmHsOX5/0LbT9GBnD5lWE=
 github.com/go-spatial/geom v0.0.0-20190319224731-c03a62f3a74a h1:I8itptD8TwF2U7IvRsSy1Ub2QU55lqN/s+uSHbuUtNs=
 github.com/go-spatial/geom v0.0.0-20190319224731-c03a62f3a74a/go.mod h1:ysDXHAm45k1iWrWWOFdbjksiQFWmWLeFgbeuv6n7XiY=
+github.com/go-spatial/geom v0.0.0-20190706003858-2760310199f5 h1:kbeqsm3nNBzSNyAvKTzItJJXxvuYCDyN5Yh3mab4qyQ=
+github.com/go-spatial/geom v0.0.0-20190706003858-2760310199f5/go.mod h1:ysDXHAm45k1iWrWWOFdbjksiQFWmWLeFgbeuv6n7XiY=
 github.com/go-spatial/tegola v0.9.0 h1:cYhxIJyhxmafP1l73N4/dSb3JoeM4P1tqxDyGnrYnak=
 github.com/go-spatial/tegola v0.9.0/go.mod h1:9XIm2q0HldzRh69l+Ex3mBopGB6OG6dIKJt0vnX6jSY=
 github.com/go-stack/stack v1.8.0/go.mod h1:v0f6uXyyMGvRgIKkXu+yp6POWl0qKG85gN/melR3HDY=
