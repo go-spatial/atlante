@@ -3,12 +3,15 @@ package postgresql
 import (
 	"crypto/tls"
 	"crypto/x509"
-	"database/sql"
 	"fmt"
 	"io/ioutil"
+	"strconv"
 	"sync"
 	"time"
 
+	"github.com/go-spatial/geom/encoding/wkb"
+
+	"github.com/go-spatial/geom"
 	"github.com/go-spatial/maptoolkit/atlante/grids"
 	"github.com/go-spatial/tegola"
 	"github.com/jackc/pgx"
@@ -86,6 +89,41 @@ const (
 	ConfigKeyQueryMDGID = "query_mdgid"
 	// ConfigKeyQueryLngLat is the sql for getting grid values from a lng lat value.
 	ConfigKeyQueryLngLat = "query_lnglat"
+
+	// SQLGeometryField is the expected sql field name for the geometry
+	SQLGeometryField = "geometry"
+	// SQLMDGIDField is the expected sql field name for the mdgid
+	SQLMDGIDField = "mdg_id"
+	// SQLSheetField is the expected sql field name for the sheet
+	SQLSheetField = "sheet"
+	// SQLSeriesField is the expected sql field name for the series
+	SQLSeriesField = "series"
+	// SQLNRNField is the expected sql field name for the nrn
+	SQLNRNField = "nrn"
+	// SQLSWLATField is the expected sql field name for the southwest lat
+	SQLSWLATField = "swlat"
+	// SQLSWLNGField is the expected sql field name for the soutwest lng
+	SQLSWLNGField = "swlng"
+	// SQLNELATField is the expected sql field name for the northeast lat
+	SQLNELATField = "nelat"
+	// SQLNELNGField is the expected sql field name for the northeast lng
+	SQLNELNGField = "nelng"
+	// SQLSWLATDMSField is the expected sql field name for the soutwest lat in degree minute seconds
+	SQLSWLATDMSField = "swlat_dms"
+	// SQLSWLNGDMSField is the expected sql field name for the soutwest lng in degree minute seconds
+	SQLSWLNGDMSField = "swlng_dms"
+	// SQLNELATDMSField is the expected sql field name for the northeast lat in degree minute seconds
+	SQLNELATDMSField = "nelat_dms"
+	// SQLNELNGDMSField is the expected sql field name for the northeast lng in degree minute seconds
+	SQLNELNGDMSField = "nelng_dms"
+	// SQLCountryField is field for the country
+	SQLCountryField = "country"
+	// SQLCityField is field for the city
+	SQLCityField = "city"
+	// SQLEditedByField is field for the edited by
+	SQLEditedByField = "edited_by"
+	// SQLEditedAtField is field for the edited at
+	SQLEditedAtField = "edited_at"
 )
 
 func init() {
@@ -368,93 +406,249 @@ LIMIT 1;
 	return p.cellFromRow(row)
 }
 
-// cellFromRow parses grid attributes into a girds.Cell struct
-func (p *Provider) cellFromRow(row *pgx.Row) (*grids.Cell, error) {
-	var (
-		mdgid  sql.NullString
-		sheet  sql.NullString
-		series sql.NullString
-		nrn    sql.NullString
-
-		swlatdms sql.NullString
-		swlngdms sql.NullString
-		nelatdms sql.NullString
-		nelngdms sql.NullString
-
-		swlat sql.NullFloat64
-		swlng sql.NullFloat64
-		nelat sql.NullFloat64
-		nelng sql.NullFloat64
-
-		country  sql.NullString
-		editedBy sql.NullString
-		editedAt sql.NullString
-	)
-
-	err := row.Scan(
-		&mdgid,
-		&sheet,
-		&series,
-		&nrn,
-		&swlatdms,
-		&swlngdms,
-		&nelatdms,
-		&nelngdms,
-		&swlat,
-		&swlng,
-		&nelat,
-		&nelng,
-		&country,
-		&editedBy,
-		&editedAt,
-	)
-	if err != nil {
-		if err == pgx.ErrNoRows {
-			return nil, grids.ErrNotFound
-		}
-		return nil, err
-	}
-
-	byStr, edAt, err := p.newEditInfo(editedBy, editedAt)
-	if err != nil {
-		return nil, err
-	}
-
-	city := ""
-
-	return grids.NewCell(
-		mdgid.String,                             // mdgid
-		[2]float64{swlat.Float64, swlng.Float64}, // sw
-		[2]float64{nelat.Float64, nelng.Float64}, // ne
-		country.String,                           // country
-		city,                                     // city
-		nil,                                      // utminfo
-		grids.NewEditInfo(byStr, edAt),           // edited info
-		time.Now(),                               // publishedAt
-		nrn.String,                               // nrn
-		sheet.String,                             // sheet
-		series.String,                            // series
-		[2]string{swlatdms.String, swlngdms.String}, // sw dms
-		[2]string{nelatdms.String, nelngdms.String}, // ne dms
-		nil, // metadata
-	), nil
+type assignTo interface {
+	AssignTo(interface{}) error
 }
 
-func (p *Provider) newEditInfo(by, date sql.NullString) (strBy string, edtAt time.Time, err error) {
+func float4val(val interface{}) (*float64, error) {
+	var (
+		vv  float64
+		err error
+	)
+	switch v := val.(type) {
+	case float32:
+		vv = float64(v)
+		return &vv, nil
 
-	strBy = p.editedBy
-	if by.Valid {
-		strBy = by.String
-	}
+	case float64:
+		return &v, nil
 
-	// Try and parse the date
-	if date.Valid {
-		edtAt, err = time.Parse(p.editedDateFormat, date.String)
+	case string:
+		vv, err = strconv.ParseFloat(v, 64)
 		if err != nil {
-			return strBy, edtAt, err
+			return nil, err
+		}
+		return &vv, nil
+
+	case assignTo:
+		if err := v.AssignTo(&vv); err != nil {
+			return nil, err
+		}
+		return &vv, nil
+
+	default:
+		return nil, ErrInvalidType
+	}
+}
+
+// cellFromRow parses grid attributes into a girds.Cell struct
+func (p *Provider) cellFromRow(r *pgx.Row) (*grids.Cell, error) {
+	rows := (*pgx.Rows)(r)
+	return p.cellFromRows(rows)
+}
+
+// cellFromRows parse the grid attributes into a grids.Cell struct, only get's the first row.
+func (p *Provider) cellFromRows(rows *pgx.Rows) (*grids.Cell, error) {
+	fdescs := rows.FieldDescriptions()
+	if rows.Err() != nil {
+		return nil, rows.Err()
+	}
+	if !rows.Next() {
+		switch rows.Err() {
+		case nil, pgx.ErrNoRows:
+			return nil, grids.ErrNotFound
+		default:
+			return nil, rows.Err()
 		}
 	}
-	return strBy, edtAt, nil
+	vals, err := rows.Values()
+	if err != nil {
+		return nil, err
+	}
+	var (
+		ok bool
+
+		geomExtent *geom.Extent
+		mdgid      string
+		sheet      string
+		series     string
+		nrn        string
+		swlat      *float64
+		swlng      *float64
+		nelat      *float64
+		nelng      *float64
+		swlatDMS   string
+		swlngDMS   string
+		nelatDMS   string
+		nelngDMS   string
+		country    string
+		city       string
+		editedBy   = p.editedBy
+		editedAt   time.Time
+	)
+
+	for i := range vals {
+		if vals[i] == nil {
+			continue
+		}
+		switch fdescs[i].Name {
+
+		case SQLGeometryField:
+			geomBytes, ok := vals[i].([]byte)
+			if !ok {
+				return nil, fmt.Errorf("error unabled to convert field %v (%v) into bytes to decode into geometry", fdescs[i].Name, i)
+			}
+			geometry, err := wkb.DecodeBytes(geomBytes)
+			if err != nil {
+				return nil, err
+			}
+			geomExtent, err = geom.NewExtentFromGeometry(geometry)
+			if err != nil {
+				return nil, err
+			}
+
+		case SQLMDGIDField:
+			if mdgid, ok = vals[i].(string); !ok {
+				return nil, fmt.Errorf("error unabled to convert field %v (%v) into string for mdgid", fdescs[i].Name, i)
+			}
+
+		case SQLSheetField:
+			if sheet, ok = vals[i].(string); !ok {
+				return nil, fmt.Errorf("error unabled to convert field %v (%v) into string for sheet", fdescs[i].Name, i)
+			}
+
+		case SQLSeriesField:
+			if series, ok = vals[i].(string); !ok {
+				return nil, fmt.Errorf("error unabled to convert field %v (%v) into string for sheet", fdescs[i].Name, i)
+			}
+
+		case SQLNRNField:
+			if nrn, ok = vals[i].(string); !ok {
+				return nil, fmt.Errorf("error unabled to convert field %v (%v) into string for nrn", fdescs[i].Name, i)
+			}
+
+		case SQLSWLATField:
+			swlat, err = float4val(vals[i])
+			if err != nil {
+				if err == ErrInvalidType {
+					return nil, fmt.Errorf("error unabled to convert field %v (%v) [%v] into float64 for swlat", fdescs[i].Name, i, vals[i])
+				}
+				return nil, fmt.Errorf("error for %v(%v) failed to parse %v as float64 for swlat: %v", fdescs[i].Name, i, vals[i], err)
+			}
+
+		case SQLSWLNGField:
+			swlng, err = float4val(vals[i])
+			if err != nil {
+				if err == ErrInvalidType {
+					return nil, fmt.Errorf("error unabled to convert field %v (%v) [%v] into float64 for swlng", fdescs[i].Name, i, vals[i])
+				}
+				return nil, fmt.Errorf("error for %v(%v) failed to parse %v as float64 for swlng: %v", fdescs[i].Name, i, vals[i], err)
+			}
+
+		case SQLNELATField:
+			nelat, err = float4val(vals[i])
+			if err != nil {
+				if err == ErrInvalidType {
+					return nil, fmt.Errorf("error unabled to convert field %v (%v) into float64 for nelat", fdescs[i].Name, i)
+				}
+				return nil, fmt.Errorf("error for %v(%v) failed to parse %v as float64 for nelat: %v", fdescs[i].Name, i, vals[i], err)
+			}
+
+		case SQLNELNGField:
+			nelng, err = float4val(vals[i])
+			if err != nil {
+				if err == ErrInvalidType {
+					return nil, fmt.Errorf("error unabled to convert field %v (%v) into float64 for nelng", fdescs[i].Name, i)
+				}
+				return nil, fmt.Errorf("error for %v(%v) failed to parse %v as float64 for nelng: %v", fdescs[i].Name, i, vals[i], err)
+			}
+
+		case SQLSWLATDMSField:
+			if swlatDMS, ok = vals[i].(string); !ok {
+				return nil, fmt.Errorf("error unabled to convert field %v (%v) into string for swlatdms", fdescs[i].Name, i)
+			}
+
+		case SQLSWLNGDMSField:
+			if swlngDMS, ok = vals[i].(string); !ok {
+				return nil, fmt.Errorf("error unabled to convert field %v (%v) into string for swlngdms", fdescs[i].Name, i)
+			}
+
+		case SQLNELATDMSField:
+			if nelatDMS, ok = vals[i].(string); !ok {
+				return nil, fmt.Errorf("error unabled to convert field %v (%v) into string for nelatdms", fdescs[i].Name, i)
+			}
+
+		case SQLNELNGDMSField:
+			if nelngDMS, ok = vals[i].(string); !ok {
+				return nil, fmt.Errorf("error unabled to convert field %v (%v) into string for nelngdms", fdescs[i].Name, i)
+			}
+
+		case SQLCountryField:
+			if country, ok = vals[i].(string); !ok {
+				return nil, fmt.Errorf("error unabled to convert field %v (%v) into string for country", fdescs[i].Name, i)
+			}
+
+		case SQLCityField:
+			if city, ok = vals[i].(string); !ok {
+				return nil, fmt.Errorf("error unabled to convert field %v (%v) into string for city", fdescs[i].Name, i)
+			}
+
+		case SQLEditedByField:
+			if editedBy, ok = vals[i].(string); !ok {
+				return nil, fmt.Errorf("error unabled to convert field %v (%v) into string for edited_by", fdescs[i].Name, i)
+			}
+
+		case SQLEditedAtField:
+			if editedAt, ok = vals[i].(time.Time); !ok {
+				return nil, fmt.Errorf("error unabled to convert field %v (%v) into string for edited_at", fdescs[i].Name, i)
+			}
+		}
+	} // for range vals
+	if mdgid == "" {
+		return nil, fmt.Errorf("error required field mdgid not provided")
+	}
+	if sheet == "" {
+		return nil, fmt.Errorf("error required field sheet not provided")
+
+	}
+	if series == "" {
+		return nil, fmt.Errorf("error required field series not provided")
+	}
+
+	calculateCoords := (swlat == nil || nelat == nil || swlng == nil || nelng == nil)
+	if calculateCoords {
+		// if anyone is nil we will just calculate all of them
+		if geomExtent == nil {
+			return nil, fmt.Errorf("error required field geometry not provided")
+		}
+		swlngv, swlatv, nelngv, nelatv := geomExtent.MinX(), geomExtent.MinY(), geomExtent.MaxX(), geomExtent.MaxY()
+		swlng, swlat, nelng, nelat = &swlngv, &swlatv, &nelngv, &nelatv
+	}
+
+	if calculateCoords || swlatDMS == "" || swlngDMS == "" || nelatDMS == "" || nelngDMS == "" {
+		swdms := grids.ToDMS(*swlat, *swlng)
+		swlatDMS, swlngDMS = swdms[0].String(), swdms[1].String()
+		nedms := grids.ToDMS(*nelat, *nelng)
+		nelatDMS, nelngDMS = nedms[0].String(), nedms[1].String()
+	}
+
+	return grids.NewCell(
+		mdgid,                                 // mdgid
+		[2]float64{*swlat, *swlng},            // sw
+		[2]float64{*nelat, *nelng},            // ne
+		country,                               // country
+		city,                                  // city
+		nil,                                   // utminfo
+		grids.NewEditInfo(editedBy, editedAt), // edited info
+		time.Now(),                            // publishedAt
+		nrn,                                   // nrn
+		sheet,                                 // sheet
+		series,                                // series
+		[2]string{swlatDMS, swlngDMS},         // sw dms
+		[2]string{nelatDMS, nelngDMS},         // ne dms
+		nil,                                   // metadata
+	), nil
+
 }
 
 // Close will close the provider's database connection
