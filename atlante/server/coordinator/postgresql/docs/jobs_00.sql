@@ -22,7 +22,7 @@ CREATE INDEX ON jobs (queue_id);
 CREATE INDEX bounds_polygon_idx ON jobs USING GIST (bounds);
 
 
-CREATE TABLE statuses (
+CREATE TABLE job_statuses (
     id SERIAL PRIMARY KEY,
     job_id INTEGER NOT NULL,
     status TEXT NOT NULL,
@@ -31,7 +31,7 @@ CREATE TABLE statuses (
 );
 
 
-CREATE INDEX ON statuses (job_id);
+CREATE INDEX ON job_statuses (job_id);
 
 -- Find job by job id
 SELECT 
@@ -44,6 +44,6 @@ SELECT
     jobstatus.description,
     jobstatus.created as updated
 FROM jobs AS job
-JOIN statuses AS jobstatus ON job.id = jobstatus.job_id
+JOIN job_statuses AS jobstatus ON job.id = jobstatus.job_id
 WHERE job.id = $1
 ORDER BY jobstatus.id desc limit 1;

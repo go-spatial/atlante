@@ -313,7 +313,7 @@ SET job_data=$2
 WHERE id=$1
 	`
 	const insertStatusQuery = `
-INSERT INTO statuses(
+INSERT INTO job_statuses(
 	job_id,
 	status,
 	description
@@ -391,7 +391,7 @@ LEFT JOIN
 	SELECT DISTINCT ON (job_id)
 	*
 	FROM
-	   statuses
+	   job_statuses
 	ORDER BY
 	   job_id, id DESC
 ) AS jobstatus ON jobstatus.job_id = job.id
@@ -470,7 +470,7 @@ SELECT
     jobstatus.description,
     jobstatus.created as updated
 FROM jobs AS job
-JOIN statuses AS jobstatus ON job.id = jobstatus.job_id
+JOIN job_statuses AS jobstatus ON job.id = jobstatus.job_id
 WHERE job.id = $1
 ORDER BY jobstatus.id desc limit 1;
 	`
@@ -574,7 +574,7 @@ LEFT JOIN
 	SELECT DISTINCT ON (job_id)
 	*
 	FROM 
-	   statuses
+	   job_statuses
 	ORDER BY
 	   job_id, id DESC
 ) AS jobstatus ON jobstatus.job_id = job.id
