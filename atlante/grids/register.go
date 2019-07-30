@@ -1,30 +1,12 @@
 package grids
 
 import (
-	"errors"
 	"sort"
 	"sync"
 
 	"github.com/go-spatial/tegola/dict"
 	"github.com/prometheus/common/log"
 )
-
-// ErrProviderTypeExists is returned when the Provider type was already registered.
-type ErrProviderTypeExists string
-
-func (err ErrProviderTypeExists) Error() string {
-	return "provider (" + string(err) + ") already exists"
-}
-
-// ErrNoProvidersRegistered is returned when providers have not been registered with the system
-var ErrNoProvidersRegistered = errors.New("no providers registered")
-
-// ErrProviderNotRegistered is returned when the requested provider has not registered
-type ErrProviderNotRegistered string
-
-func (err ErrProviderNotRegistered) Error() string {
-	return "provider (" + string(err) + ") not registered"
-}
 
 // ProviderConfig implements the ProviderConfig interface
 type ProviderConfig interface {
