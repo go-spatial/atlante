@@ -527,6 +527,7 @@ func (s *Server) SheetInfoHandler(w http.ResponseWriter, request *http.Request, 
 	}
 }
 
+// JobInfoHandler is a http handler for information about a job.
 func (s *Server) JobInfoHandler(w http.ResponseWriter, request *http.Request, urlParams map[string]string) {
 
 	jobid, ok := urlParams[string(ParamsKeyJobID)]
@@ -565,6 +566,7 @@ func (s *Server) JobsHandler(w http.ResponseWriter, request *http.Request, urlPa
 	}
 }
 
+// NotificationHandler is an http handle for worker job progress notifications
 func (s *Server) NotificationHandler(w http.ResponseWriter, request *http.Request, urlParams map[string]string) {
 
 	log.Infof("Got a post to Notification: %v", urlParams)
@@ -606,11 +608,27 @@ func (s *Server) NotificationHandler(w http.ResponseWriter, request *http.Reques
 	w.WriteHeader(http.StatusNoContent)
 }
 
+// HealthCheckHandler is an http handler use to indicate the health of the server.
+// TODO(gdey): make the handler more intelligent as we understand more about the environment.
+func (*Server) HealthCheckHandler(w http.ResponseWriter, _ *http.Request, _ map[string]string) {
+	// We always return a 200 while we are able to serve requests.
+	w.WriteHeader(http.StatusOK)
+	return
+}
+
+// corsHanlder is used to respond to all OPTIONS requests for registered routes
+func corsHandler(w http.ResponseWriter, r *http.Request, params map[string]string) {
+	setHeaders(map[string]string{}, w)
+	return
+}
+
 // RegisterRoutes setup the routes
 func (s *Server) RegisterRoutes(r *httptreemux.TreeMux) {
 
 	r.OptionsHandler = corsHandler
 
+	r.GET("/status", s.HealthCheckHandler)
+	log.Infof("registering: GET  /status")
 	r.GET("/sheets", s.SheetInfoHandler)
 	log.Infof("registering: GET  /sheets")
 	group := r.NewGroup(GenPath("sheets", ParamsKeySheetname))
@@ -627,15 +645,9 @@ func (s *Server) RegisterRoutes(r *httptreemux.TreeMux) {
 	r.GET("/jobs", s.JobsHandler)
 	jgroup := r.NewGroup(GenPath("jobs", ParamsKeyJobID))
 	log.Infof("registering: GET  /jobs/:jobid/status")
-	jgroup.GET("/status", s.JobInfoHandler)
+	group.GET("/status", s.JobInfoHandler)
 	if !s.DisableNotificationEP {
 		log.Infof("registering: POST  /jobs/:jobid/status")
 		jgroup.POST("/status", s.NotificationHandler)
 	}
-}
-
-// corsHanlder is used to respond to all OPTIONS requests for registered routes
-func corsHandler(w http.ResponseWriter, r *http.Request, params map[string]string) {
-	setHeaders(map[string]string{}, w)
-	return
 }
