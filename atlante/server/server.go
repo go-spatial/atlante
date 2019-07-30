@@ -327,6 +327,10 @@ func (s *Server) GridInfoHandler(w http.ResponseWriter, request *http.Request, u
 		mdgid = grids.NewMDGID(mdgidStr)
 		cell, err = sheet.CellForMDGID(mdgid)
 		if err != nil {
+			if err == grids.ErrNotFound {
+				w.WriteHeader(http.StatusNotFound)
+				return
+			}
 			badRequest(w, "error getting grid(%v):%v", mdgidStr, err)
 			return
 		}
@@ -358,6 +362,10 @@ func (s *Server) GridInfoHandler(w http.ResponseWriter, request *http.Request, u
 		// the url?
 		cell, err = sheet.CellForLatLng(lat, lng, srid)
 		if err != nil {
+			if err == grids.ErrNotFound {
+				w.WriteHeader(http.StatusNotFound)
+				return
+			}
 			badRequest(w, "error getting grid(%v,%v,srid: %v):%v", lat, lng, srid, err)
 			return
 		}

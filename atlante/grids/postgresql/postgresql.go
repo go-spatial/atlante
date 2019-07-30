@@ -409,6 +409,9 @@ func (p *Provider) cellFromRow(row *pgx.Row) (*grids.Cell, error) {
 		&editedAt,
 	)
 	if err != nil {
+		if err == pgx.ErrNoRows {
+			return nil, grids.ErrNotFound
+		}
 		return nil, err
 	}
 

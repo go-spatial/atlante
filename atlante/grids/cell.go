@@ -43,7 +43,9 @@ const (
 )
 
 // Provider returns a grid object that can be used to generate
-// a Map Grid
+// a Map Grid, if the grid object is not found or does not exist
+// the CellFor* methods should return a nil cell, and ErrNotFound
+// error
 type Provider interface {
 	CellForLatLng(lat, lng float64, srid uint) (*Cell, error)
 	CellForMDGID(mgdID *MDGID) (*Cell, error)
