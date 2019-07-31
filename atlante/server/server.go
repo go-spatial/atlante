@@ -651,11 +651,11 @@ func (s *Server) RegisterRoutes(r *httptreemux.TreeMux) {
 
 	log.Infof("registering: GET  /jobs")
 	r.GET("/jobs", s.JobsHandler)
-	jgroup := r.NewGroup(GenPath("jobs", ParamsKeyJobID))
+	jobsGroup := r.NewGroup(GenPath("jobs", ParamsKeyJobID))
 	log.Infof("registering: GET  /jobs/:jobid/status")
-	group.GET("/status", s.JobInfoHandler)
+	jobsGroup.GET("/status", s.JobInfoHandler)
 	if !s.DisableNotificationEP {
 		log.Infof("registering: POST  /jobs/:jobid/status")
-		jgroup.POST("/status", s.NotificationHandler)
+		jobsGroup.POST("/status", s.NotificationHandler)
 	}
 }
