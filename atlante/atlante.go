@@ -76,7 +76,7 @@ func (img ImgStruct) Close() {
 	img.image.Close()
 }
 
-// generateImage is use to create the image into the filestore
+// generateIamge is use to generate the image we want to store in the filestore
 func (img *ImgStruct) generateImage() (fn string, err error) {
 	if img.generated {
 		return img.filename, nil
@@ -135,11 +135,14 @@ func (img *ImgStruct) generateImage() (fn string, err error) {
 	defer file.Close()
 
 	if err = img.image.GenerateImage(); err != nil {
+		log.Infof("got err %v generating image", err)
 		return "", err
 	}
+
 	if err := png.Encode(file, img.image); err != nil {
 		return "", err
 	}
+
 	// Clean up the backing store.
 	if img.endGenerationCallBack != nil {
 		img.endGenerationCallBack()
@@ -249,6 +252,7 @@ func NewFilenameTemplate(fnTemplate string) (*filenameTemplate, error) {
 
 const DefaultFilenameTemplate = "{{.SheetName}}_{{.Grid.ReferenceNumber}}.{{.Ext}}"
 
+// Filenames geneate the various filename for the different types we need
 func (ft filenameTemplate) Filename(sheetName string, grid *grids.Cell, wd string, ext string) string {
 	var str strings.Builder
 	err := ft.t.Execute(&str, FilenameTemplateContext{
@@ -263,6 +267,7 @@ func (ft filenameTemplate) Filename(sheetName string, grid *grids.Cell, wd strin
 	return str.String()
 }
 
+// GeneratePDF will generate the PDF based on the sheet, and grid
 func GeneratePDF(ctx context.Context, sheet *Sheet, grid *grids.Cell, filenames *GeneratedFiles) error {
 	if grid == nil {
 		return ErrNilGrid
