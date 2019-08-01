@@ -8,6 +8,7 @@ require (
 	github.com/aws/aws-sdk-go v1.19.45
 	github.com/cockroachdb/apd v1.1.0 // indirect
 	github.com/dimfeld/httptreemux v5.0.1+incompatible
+	github.com/gdey/cmd v0.0.0-20180214202002-8f086d11c1e6
 	github.com/gdey/errors v0.0.0-20190426172550-8ebd5bc891fb
 	github.com/gdey/tbltest v0.0.0-20180914212833-1865222d591f // indirect
 	github.com/go-spatial/geom v0.0.0-20191004223540-7f2d6843ed9f
