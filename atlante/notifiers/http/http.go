@@ -80,7 +80,7 @@ func (e *emitter) Emit(se field.StatusEnum) error {
 	if e == nil {
 		return errors.String("emitter is nil")
 	}
-	bdy, err := json.Marshal(field.Status{se})
+	bdy, err := json.Marshal(field.Status{Status: se})
 	if err != nil {
 		return err
 	}

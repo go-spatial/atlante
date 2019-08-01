@@ -6,7 +6,6 @@ import (
 	"image/color"
 	"io"
 	"io/ioutil"
-	"log"
 	"math"
 	"os"
 	"sync"
@@ -14,6 +13,7 @@ import (
 	"github.com/go-spatial/geom"
 	"github.com/go-spatial/maptoolkit/mbgl"
 	"github.com/go-spatial/maptoolkit/mbgl/bounds"
+	"github.com/prometheus/common/log"
 )
 
 const (
@@ -21,11 +21,13 @@ const (
 	scale    = 4
 )
 
+// ReadAtCloser is a ReaderAt that can be closed as well
 type ReadAtCloser interface {
 	io.ReaderAt
 	io.Closer
 }
 
+// CenterRect d4scribes the center point of a the rectangle for a given lat/lng
 type CenterRect struct {
 	Lat  float64
 	Lng  float64
@@ -36,6 +38,7 @@ type CenterRect struct {
 	imgWidth int
 }
 
+// Image draws a raster image of the vector image of the request widht and height
 type Image struct {
 	// Width of the desired image, it will be multipiled by the PPIRatio to get the final width
 	width int
@@ -78,27 +81,31 @@ type Image struct {
 	fullBounds image.Rectangle
 }
 
-func (im *Image) SetDebugBounds(extent *geom.Extent, zoom float64) {
+// SetDebugBounds draws a black line around the border of the image
+func (img *Image) SetDebugBounds(extent *geom.Extent, zoom float64) {
 
 	// for lat lng geom.Extent should be laid out as follows:
 	// {west, south, east, north}
 	ne := [2]float64{extent[3], extent[2]}
 	sw := [2]float64{extent[1], extent[0]}
 
-	swPt := bounds.LatLngToPoint(im.prj, sw[0], sw[1], zoom, tilesize)
-	nePt := bounds.LatLngToPoint(im.prj, ne[0], ne[1], zoom, tilesize)
-	im.drawBounds = true
-	im.bounds = [4]float64{
-		float64(int((nePt[0] - float64(im.fullBounds.Min.X)) / scale)),
-		float64(int((swPt[1] - float64(im.fullBounds.Min.Y)) / scale)),
-		float64(int((swPt[0] - float64(im.fullBounds.Min.X)) / scale)),
-		float64(int((nePt[1] - float64(im.fullBounds.Min.Y)) / scale)),
+	swPt := bounds.LatLngToPoint(img.prj, sw[0], sw[1], zoom, tilesize)
+	nePt := bounds.LatLngToPoint(img.prj, ne[0], ne[1], zoom, tilesize)
+	img.drawBounds = true
+	img.bounds = [4]float64{
+		float64(int((nePt[0] - float64(img.fullBounds.Min.X)) / scale)),
+		float64(int((swPt[1] - float64(img.fullBounds.Min.Y)) / scale)),
+		float64(int((swPt[0] - float64(img.fullBounds.Min.X)) / scale)),
+		float64(int((nePt[1] - float64(img.fullBounds.Min.Y)) / scale)),
 	}
 }
 
-func (_ Image) ColorModel() color.Model { return color.RGBAModel }
-func (im Image) Bounds() image.Rectangle {
-	return image.Rect(0, 0, int(float64(im.width)*im.ppiratio), int(float64(im.height)*im.ppiratio))
+// ColorModel returns that the image is a RGBA image
+func (Image) ColorModel() color.Model { return color.RGBAModel }
+
+// Bounds is the size of the actual image
+func (img Image) Bounds() image.Rectangle {
+	return image.Rect(0, 0, int(float64(img.width)*img.ppiratio), int(float64(img.height)*img.ppiratio))
 }
 
 // Close will close the backing store and remove it.
@@ -122,32 +129,33 @@ func (im Image) Close() {
 }
 
 //At returns the color for the x,y position in the image.
-func (im Image) At(x, y int) color.Color {
-	if !im.initilized {
-		if err := im.GenerateImage(); err != nil {
+func (img Image) At(x, y int) color.Color {
+	if !img.initilized {
+		if err := img.GenerateImage(); err != nil {
+			log.Info("got error generating image")
 			// Failed to generate the image, just return black
 			return color.RGBA{0, 0, 0, 255}
 		}
 	}
-	rx, ry := x+im.offsetWidth, y+im.offsetHeight
+	rx, ry := x+img.offsetWidth, y+img.offsetHeight
 	// rx, ry := x, y
 	var data [4]byte
 
-	if im.drawBounds {
-		if int(im.bounds[0]) == rx || int(im.bounds[2]) == rx || int(im.bounds[1]) == ry || int(im.bounds[3]) == ry {
+	if img.drawBounds {
+		if int(img.bounds[0]) == rx || int(img.bounds[2]) == rx || int(img.bounds[1]) == ry || int(img.bounds[3]) == ry {
 			return color.RGBA{0, 0, 0, 255}
 		}
 	}
 
 	// We need to look through the centers to find the first rect that containts this x,y
-	for i := range im.centers {
-		rect := im.centers[i].Rect
+	for i := range img.centers {
+		rect := img.centers[i].Rect
 		if rect.Min.X <= rx && rx <= rect.Max.X && rect.Min.Y <= ry && ry <= rect.Max.Y {
 			dx, dy := rx-rect.Min.X, ry-rect.Min.Y
-			idx := int64(im.centers[i].imgWidth*4*dy+(4*dx)) + (im.centers[i].offset)
-			_, err := im.backingStore.ReadAt(data[:], idx)
+			idx := int64(img.centers[i].imgWidth*4*dy+(4*dx)) + (img.centers[i].offset)
+			_, err := img.backingStore.ReadAt(data[:], idx)
 			if err != nil {
-				panic(fmt.Sprintf("(%v,%v) -> Centers[%v]{ %v }: %v Got an error reading backing store: %v", x, y, i, im.centers[i], idx, err))
+				panic(fmt.Sprintf("(%v,%v) -> Centers[%v]{ %v }: %v Got an error reading backing store: %v", x, y, i, img.centers[i], idx, err))
 			}
 			return color.RGBA{data[0], data[1], data[2], data[3]}
 		}
@@ -156,6 +164,7 @@ func (im Image) At(x, y int) color.Color {
 	return color.RGBA{}
 }
 
+// New returns a new image with the desired properties
 func New(
 	prj bounds.AProjection,
 	desiredWidth, desiredHeight int,
@@ -176,8 +185,8 @@ func New(
 		)/tilesize + 1) / 2,
 		),
 	)
-	log.Println("desiredWidth", desiredWidth)
-	log.Println("desiredHeight", desiredHeight)
+	log.Infoln("desiredWidth", desiredWidth)
+	log.Infoln("desiredHeight", desiredHeight)
 
 	tmpDir := "."
 	if tempDir == "" {
@@ -193,7 +202,7 @@ func New(
 		return nil, fmt.Errorf("Failed to setup backing store: %v", err)
 	}
 
-	log.Println("numbTilesNeeded", numTilesNeeded)
+	log.Infoln("numbTilesNeeded", numTilesNeeded)
 
 	img := Image{
 		prj:                 prj,
@@ -282,11 +291,10 @@ func (img *Image) GenerateImage() error {
 	img.offsetWidth = (rx / 2) - int(float64(desiredWidth/2)*ppi)
 	img.offsetHeight = (ry / 2) - int(float64(desiredHeight/2)*ppi)
 
-	log.Println("done generating images")
 	img.initilized = true
 	err := img.backingStore.Sync()
 	// Move to the top of the file.
-	log.Printf("Backing store has been sync'd : %v -- %v", img.backingStore.Name(), err)
+	log.Infof("Backing store has been sync'd : %v -- %v", img.backingStore.Name(), err)
 	if err != nil {
 		return err
 	}
