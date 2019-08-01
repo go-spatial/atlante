@@ -44,8 +44,10 @@ var (
 	sheetName  string
 	dpi        = DefaultDPI
 	job        string
+	jobid      string
 	showJob    bool
 	workDir    string
+	timeout    uint8
 )
 
 func init() {
@@ -55,8 +57,10 @@ func init() {
 	Root.Flags().StringVar(&mdgid, "mdgid", "", "mdgid of the grid")
 	Root.Flags().StringVar(&sheetName, "sheet", "", "the sheet to use")
 	Root.Flags().StringVar(&job, "job", "", "base64 encoded job")
-	Root.Flags().BoolVar(&showJob, "show-job", false, "print out the job string for the parameters, and exit, if job is given with a string print out what's in the job string")
+	Root.Flags().StringVar(&jobid, "job-id", "", "job-id to use, if a job is defined in the job, it will override this value")
+	Root.Flags().BoolVar(&showJob, "show-job", false, "print out the job string for the parameters, and exit. If job is given, print out string representation of the job")
 	Root.Flags().StringVarP(&workDir, "workdir", "o", "", "workdir to find the assets and leave the output")
+	Root.Flags().Uint8Var(&timeout, "timeout", 0, "timeout in minutes, 0 means no timeout.")
 
 	// Add server command
 	Root.AddCommand(Server)
@@ -82,6 +86,7 @@ func generatePDFForJob(ctx context.Context, a *atlante.Atlante, jobstr string) (
 }
 
 func rootCmdParseArgs(ctx context.Context, a *atlante.Atlante) (*atlante.GeneratedFiles, error) {
+	a.JobID = jobid
 	switch {
 	case showJob:
 		switch {
@@ -122,6 +127,10 @@ func rootCmdParseArgs(ctx context.Context, a *atlante.Atlante) (*atlante.Generat
 
 func rootCmdRun(cmd *cobra.Command, args []string) error {
 
+	var (
+		ctx    context.Context
+		cancel context.CancelFunc
+	)
 	a, err := config.Load(configFile, dpi, cmd.Flag("dpi").Changed)
 	if err != nil {
 		return ErrExitWith{
@@ -131,7 +140,14 @@ func rootCmdRun(cmd *cobra.Command, args []string) error {
 			ExitCode:  1,
 		}
 	}
-	ctx, cancel := context.WithCancel(context.Background())
+	if timeout != 0 {
+		to := time.Duration(timeout) * time.Minute
+		fmt.Fprintf(cmd.OutOrStderr(), "setting timeout to: %v\n", to)
+		ctx, cancel = context.WithDeadline(context.Background(), time.Now().Add(to))
+	} else {
+		ctx, cancel = context.WithCancel(context.Background())
+	}
+
 	defer cancel()
 	mbgl.StartSnapshotManager(ctx)
 

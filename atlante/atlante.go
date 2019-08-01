@@ -65,7 +65,11 @@ func (img *ImgStruct) Filename() (string, error) {
 		return img.filename, nil
 	}
 	// We need to generate the file and then return the filename
-	return img.generateImage()
+	fname, err := img.generateImage()
+	if err != nil {
+		log.Infof("Go error generating image: %v", err)
+	}
+	return fname, err
 }
 
 // Close closes out any open resources
@@ -121,6 +125,10 @@ func (img *ImgStruct) generateImage() (fn string, err error) {
 				img.generationFailureCallBack(err)
 			}
 		}()
+	}
+
+	if err = img.image.GenerateImage(); err != nil {
+		return "", err
 	}
 
 	file, err := img.filestore.Writer(img.filename, img.intermediate)
@@ -326,6 +334,7 @@ func GeneratePDF(ctx context.Context, sheet *Sheet, grid *grids.Cell, filenames 
 
 	centerPt := bounds.LatLngToPoint(prj, latLngCenterPt[0], latLngCenterPt[1], zoom, tilesize)
 	dstimg, err := image.New(
+		ctx,
 		prj,
 		int(width), int(height),
 		centerPt,
