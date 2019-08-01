@@ -1,6 +1,7 @@
 package image
 
 import (
+	"context"
 	"fmt"
 	"image"
 	"image/color"
@@ -79,6 +80,9 @@ type Image struct {
 	// the color will be black
 	bounds     [4]float64
 	fullBounds image.Rectangle
+
+	// context to be able to set processing timelimit
+	ctx context.Context
 }
 
 // SetDebugBounds draws a black line around the border of the image
@@ -108,28 +112,41 @@ func (img Image) Bounds() image.Rectangle {
 	return image.Rect(0, 0, int(float64(img.width)*img.ppiratio), int(float64(img.height)*img.ppiratio))
 }
 
+// close will close the backstore and remote it. It does not do any locking.
+func (img Image) close() {
+	if img.backingStore == nil {
+		return
+	}
+	if err := img.backingStore.Close(); err != nil {
+		log.Infof("warning failed to close %v : %v", img.backingStore.Name(), err)
+	}
+	log.Infof("removing backing store %v", img.backingStore.Name())
+	// ignore any errors.
+	if err := os.Remove(img.backingStore.Name()); err != nil {
+		log.Infof("warning failed to remove %v : %v", img.backingStore.Name(), err)
+	}
+	img.backingStore = nil
+	img.initilized = false
+
+}
+
 // Close will close the backing store and remove it.
-func (im Image) Close() {
-	if im.backingStore == nil {
+func (img Image) Close() {
+	if img.backingStore == nil {
 		return
 	}
 	// Want to make sure generate/At don't try to use this if it's closing
-	im.initLck.Lock()
-	defer im.initLck.Unlock()
-	if err := im.backingStore.Close(); err != nil {
-		log.Printf("warning failed to close %v : %v", im.backingStore.Name(), err)
-	}
-	log.Printf("removing backing store %v", im.backingStore.Name())
-	// ignore any errors.
-	if err := os.Remove(im.backingStore.Name()); err != nil {
-		log.Printf("warning failed to remove %v : %v", im.backingStore.Name(), err)
-	}
-	im.backingStore = nil
-	im.initilized = false
+	img.initLck.Lock()
+	defer img.initLck.Unlock()
+	img.close()
 }
 
 //At returns the color for the x,y position in the image.
 func (img Image) At(x, y int) color.Color {
+	if img.ctx.Err() != nil {
+		// ctx is expired
+		return color.RGBA{0, 0, 0, 255}
+	}
 	if !img.initilized {
 		if err := img.GenerateImage(); err != nil {
 			log.Info("got error generating image")
@@ -166,6 +183,7 @@ func (img Image) At(x, y int) color.Color {
 
 // New returns a new image with the desired properties
 func New(
+	ctx context.Context,
 	prj bounds.AProjection,
 	desiredWidth, desiredHeight int,
 	centerXY [2]float64,
@@ -177,6 +195,9 @@ func New(
 
 	const tilesize = 4096 / 2
 	const scale = 4
+	if ctx == nil {
+		ctx = context.Background()
+	}
 
 	numTilesNeeded := int(
 		math.Ceil((math.Max(
@@ -205,6 +226,7 @@ func New(
 	log.Infoln("numbTilesNeeded", numTilesNeeded)
 
 	img := Image{
+		ctx:                 ctx,
 		prj:                 prj,
 		style:               style,
 		zoom:                zoom,
@@ -246,6 +268,12 @@ func (img *Image) GenerateImage() error {
 	for y := -numTilesNeeded; y <= numTilesNeeded; y++ {
 		rx = 0
 		for x := -numTilesNeeded; x <= numTilesNeeded; x++ {
+			if img.ctx.Err() != nil {
+				// Delete the tempfile -- don't need to worry about the error.
+				// we want to shadow the err here
+				img.close()
+				return img.ctx.Err()
+			}
 
 			var crect CenterRect
 			center := [2]float64{centerXY[0] + (float64(x*tilesize) * scale), centerXY[1] + (float64(y*tilesize) * scale)}
@@ -268,14 +296,20 @@ func (img *Image) GenerateImage() error {
 			if err != nil {
 				// Delete the tempfile -- don't need to worry about the error.
 				// we want to shadow the err here
-				img.Close()
+				img.close()
 				return err
+			}
+			if img.ctx.Err() != nil {
+				// Delete the tempfile -- don't need to worry about the error.
+				// we want to shadow the err here
+				img.close()
+				return img.ctx.Err()
 			}
 			crect.length, err = img.backingStore.Write(snpImage.Data)
 			if err != nil {
 				// Delete the tempfile -- don't need to worry about the error.
 				// we want to shadow the err here
-				img.Close()
+				img.close()
 				return err
 			}
 			crect.offset = bsOffset
