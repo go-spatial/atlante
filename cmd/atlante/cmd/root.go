@@ -5,6 +5,9 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"time"
+
+	gdcmd "github.com/gdey/cmd"
 
 	"github.com/go-spatial/maptoolkit/atlante"
 	"github.com/go-spatial/maptoolkit/atlante/grids"
@@ -131,6 +134,9 @@ func rootCmdRun(cmd *cobra.Command, args []string) error {
 		ctx    context.Context
 		cancel context.CancelFunc
 	)
+
+	defer gdcmd.New().Complete()
+
 	a, err := config.Load(configFile, dpi, cmd.Flag("dpi").Changed)
 	if err != nil {
 		return ErrExitWith{
@@ -150,6 +156,17 @@ func rootCmdRun(cmd *cobra.Command, args []string) error {
 
 	defer cancel()
 	mbgl.StartSnapshotManager(ctx)
+
+	go func() {
+		done := ctx.Done()
+		cancelled := gdcmd.Cancelled()
+		select {
+		case <-done:
+			// no opt
+		case <-cancelled:
+			cancel()
+		}
+	}()
 
 	if workDir != "" {
 		if err := os.Chdir(workDir); err != nil {

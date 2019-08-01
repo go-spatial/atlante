@@ -16,6 +16,8 @@ github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/dimfeld/httptreemux v5.0.1+incompatible h1:Qj3gVcDNoOthBAqftuD596rm4wg/adLLz5xh5CmpiCA=
 github.com/dimfeld/httptreemux v5.0.1+incompatible/go.mod h1:rbUlSV+CCpv/SuqUTP/8Bk2O3LyUV436/yaRGkhP6Z0=
+github.com/gdey/cmd v0.0.0-20180214202002-8f086d11c1e6 h1:WUKG8u4r4qE+yfjsVtVdoUG2hjPX8cC9718+06TdmJU=
+github.com/gdey/cmd v0.0.0-20180214202002-8f086d11c1e6/go.mod h1:D3bqQH+RTv7jsg9ujbFcQOJUG77rswFOebbuU+Gl5v8=
 github.com/gdey/errors v0.0.0-20190426172550-8ebd5bc891fb h1:FYO+lZtAUnakgSW9xYs7QvgawjCDM5wgHaXoDhYHNH4=
 github.com/gdey/errors v0.0.0-20190426172550-8ebd5bc891fb/go.mod h1:PFaV7MgSRe92Wo9O2H2i1CIm7urUk10AgdSHKyBfjmQ=
 github.com/gdey/tbltest v0.0.0-20180914212833-1865222d591f h1:eqGnktl65l0bBrqFWtWVdwrV1B8vRKpucSarJBRWEEs=
