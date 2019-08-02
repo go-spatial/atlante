@@ -490,6 +490,12 @@ func (s *Server) QueueHandler(w http.ResponseWriter, request *http.Request, urlP
 
 	qjobid, err := s.Queue.Enqueue(jb.JobID, &qjob)
 	if err != nil {
+		s.Coordinator.UpdateField(jb,
+			field.Status{field.Failed{
+				Description: "Failed to enqueue job",
+				Error:       err,
+			}},
+		)
 		badRequest(w, "failed to queue job: %v", err)
 		return
 	}
