@@ -22,7 +22,7 @@ import (
 	"github.com/jackc/pgx"
 )
 
-// Name is the name of the provider type
+// TYPE is the name of the provider type
 const TYPE = "postgresql"
 
 // AppName is shown by the pqclient
@@ -93,8 +93,40 @@ func (e ErrInvalidSSLMode) Error() string {
 	return fmt.Sprintf("postgis: invalid ssl mode (%v)", string(e))
 }
 
+// ErrInvalidStatus is returned when a job entry as not have a valid status. Either
+// the status is missing or the status type is unknown
+type ErrInvalidStatus struct {
+	Job    int
+	Status string
+	Desc   string
+	Err    error
+}
+
+func (e ErrInvalidStatus) Error() string {
+	if e.Status == "" {
+		return fmt.Sprintf("postgis: invalid status for job %d", e.Job)
+	}
+	return fmt.Sprintf("postgis: invalid status (%v) for job %d", e.Status, e.Job)
+}
+
+// ErrNoQueueID is returned when a job does not have a queue id associated with it
+type ErrNoQueueID int
+
+func (e ErrNoQueueID) Error() string {
+	return fmt.Sprintf("postgis: no queueid for job %d", int(e))
+}
+
 func init() {
 	coordinator.Register(TYPE, initFunc, cleanup)
+}
+
+// rowScanner will scan the values into the given dest parameters
+type rowScanner interface {
+	//	Scan reads the values from the current row into dest values positionally.
+	// dest can include pointers to core types, values implementing the Scanner
+	// interface, []byte, and nil. []byte will skip the decoding process and directly
+	// copy the raw bytes received.
+	Scan(dest ...interface{}) error
 }
 
 // initFunc returns a new provider based on the postgresql database
@@ -259,6 +291,7 @@ func ConfigTLS(sslMode string, sslKey string, sslCert string, sslRootCert string
 	return nil
 }
 
+// NewJob retuns a new coordinator job based on the atlante job description
 func (p *Provider) NewJob(job *atlante.Job) (jb *coordinator.Job, err error) {
 	if job == nil {
 		return nil, coordinator.ErrNilAtlanteJob
@@ -301,6 +334,7 @@ RETURNING id;
 	return coordinator.NewJob(fmt.Sprintf("%v", id), job), nil
 }
 
+// UpdateField will update the job status for the given fields
 func (p *Provider) UpdateField(job *coordinator.Job, fields ...field.Value) error {
 	const updateQJobIDQuery = `
 UPDATE jobs 
@@ -374,12 +408,94 @@ VALUES($1,$2,$3);
 	}
 	return nil
 }
+func logScanError(err error) {
+	switch e := err.(type) {
+	case ErrNoQueueID:
+		log.Infof("no queuid for job %v, skipping", int(e))
+	case ErrInvalidStatus:
+		log.Infof("invalid status entries for job %v, skipping", e.Job)
+	default:
+		if err != pgx.ErrNoRows {
+			log.Infof("got error scanning job skipping: %V", err)
+		}
+	}
+}
+func scanRow(row rowScanner) (*coordinator.Job, error) {
 
+	var (
+		// an empty string we can take the pointer of
+		emptyString string
+		zeroTime    time.Time
+
+		jobid       int
+		mdgid       string
+		sheetNumber int
+		sheetName   string
+		queueIDp    *string
+		enqueued    time.Time
+		status      *string
+		desc        *string
+		updated     *time.Time
+	)
+
+	if err := row.Scan(
+		&jobid,
+		&mdgid,
+		&sheetNumber,
+		&sheetName,
+		&queueIDp,
+		&enqueued,
+		&status,
+		&desc,
+		&updated,
+	); err != nil {
+		return nil, err
+	}
+	if queueIDp == nil || *queueIDp == "" {
+		return nil, ErrNoQueueID(jobid)
+	}
+
+	if status == nil || *status == "" {
+		return nil, ErrInvalidStatus{Job: jobid}
+	}
+
+	if desc == nil {
+		desc = &emptyString
+	}
+	s, err := field.NewStatusFor(*status, *desc)
+	if err != nil {
+		return nil, ErrInvalidStatus{
+			Job:    jobid,
+			Status: *status,
+			Desc:   *desc,
+			Err:    err,
+		}
+	}
+	if updated == nil {
+		updated = &zeroTime
+	}
+	return &coordinator.Job{
+		JobID:      fmt.Sprintf("%v", jobid),
+		QJobID:     *queueIDp,
+		MdgID:      mdgid,
+		MdgIDPart:  uint32(sheetNumber),
+		SheetName:  sheetName,
+		Status:     field.Status{s},
+		EnqueuedAt: enqueued,
+		UpdatedAt:  *updated,
+	}, nil
+
+}
+
+// FindByJob will find the lastest 2 jobs as described by the atlante job descriptions
 func (p *Provider) FindByJob(job *atlante.Job) (jobs []*coordinator.Job) {
 
 	const selectQuery = `
 SELECT 
-    job.id,
+	job.id,
+	job.mdgid,
+	job.sheet_number,
+	job.sheet_name,
     job.queue_id,
     job.created as enqueued,
     jobstatus.status,
@@ -410,15 +526,6 @@ LIMIT 2;
 	sheetNumber := job.Cell.Mdgid.Part
 	sheetName := job.SheetName
 
-	var (
-		jobid    int
-		queueID  string
-		enqueued time.Time
-		status   string
-		desc     string
-		updated  time.Time
-	)
-
 	rows, err := p.pool.Query(query, mdgid, sheetNumber, sheetName)
 	if err != nil {
 		log.Errorf("postgresql: unable to preform query: %v", err)
@@ -426,41 +533,22 @@ LIMIT 2;
 	}
 	defer rows.Close()
 	for rows.Next() {
-		if err := rows.Scan(
-			&jobid,
-			&queueID,
-			&enqueued,
-			&status,
-			&desc,
-			&updated,
-		); err != nil {
-			log.Warnf("postgresql: got error finding job %v-%v-%v: %v -- \n%v", mdgid, sheetNumber, sheetName, err, selectQuery)
-			return nil
-		}
-		s, err := field.NewStatusFor(status, desc)
+		jb, err := scanRow(rows)
 		if err != nil {
-			log.Warnf("postgressql: jobid(%v) got bad status from database:%v -- %v", jobid, s, err)
+			logScanError(err)
 			continue
 		}
-		jobs = append(jobs, &coordinator.Job{
-			JobID:      fmt.Sprintf("%v", jobid),
-			QJobID:     queueID,
-			MdgID:      mdgid,
-			MdgIDPart:  uint32(sheetNumber),
-			SheetName:  sheetName,
-			Status:     field.Status{s},
-			EnqueuedAt: enqueued,
-			UpdatedAt:  updated,
-		})
+		jobs = append(jobs, jb)
 	}
 	return jobs
-
 }
 
+// FindByJobID will attempt to locate the job for the given job id
 func (p *Provider) FindByJobID(jobid string) (jb *coordinator.Job, found bool) {
 
 	const selectQuery = `
 SELECT 
+	job.id,
     job.mdgid,
     job.sheet_number,
     job.sheet_name,
@@ -483,43 +571,14 @@ ORDER BY jobstatus.id desc limit 1;
 		return nil, false
 	}
 
-	var (
-		mdgid       string
-		sheetNumber int
-		sheetName   string
-		queueID     string
-		enqueued    time.Time
-		status      string
-		desc        string
-		updated     time.Time
-	)
 	row := p.pool.QueryRow(query, id)
-	if err := row.Scan(
-		&mdgid,
-		&sheetNumber,
-		&sheetName,
-		&queueID,
-		&enqueued,
-		&status,
-		&desc,
-		&updated,
-	); err != nil {
+	jb, err = scanRow(row)
+	if err != nil {
+		logScanError(err)
 		return nil, false
 	}
-	s, err := field.NewStatusFor(status, desc)
-	if err != nil {
-		log.Warnf("jobid(%v) got bad status from database:%v -- %v", jobid, s, err)
-	}
-	return &coordinator.Job{
-		JobID:      jobid,
-		QJobID:     queueID,
-		MdgID:      mdgid,
-		MdgIDPart:  uint32(sheetNumber),
-		SheetName:  sheetName,
-		Status:     field.Status{s},
-		EnqueuedAt: enqueued,
-		UpdatedAt:  updated,
-	}, true
+	return jb, true
+
 }
 
 // genAllSQL retuns the all sql (primarySQL if it's not empty otherwise defaultSQL) that results from running the provided
@@ -582,17 +641,6 @@ ORDER BY jobstatus.id desc
 {{limit}}
 ;
 `
-	var (
-		jobid       int
-		mdgid       string
-		sheetNumber int
-		sheetName   string
-		queueID     string
-		enqueued    time.Time
-		status      string
-		desc        string
-		updated     time.Time
-	)
 
 	query, err := genAllSQL(p.QuerySelectAllJobs, selectQuery, limit)
 	if err != nil {
@@ -606,36 +654,12 @@ ORDER BY jobstatus.id desc
 	defer rows.Close()
 
 	for rows.Next() {
-		if err := rows.Scan(
-			&jobid,
-			&mdgid,
-			&sheetNumber,
-			&sheetName,
-			&queueID,
-			&enqueued,
-			&status,
-			&desc,
-			&updated,
-		); err != nil {
-			return nil, err
-		}
-		s, err := field.NewStatusFor(status, desc)
+		jb, err := scanRow(rows)
 		if err != nil {
-			return nil, err
+			logScanError(err)
+			continue
 		}
-		jobs = append(
-			jobs,
-			&coordinator.Job{
-				JobID:      fmt.Sprintf("%v", jobid),
-				QJobID:     queueID,
-				MdgID:      mdgid,
-				MdgIDPart:  uint32(sheetNumber),
-				SheetName:  sheetName,
-				Status:     field.Status{s},
-				EnqueuedAt: enqueued,
-				UpdatedAt:  updated,
-			},
-		)
+		jobs = append(jobs, jb)
 	}
 	return jobs, nil
 }
