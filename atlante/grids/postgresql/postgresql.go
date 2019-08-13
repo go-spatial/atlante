@@ -444,6 +444,8 @@ func float4val(val interface{}) (*float64, error) {
 // cellFromRow parses grid attributes into a girds.Cell struct
 func (p *Provider) cellFromRow(r *pgx.Row) (*grids.Cell, error) {
 	rows := (*pgx.Rows)(r)
+	defer rows.Close()
+
 	return p.cellFromRows(rows)
 }
 
