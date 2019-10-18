@@ -11,6 +11,8 @@ import (
 	"sync"
 	"text/template"
 
+	"github.com/go-spatial/maptoolkit/atlante/template/trellis"
+
 	"github.com/go-spatial/maptoolkit/atlante/filestore"
 	fsfile "github.com/go-spatial/maptoolkit/atlante/filestore/file"
 	fsmulti "github.com/go-spatial/maptoolkit/atlante/filestore/multi"
@@ -138,6 +140,21 @@ type GridTemplateContext struct {
 	DPI           uint
 	Scale         uint
 	Zoom          float64
+}
+
+func (grctx GridTemplateContext) DrawBars(gridSize int, x, y float64, dpiScale float64) (string, error) {
+
+	log.Infof("Draw Bars called: ground measure: %v", dpiScale)
+	sw := grctx.Grid.SW()
+	ne := grctx.Grid.NE()
+
+	return TplDrawBars(
+		float64(sw[0]), float64(ne[1]),
+		float64(ne[0]), float64(sw[1]),
+		x, y,
+		dpiScale,
+		trellis.Grid(gridSize),
+	)
 }
 
 type GeneratedFiles struct {

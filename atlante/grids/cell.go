@@ -4,6 +4,7 @@ package grids
 
 import (
 	"fmt"
+	"log"
 	"math"
 	"strconv"
 	"strings"
@@ -287,10 +288,24 @@ func (c *Cell) NE() [2]float64 {
 	return [2]float64{float64(ne.GetLng()), float64(ne.GetLat())}
 }
 
+// NW will return the North West coordinate
+func (c *Cell) NW() [2]float64 {
+	ne := c.GetNe()
+	sw := c.GetSw()
+	return [2]float64{float64(ne.GetLng()), float64(sw.GetLat())}
+}
+
 // SW will return the South West coordinate
 func (c *Cell) SW() [2]float64 {
 	sw := c.GetSw()
 	return [2]float64{float64(sw.GetLng()), float64(sw.GetLat())}
+}
+
+// SE will return the South East coordinate
+func (c *Cell) SE() [2]float64 {
+	ne := c.GetNe()
+	sw := c.GetSw()
+	return [2]float64{float64(sw.GetLng()), float64(ne.GetLat())}
 }
 
 // Hull returns the hull of the Cell
@@ -372,7 +387,8 @@ func toDMS(v float64) (d int64, m int64, s float64) {
 }
 
 // ToDMS will take a lat/lon value and convert it to a DMS value
-func ToDMS(lat, lng float64) [2]DMS {
+func ToDMS(lat, lng float64) (todms [2]DMS) {
+	defer log.Printf("converted %v, %v to %v", lat, lng, todms)
 	latD, latM, latS := toDMS(lat)
 	latH := 'N'
 	if lat < 0 {
