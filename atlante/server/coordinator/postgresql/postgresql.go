@@ -318,7 +318,7 @@ RETURNING id;
 	//	bounds, _ := wkt.Encode(job.Cell.Hull().AsPolygon())
 	h := job.Cell.Hull().Vertices()
 	h = append(h, h[0])
-	bounds, _ := wkt.Encode(geom.Polygon{h})
+	bounds, _ := wkt.EncodeString(geom.Polygon{h})
 
 	row := p.pool.QueryRow(
 		query,
