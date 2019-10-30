@@ -2,6 +2,7 @@ package file
 
 import (
 	"io"
+	"log"
 	"os"
 	"path/filepath"
 
@@ -88,6 +89,19 @@ type Writer struct {
 	Intermediate bool
 }
 
+//Exists returns weather the fpath exists, and is not a directory.
+func (w Writer) Exists(fpath string) bool {
+	log.Printf("checking if %v exists", fpath)
+	// First thing to do is combine the file path with the base path.
+	path := w.Path(fpath)
+	info, err := os.Stat(path)
+	if os.IsNotExist(err) {
+		return false
+	}
+	log.Printf("File exists, checking if dir")
+	return !info.IsDir()
+}
+
 // Writer implements the filestore.FileWriter interface
 func (w Writer) Writer(fpath string, isIntermediate bool) (io.WriteCloser, error) {
 	// If we are not writing out intermediate file, skip.
@@ -117,4 +131,5 @@ func (w Writer) Path(fpath string) string {
 var (
 	_ = filestore.Provider(Provider{})
 	_ = filestore.FileWriter(Writer{})
+	_ = filestore.Exister(Writer{})
 )
