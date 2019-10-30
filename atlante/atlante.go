@@ -181,26 +181,30 @@ func (grctx GridTemplateContext) DrawBars(gridSize int, pxlBox PixelBox, lblRows
 	)
 }
 
-/*
-func (grctx GridTemplateContext) DrawOnlyLabels(gridSize int, x, y float64, dpiScale float64, lblRows, lblCols []int, lblMeterOffset int) (string, error) {
+func (grctx GridTemplateContext) DrawOnlyLabels(gridSize int, pxlBox PixelBox, lblRows, lblCols []int, lblMeterOffset int) (string, error) {
 
-	log.Infof("Draw Bars called: ground measure: %v", dpiScale)
+	log.Infof("Draw only labels called: ground measure: %v", pxlBox.GroundPixel)
 	sw := grctx.Grid.SW()
 	ne := grctx.Grid.NE()
 
 	return TplDrawBars(
-		float64(sw[0]), float64(ne[1]),
-		float64(ne[0]), float64(sw[1]),
-		x, y,
-		dpiScale,
+		coord.LngLat{
+			Lng: sw[0],
+			Lat: sw[1],
+		},
+		coord.LngLat{
+			Lng: ne[0],
+			Lat: ne[1],
+		},
+		pxlBox,
 		trellis.Grid(gridSize),
 		lblRows,
 		lblCols,
 		lblMeterOffset,
 		false,
 	)
+
 }
-*/
 
 type GeneratedFiles struct {
 	IMG string
