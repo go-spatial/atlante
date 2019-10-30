@@ -3,3 +3,9 @@ testdata
 _*
 temp
 .devcontainer
+.idea/inspectionProfiles/Project_Default.xml
+.idea/maptoolkit.iml
+.idea/misc.xml
+.idea/modules.xml
+.idea/vcs.xml
+atlante/.vscode/settings.json
