@@ -33,6 +33,11 @@ type Provider interface {
 	FileWriter(group string) (FileWriter, error)
 }
 
+type Exister interface {
+	//Exists returns weather the fpath exists, and is not a directory.
+	Exists(fpath string) bool
+}
+
 // URLInfo encodes the url that can be used to get the file and the LastModified time of that url.
 type URLInfo struct {
 	URL          *url.URL

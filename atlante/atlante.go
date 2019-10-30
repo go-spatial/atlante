@@ -7,10 +7,12 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"text/template"
 
+	"github.com/go-spatial/geom/planar/coord"
 	"github.com/go-spatial/maptoolkit/atlante/template/trellis"
 
 	"github.com/go-spatial/maptoolkit/atlante/filestore"
@@ -36,7 +38,10 @@ type ImgStruct struct {
 	intermediate bool
 	// Have we generated the file?
 	// This will allow us to generate the file only when requested
-	generated                 bool
+	generated bool
+	// useCached  will only generate if the file does not already exist in the filestore,
+	// and the file store supports filestore.Exister interface
+	useCached                 bool
 	lck                       sync.Mutex
 	image                     *mbgl.Image
 	startGenerationCallBack   func()
@@ -71,7 +76,7 @@ func (img ImgStruct) Close() {
 	img.image.Close()
 }
 
-// generateIamge is use to create the image into the filestore
+// generateImage is use to create the image into the filestore
 func (img *ImgStruct) generateImage() (fn string, err error) {
 	if img.generated {
 		return img.filename, nil
@@ -91,7 +96,17 @@ func (img *ImgStruct) generateImage() (fn string, err error) {
 		return img.filename, nil
 	}
 
-	// generateIamge is use to create the image into the filestore
+	if img.useCached {
+		log.Infof("usedCached is on")
+		if exister, ok := img.filestore.(filestore.Exister); ok {
+			log.Infof("Is exister")
+			if exister.Exists(img.filename) {
+				return img.filename, nil
+			}
+		}
+	}
+
+	// generateImage is use to create the image into the filestore
 	img.lck.Lock()
 	defer img.lck.Unlock()
 	if img.generated {
@@ -142,7 +157,32 @@ type GridTemplateContext struct {
 	Zoom          float64
 }
 
-func (grctx GridTemplateContext) DrawBars(gridSize int, x, y float64, dpiScale float64) (string, error) {
+func (grctx GridTemplateContext) DrawBars(gridSize int, pxlBox PixelBox, lblRows, lblCols []int, lblMeterOffset int) (string, error) {
+
+	log.Infof("Draw Bars called: ground measure: %v", pxlBox.GroundPixel)
+	sw := grctx.Grid.SW()
+	ne := grctx.Grid.NE()
+
+	return TplDrawBars(
+		coord.LngLat{
+			Lng: sw[0],
+			Lat: sw[1],
+		},
+		coord.LngLat{
+			Lng: ne[0],
+			Lat: ne[1],
+		},
+		pxlBox,
+		trellis.Grid(gridSize),
+		lblRows,
+		lblCols,
+		lblMeterOffset,
+		true,
+	)
+}
+
+/*
+func (grctx GridTemplateContext) DrawOnlyLabels(gridSize int, x, y float64, dpiScale float64, lblRows, lblCols []int, lblMeterOffset int) (string, error) {
 
 	log.Infof("Draw Bars called: ground measure: %v", dpiScale)
 	sw := grctx.Grid.SW()
@@ -154,8 +194,13 @@ func (grctx GridTemplateContext) DrawBars(gridSize int, x, y float64, dpiScale f
 		x, y,
 		dpiScale,
 		trellis.Grid(gridSize),
+		lblRows,
+		lblCols,
+		lblMeterOffset,
+		false,
 	)
 }
+*/
 
 type GeneratedFiles struct {
 	IMG string
@@ -289,11 +334,18 @@ func GeneratePDF(ctx context.Context, sheet *Sheet, grid *grids.Cell, filenames 
 		return err
 	}
 
+	useCached := false
+	if val, ok := os.LookupEnv("ATLANTE_USED_CACHED_IMAGES"); ok {
+		useCached, _ = strconv.ParseBool(val)
+		log.Infof("ATLANTE_USED_CHACED_IMAGES=%t", useCached)
+	}
+
 	img := ImgStruct{
 		filename:     filenames.IMG,
 		image:        dstimg,
 		filestore:    multiWriter,
 		intermediate: true,
+		useCached:    useCached,
 		startGenerationCallBack: func() {
 			sheet.Emit(field.Processing{
 				Description: fmt.Sprintf("intermediate file: %v", filenames.IMG),

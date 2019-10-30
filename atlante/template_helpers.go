@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
 	"math"
 	"reflect"
 	"strconv"
@@ -13,27 +12,30 @@ import (
 	"text/template"
 	"time"
 
+	"github.com/go-spatial/geom"
 	"github.com/go-spatial/geom/planar/coord"
 	"github.com/go-spatial/maptoolkit/atlante/template/trellis"
 )
 
 var funcMap = template.FuncMap{
-	"to_upper":    strings.ToUpper,
-	"to_lower":    strings.ToLower,
-	"format":      tplFormat,
-	"now":         time.Now,
-	"div":         tplMathDiv,
-	"add":         tplMathAdd,
-	"sub":         tplMathSub,
-	"mul":         tplMathMul,
-	"neg":         tplMathNeg,
-	"abs":         tplMathAbs,
-	"seq":         tplSeq,
-	"new_toggler": tplNewToggle,
-	"rounder_for": tplRoundTo,
-	"rounder3":    tplRound3,
-	"first":       tplFirstNonZero,
-	"DrawBars":    TplDrawBars,
+	"to_upper":     strings.ToUpper,
+	"to_lower":     strings.ToLower,
+	"format":       tplFormat,
+	"now":          time.Now,
+	"div":          tplMathDiv,
+	"add":          tplMathAdd,
+	"sub":          tplMathSub,
+	"mul":          tplMathMul,
+	"neg":          tplMathNeg,
+	"abs":          tplMathAbs,
+	"seq":          tplSeq,
+	"new_toggler":  tplNewToggle,
+	"rounder_for":  tplRoundTo,
+	"rounder3":     tplRound3,
+	"first":        tplFirstNonZero,
+	"DrawBars":     TplDrawBars,
+	"asIntSlice":   IntSlice,
+	"pixel_bounds": PixelBounds,
 }
 
 //tplFormat is a helper function for templates that will format the given
@@ -206,12 +208,14 @@ func tplNewToggle(strs ...string) *tplToggle {
 	}
 }
 
-func tplRound(x float64, unit float64) float64 {
-	return math.Round(x/unit) * unit
+func tplRound(x float64, unit int) float64 {
+	factor := math.Pow10(unit)
+
+	return math.Round(x*factor) / factor
 }
 
-func tplRound3(x float64) float64 { return tplRound(x, 0.001) }
-func tplRoundTo(unit float64) func(float64) float64 {
+func tplRound3(x float64) float64 { return tplRound(x, 3) }
+func tplRoundTo(unit int) func(float64) float64 {
 	return func(x float64) float64 { return tplRound(x, unit) }
 }
 
@@ -327,7 +331,7 @@ func (lp LabelPart) DrawAt(w io.Writer, x, y float64, show ShowParts) {
 
 	prefix, label, suffix := lp.Parts()
 	var output bytes.Buffer
-	fmt.Fprintf(&output, `<text x="%v" y="%v" font-size="12px" text-anchor="middle">`, x, y)
+	fmt.Fprintf(&output, `<text x="%v" y="%v" font-size="12px" text-anchor="middle" >`, x, y)
 	fmt.Fprintln(&output, "")
 	if show&ShowPartPrefix == ShowPartPrefix {
 		fmt.Fprintf(&output, `<tspan font-size="6px" fill="black">%d</tspan>`, prefix)
@@ -349,28 +353,289 @@ func (lp LabelPart) DrawAt(w io.Writer, x, y float64, show ShowParts) {
 
 }
 
-func TplDrawBars(lng1, lat1, lng2, lat2 float64, startingX, startingY float64, groundPixel float64, grid trellis.Grid) (string, error) {
-
-	lnglat1 := coord.LngLat{
-		Lng: lng1,
-		Lat: lat1,
+func IntSlice(vals ...interface{}) ([]int, error) {
+	ints := make([]int, 0, len(vals))
+	for i := range vals {
+		switch v := vals[i].(type) {
+		case int8:
+			ints = append(ints, int(v))
+		case int16:
+			ints = append(ints, int(v))
+		case int32:
+			ints = append(ints, int(v))
+		case int:
+			ints = append(ints, v)
+		case int64:
+			ints = append(ints, int(v))
+		case uint8:
+			ints = append(ints, int(v))
+		case uint16:
+			ints = append(ints, int(v))
+		case uint32:
+			ints = append(ints, int(v))
+		case uint:
+			ints = append(ints, int(v))
+		case uint64:
+			ints = append(ints, int(v))
+		case float64:
+			ints = append(ints, int(v))
+		case float32:
+			ints = append(ints, int(v))
+		case string:
+			a, err := strconv.Atoi(v)
+			if err != nil {
+				return ints, err
+			}
+			ints = append(ints, a)
+		default:
+			return ints, fmt.Errorf("unknown int value at %v: '%v' ", i, v)
+		}
 	}
-	lnglat2 := coord.LngLat{
-		Lng: lng2,
-		Lat: lat2,
+	return ints, nil
+}
+
+func LngLatCoord(lng, lat float64) coord.LngLat {
+	return coord.LngLat{
+		Lng: lng,
+		Lat: lat,
+	}
+}
+
+type PixelBox struct {
+	Starting    [2]float64
+	Ending      [2]float64
+	GroundPixel float64
+}
+
+func PixelBounds(x1, y1, x2, y2 float64, groundPixel float64) PixelBox {
+	return PixelBox{
+		Starting:    [2]float64{x1, y1},
+		Ending:      [2]float64{x2, y2},
+		GroundPixel: groundPixel,
+	}
+}
+
+func (pbx PixelBox) TransformLine(l geom.Line) geom.Line {
+	return geom.Line{
+		{
+			pbx.Starting[0] + (l[0][0] / pbx.GroundPixel),
+			pbx.Starting[1] + (l[0][1] / pbx.GroundPixel),
+		}, {
+			pbx.Starting[0] + (l[1][0] / pbx.GroundPixel),
+			pbx.Starting[1] + (l[1][1] / pbx.GroundPixel),
+		},
 	}
 
-	log.Printf("lnglat1: %#v lnglat2: %#v", lnglat1, lnglat2)
+}
+func (pbx PixelBox) TransformPoint(pt geom.Point) geom.Point {
+	return geom.Point{
+		pbx.Starting[0] + (pt[0] / pbx.GroundPixel),
+		pbx.Starting[1] + (pt[1] / pbx.GroundPixel),
+	}
+}
 
-	strt, err := trellis.NewLngLat2(lnglat1, lnglat2, trellis.WGS84Ellip, grid)
+func TplDrawBars(topLeft, bottomRight coord.LngLat, pxlBox PixelBox, grid trellis.Grid, lblRows, lblCols []int, lblMeterOffset int, drawLines bool) (string, error) {
+
+	structure, err := trellis.NewLngLat(topLeft, bottomRight, trellis.WGS84Ellip, grid)
 	if err != nil {
 		return "", err
 	}
+
+	// Lines to be drawn
+	var lines []geom.Line
+
 	var output strings.Builder
-
-	const lineFormat = `<line x1="%v" y1="%v" x2="%v" y2="%v" stroke="black" stroke-width="1"  />`
-
 	output.WriteString(`<g id="bars">`)
+
+	// draw the the northing lines (horizontal lines) -- the labels for these will be on the lblCol
+	{
+
+		// Calculate the number of steps
+		numberOfStepsEasting := int(math.Abs(math.Ceil(structure.BottomRightUTM.Easting-structure.BottomLeftUTM.Easting) / float64(grid.Size())))
+		numberOfStepsNorthing := int(math.Abs(math.Ceil(structure.TopLeftUTM.Northing-structure.BottomLeftUTM.Northing)/float64(grid.Size()))) + 1
+		part := LabelPart{
+			Grid: grid,
+			Unit: "m",
+		}
+		for col := 0; col < numberOfStepsEasting; col++ {
+			if drawLines {
+				pt1 := structure.At(col, -1)
+				pt2 := structure.At(col, numberOfStepsNorthing)
+				ln := pxlBox.TransformLine(geom.Line{[2]float64(pt1), [2]float64(pt2)})
+				ln[0][1] = pxlBox.Starting[1]
+				ln[1][1] = pxlBox.Ending[1]
+				lines = append(lines, ln)
+				//	lines = append(lines, pxlBox.TransformLine(structure.EastingBar(col)))
+			}
+			if len(lblCols) <= 0 {
+				continue
+			}
+			part.Coord = int64(structure.BottomLeftUTM.Easting) + int64(structure.LeftOffset) + (int64(col) * grid.Size())
+			part.Hemi = "E."
+			if part.Coord < 0 {
+				part.Hemi = "W."
+			}
+
+			for _, lblCol := range lblCols {
+				if lblCol != col {
+					continue
+				}
+				for row := 0; row < numberOfStepsNorthing; row++ {
+					startPt := structure.At(col, row)
+					endPt := structure.At(col, row+1)
+					pt := pxlBox.TransformPoint(geom.Point{
+						startPt[0] + ((endPt[0] - startPt[0]) / 2),
+						startPt[1] + ((endPt[1] - startPt[1]) / 2),
+					})
+					part.DrawAt(&output, pt[0], pt[1], ShowPartLabel)
+				}
+			}
+
+			// outter labels
+			show := ShowPartLabel
+			if part.IsLabelMod10() {
+				show |= ShowPartPrefix
+			}
+			if col == 0 {
+				show = ShowPartAll
+			}
+			pt := pxlBox.TransformPoint(structure.At(col, -1))
+			pt[1] = pxlBox.Starting[1] + 50
+			part.DrawAt(&output, pt[0], pt[1], show)
+
+			show = ShowPartLabel
+			if part.IsLabelMod10() {
+				show |= ShowPartPrefix
+			}
+
+			pt = pxlBox.TransformPoint(structure.At(col, numberOfStepsNorthing))
+			pt[1] = pxlBox.Ending[1] - 10
+			part.DrawAt(&output, pt[0], pt[1], show)
+		}
+
+		for row := 0; row < numberOfStepsNorthing; row++ {
+			if drawLines {
+				pt1 := structure.At(-1, row)
+				pt2 := structure.At(numberOfStepsEasting, row)
+				ln := pxlBox.TransformLine(geom.Line{[2]float64(pt1), [2]float64(pt2)})
+				ln[0][0] = pxlBox.Starting[0]
+				ln[1][0] = pxlBox.Ending[0]
+				lines = append(lines, ln)
+
+				//lines = append(lines, pxlBox.TransformLine(structure.NorthingBar(row)))
+			}
+			if len(lblRows) <= 0 {
+				continue
+			}
+
+			part.Coord = int64(structure.BottomLeftUTM.Northing) + int64(structure.BottomOffset) + (int64(row) * grid.Size())
+			part.Hemi = "N."
+			if part.Coord < 0 {
+				part.Hemi = "S."
+			}
+			for _, lblRow := range lblRows {
+				if lblRow != row {
+					continue
+				}
+				for col := 0; col < numberOfStepsEasting; col++ {
+					startPt := structure.At(col, row)
+					endPt := structure.At(col+1, row)
+					pt := pxlBox.TransformPoint(geom.Point{
+						startPt[0] + ((endPt[0] - startPt[0]) / 2),
+						startPt[1] + ((endPt[1] - startPt[1]) / 2),
+					})
+					part.DrawAt(&output, pt[0], pt[1], ShowPartLabel)
+				}
+			}
+
+			// outter labels
+			show := ShowPartLabel
+			if part.IsLabelMod10() {
+				show |= ShowPartPrefix
+			}
+			if row == 0 {
+				show = ShowPartAll
+			}
+			pt := pxlBox.TransformPoint(structure.At(-1, row))
+			pt[0] = pxlBox.Starting[0] - 50
+			part.DrawAt(&output, pt[0], pt[1], show)
+			show = ShowPartLabel
+			if part.IsLabelMod10() {
+				show |= ShowPartPrefix
+			}
+			pt = pxlBox.TransformPoint(structure.At(numberOfStepsEasting, row))
+			pt[0] = pxlBox.Ending[0] + 50
+			part.DrawAt(&output, pt[0], pt[1], show)
+
+		}
+
+		/*
+			for idx := 0; idx < 30; idx++ {
+				if idx >= 30 {
+					break
+				}
+
+				pt := structure.At(idx, idx)
+				pt[0] = pxlBox.Starting[0] + (pt[0] / pxlBox.GroundPixel)
+				pt[1] = pxlBox.Starting[1] + (pt[1] / pxlBox.GroundPixel)
+
+				fmt.Fprintf(&output, "<circle cx=\"%v\" cy=\"%v\" r=\"1\" stroke=\"black\" /> \n", pt[0], pt[1])
+				fmt.Fprintf(&output, "<text x=\"%v\" y=\"%v\" stroke=\"green\"> %v </text>\n", pt[0], pt[1], idx)
+
+			}
+		*/
+	}
+
+	/*
+		bo := float64(structure.BottomOffset) / pxlBox.GroundPixel
+		lo := float64(structure.LeftOffset) / pxlBox.GroundPixel
+		fmt.Fprintf(
+			&output,
+			`<line x1="%g" y1="%g" x2="%g" y2="%g" stroke="blue" stroke-width="1"  />`,
+			pxlBox.Starting[0],
+			pxlBox.Starting[1],
+			pxlBox.Starting[0],
+			pxlBox.Starting[1]-bo,
+		)
+		fmt.Fprintf(
+			&output,
+			`<line x1="%g" y1="%g" x2="%g" y2="%g" stroke="blue" stroke-width="1"  />`,
+			pxlBox.Starting[0],
+			pxlBox.Starting[1],
+			pxlBox.Starting[0]+lo,
+			pxlBox.Starting[1],
+		)
+
+		fmt.Fprintf(
+			&output,
+			"<text x=\"%v\" y=\"%v\" stroke=\"green\" font-size=\"8px\">%v</text>\n",
+			pxlBox.Starting[0],
+			pxlBox.Starting[1]-bo,
+			structure.BottomLeftUTM.Northing+float64(structure.BottomOffset),
+		)
+
+		fmt.Fprintf(&output, "<circle cx=\"%v\" cy=\"%v\" r=\"1\" stroke=\"black\" /> \n", pxlBox.Starting[0], pxlBox.Starting[1])
+		fmt.Fprintf(
+			&output,
+			"<text x=\"%v\" y=\"%v\" stroke=\"green\" font-size=\"8px\">%v,%v</text>\n",
+			pxlBox.Starting[0],
+			pxlBox.Starting[1],
+			structure.BottomLeftUTM.Easting,
+			structure.BottomLeftUTM.Northing,
+		)
+	*/
+
+	const lineFormat = `<line x1="%g" y1="%g" x2="%g" y2="%g" stroke="black" stroke-width="1"  />`
+	fmt.Fprintf(&output, "<!--  number of lines: %v -->", len(lines))
+	for _, line := range lines {
+		fmt.Fprintf(&output, lineFormat, line[0][0], line[0][1], line[1][0], line[1][1])
+	}
+	output.WriteString("</g>\n")
+	return output.String(), nil
+}
+
+/*
+
 	// Draw the horizontal lines
 	output.WriteString(`<g id="horizontal_bars">`)
 	err = strt.NorthingBars(func(i int, bar trellis.Bar) error {
@@ -403,7 +668,9 @@ func TplDrawBars(lng1, lat1, lng2, lat2 float64, startingX, startingY float64, g
 
 		part.DrawAt(&output, x1-40, y1, show)
 
-		fmt.Fprintf(&output, lineFormat, x1, y1, x2, y2)
+		if drawLines {
+			fmt.Fprintf(&output, lineFormat, x1, y1, x2, y2)
+		}
 
 		show = ShowPartLabel
 		if part.IsLabelMod10() {
@@ -411,6 +678,25 @@ func TplDrawBars(lng1, lat1, lng2, lat2 float64, startingX, startingY float64, g
 		}
 
 		part.DrawAt(&output, x2+40, y2, show)
+
+		lblCols = sort.IntSlice(lblCols)
+		colsidx := 0
+
+		strt.EastingBars(func(j int, bar1 trellis.Bar) error {
+			if colsidx >= len(lblCols) {
+				return nil
+			}
+			if lblCols[colsidx] != j {
+				return nil
+			}
+			colsidx++
+
+			x := startingX + ((bar1.X1 + float64(lblMeterOffset)) / groundPixel)
+			part.DrawAt(&output, x, y1, ShowPartLabel)
+
+			return nil
+
+		})
 
 		return nil
 
@@ -420,20 +706,16 @@ func TplDrawBars(lng1, lat1, lng2, lat2 float64, startingX, startingY float64, g
 	// Draw the vertical lines
 	output.WriteString(`<g id="vertical_bars">
 	`)
-	//	rowsToShowEastLabels := []uint{8, 19}
 	err = strt.EastingBars(func(i int, bar trellis.Bar) error {
 
 		x1 := startingX + (bar.X1 / groundPixel)
 		x2 := startingX + (bar.X2 / groundPixel)
 		y1 := startingY
 		y2 := startingY - (bar.Length / groundPixel)
-		/*
-			fmt.Fprintf(&output, `<text x="%v" y="%v" font-size="12px" text-anchor="middle">S(%[1]v,%v)</text>`, startingX, startingY)
-			fmt.Fprintf(&output, `<text x="%v" y="%v" font-size="12px" text-anchor="middle">E1(%[1]v,%v)</text>`, x1, y1)
-			fmt.Fprintf(&output, `<text x="%v" y="%v" font-size="12px" text-anchor="middle">E2(%[1]v,%v)</text>`, x2, y2)
-		*/
 
-		fmt.Fprintf(&output, lineFormat, x1, y1, x2, y2)
+		if drawLines {
+			fmt.Fprintf(&output, lineFormat, x1, y1, x2, y2)
+		}
 
 		hemi := "E."
 		if bar.Start.Easting < 0 {
@@ -461,14 +743,24 @@ func TplDrawBars(lng1, lat1, lng2, lat2 float64, startingX, startingY float64, g
 		}
 		part.DrawAt(&output, x2, y1+25, show)
 
-		/*
-			// Draw the labels for the select rows
-			for _, row := range rowsToShowEastLabels {
-				y := startingY + ((float64(grid.Size()/2-10) + float64(uint(grid.Size())*(row-1)) + float64(bar.YOffsetStart)) / groundPixel)
-				part.DrawAt(&output, x1, y, ShowPartLabel)
+		lblRows = sort.IntSlice(lblRows)
+		rowsidx := 0
 
+		strt.NorthingBars(func(j int, bar1 trellis.Bar) error {
+			if rowsidx >= len(lblRows) {
+				return nil
 			}
-		*/
+			if lblRows[rowsidx] != j {
+				return nil
+			}
+			rowsidx++
+
+			y := startingY - ((bar1.Y1 + float64(lblMeterOffset)) / groundPixel)
+			part.DrawAt(&output, x1, y, ShowPartLabel)
+
+			return nil
+
+		})
 
 		return nil
 
@@ -476,5 +768,4 @@ func TplDrawBars(lng1, lat1, lng2, lat2 float64, startingX, startingY float64, g
 	output.WriteString("</g>\n")
 	output.WriteString("</g>\n")
 
-	return output.String(), nil
-}
+*/

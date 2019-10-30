@@ -4,6 +4,9 @@ import (
 	"log"
 	"math"
 
+	"github.com/go-spatial/geom"
+	"github.com/go-spatial/geom/planar"
+
 	"github.com/go-spatial/geom/planar/coord"
 	"github.com/go-spatial/geom/planar/coord/utm"
 )
@@ -34,6 +37,40 @@ type Offset struct {
 	Length float64
 }
 
+type Vector struct {
+	Theta float64
+	M     float64 // Slope
+	B     float64 // Y-Intercept
+}
+
+// Travel distance from at 0,0
+func (v Vector) Travel(dist float64) (x, y float64) {
+	x = dist * math.Cos(v.Theta)
+	y = dist * math.Sin(v.Theta)
+	return x, y
+}
+
+func NewVector(line [2][2]float64) Vector {
+	m, b, defined := planar.Slope(line)
+	// vertical || horizontal
+	if !defined || m == 0 {
+		return Vector{
+			M: m,
+			B: b,
+		}
+	}
+	adj := line[1][0] - line[0][0]
+	opp := line[1][1] - line[0][1]
+	hyp := math.Sqrt(adj*adj + opp*opp)
+	theta := math.Acos(adj / hyp)
+	return Vector{
+		M:     m,
+		B:     b,
+		Theta: theta,
+	}
+
+}
+
 // Bar describes a bar to be drawn
 type Bar struct {
 	// The UTM coord for the start of the bar
@@ -59,89 +96,157 @@ type DrawFn func(count int, bar Bar) error
 
 // Structure describes vertical and horizontal bars in the Trellis
 type Structure struct {
-	TopLeft        coord.LngLat
-	BottomRight    coord.LngLat
 	Ellips         coord.Ellipsoid
-	TopLeftUTM     utm.Coord
-	TopRightUTM    utm.Coord
 	BottomLeftUTM  utm.Coord
 	BottomRightUTM utm.Coord
+	TopLeftUTM     utm.Coord
 
-	NATO     bool
-	Grid     Grid
-	Northing Offset
-	Easting  Offset
+	Grid Grid
+
+	LeftVector Vector
+	LeftOffset int
+
+	BottomVector Vector
+	BottomOffset int
 }
 
-// NorthingBars are the Horizontal bars that travel south to north
-func (str Structure) NorthingBars(fn DrawFn) error {
+func (structure Structure) At(col, row int) [2]float64 {
+	leftVector := structure.LeftVector
+	leftOffset := structure.LeftOffset
+	bottomVector := structure.BottomVector
+	bottomOffset := structure.BottomOffset
+	size := int(structure.Grid.Size())
 
-	log.Printf("Northing steps: %v -- %v", str.Northing.Steps, str.Northing.Length)
-	for i := 0; i < str.Northing.Steps; i++ {
-		utmA11Offset := float64(str.Northing.A11Offset + (i * int(str.Grid)))
-		utmA12Offset := float64(str.Northing.A12Offset + (i * int(str.Grid)))
-		utmStart := str.BottomLeftUTM
-		utmEnd := str.TopLeftUTM
-		utmStart.Northing += utmA11Offset
-		utmEnd.Northing += utmA12Offset
+	distY := float64(bottomOffset + (row * size))
+	y1 := distY * math.Sin(leftVector.Theta)
 
-		startStepOffset := (float64(i) * str.Northing.StartStepSize)
-		endStepOffset := (float64(i) * str.Northing.EndStepSize)
-		x1 := 0.0
-		y1 := str.Northing.StartOffset + startStepOffset
-		x2 := str.Easting.Length
-		y2 := str.Northing.EndOffset + endStepOffset
-		err := fn(i, Bar{
-			Start:  &utmStart,
-			End:    &utmEnd,
-			X1:     x1,
-			Y1:     y1,
-			X2:     x2,
-			Y2:     y2,
-			Length: str.Easting.Length,
-			Parent: &str,
-		})
-		if err != nil {
-			return err
-		}
-	}
-	return nil
-
+	distX := float64(leftOffset + (col * size))
+	x, y := bottomVector.Travel(distX)
+	y -= y1
+	return [2]float64{x, y}
 }
 
-// EastingBars are the vertical bars in meters that travel from east to west
-func (str Structure) EastingBars(fn DrawFn) error {
-	log.Printf("v3 Easting steps: %v -- %v", str.Easting.Steps, str.Easting.Length)
-	for i := 0; i < str.Easting.Steps; i++ {
+func (structure Structure) NorthingBar(idx int) geom.Line {
 
-		utmA11Offset := float64(str.Easting.A11Offset + (i * int(str.Grid)))
-		utmA12Offset := float64(str.Easting.A12Offset + (i * int(str.Grid)))
-		utmStart := str.BottomLeftUTM
-		utmEnd := str.BottomRightUTM
-		utmStart.Easting += utmA11Offset
-		utmEnd.Easting += utmA12Offset
+	leftVector := structure.LeftVector
+	bottomVector := structure.BottomVector
+	bottomOffset := structure.BottomOffset
+	size := int(structure.Grid.Size())
 
-		startStepOffset := (float64(i) * str.Easting.StartStepSize)
-		endStepOffset := (float64(i) * str.Easting.EndStepSize)
-		x1 := str.Easting.StartOffset + startStepOffset
-		y1 := 0.0
-		x2 := str.Easting.EndOffset + endStepOffset
-		y2 := str.Northing.Length
-		err := fn(i, Bar{
-			Start:  &utmStart,
-			End:    &utmEnd,
-			X1:     x1,
-			Y1:     y1,
-			X2:     x2,
-			Y2:     y2,
-			Length: str.Northing.Length,
-			Parent: &str,
-		})
-		if err != nil {
-			return err
-		}
+	var (
+		xstart = 0.0
+		xend   = 0.0
+		ystart = 0.0
+		yend   = 0.0
+	)
+
+	barLength := float64(structure.BottomRightUTM.Easting - structure.BottomLeftUTM.Easting)
+	//xend = structure.BottomLeftUTM.Easting + (barLength * math.Cos(bottomVector.Theta))
+
+	dist := float64(bottomOffset + (idx * size))
+	y := dist * math.Sin(leftVector.Theta)
+	b := y
+
+	ystart -= b
+
+	xend, yend = bottomVector.Travel(barLength)
+	xend += structure.BottomLeftUTM.Easting
+	yend -= b
+
+	log.Printf("%v: offset: %v -- %v", idx, bottomOffset, y)
+
+	return geom.Line{{xstart, ystart}, {xend, yend}}
+}
+func (structure Structure) EastingBar(idx int) geom.Line {
+
+	leftVector := structure.LeftVector
+	leftOffset := structure.LeftOffset
+	bottomVector := structure.BottomVector
+	size := int(structure.Grid.Size())
+
+	var (
+		xstart = 0.0
+		xend   = 0.0
+		ystart = 0.0
+		yend   = 0.0
+	)
+
+	barLength := float64(structure.TopLeftUTM.Northing - structure.BottomLeftUTM.Northing)
+	yend = barLength * math.Cos(leftVector.Theta)
+
+	dist := float64(leftOffset + (idx * size))
+	x := (dist * math.Cos(bottomVector.Theta))
+
+	xstart += x
+
+	xend, yend = leftVector.Travel(barLength)
+	//yend -= structure.BottomLeftUTM.Northing
+	xend += x
+
+	log.Printf("%v: offset: %v -- %v", idx, leftOffset, x)
+
+	return geom.Line{{xstart, ystart}, {xend, yend}}
+}
+
+func NewLngLat(topLeft, bottomRight coord.LngLat, ellips coord.Ellipsoid, grid Grid) (Structure, error) {
+
+	tlUTM, err := utm.FromLngLat(topLeft, ellips)
+	if err != nil {
+		return Structure{}, err
 	}
-	return nil
+	/*
+		trUTM, err := utm.FromLngLat(coord.LngLat{
+			Lng: bottomRight.Lng,
+			Lat: topLeft.Lat,
+		}, ellips)
+		if err != nil {
+			return Structure{}, err
+		}
+	*/
+
+	blUTM, err := utm.FromLngLat(coord.LngLat{
+		Lng: topLeft.Lng,
+		Lat: bottomRight.Lat,
+	}, ellips)
+	if err != nil {
+		return Structure{}, err
+	}
+	brUTM, err := utm.FromLngLat(bottomRight, ellips)
+	if err != nil {
+		return Structure{}, err
+	}
+
+	leftVector := NewVector([2][2]float64{
+		{blUTM.Easting, blUTM.Northing},
+		{tlUTM.Easting, tlUTM.Northing},
+	})
+	bottomVector := NewVector([2][2]float64{
+		{blUTM.Easting, blUTM.Northing},
+		{brUTM.Easting, brUTM.Northing},
+	})
+
+	_, _, bottomOffset := grid.PartsFor(int64(blUTM.Northing))
+	log.Printf("BottomLeft: %v --- offset: %v", blUTM.Northing, bottomOffset)
+	_, _, leftOffset := grid.PartsFor(int64(blUTM.Easting))
+
+	size := int(grid.Size())
+
+	bottomOffset = size - bottomOffset
+	leftOffset = size - leftOffset
+	return Structure{
+		Ellips:         ellips,
+		BottomLeftUTM:  blUTM,
+		BottomRightUTM: brUTM,
+		TopLeftUTM:     tlUTM,
+
+		Grid: grid,
+
+		LeftVector: leftVector,
+		LeftOffset: leftOffset,
+
+		BottomVector: bottomVector,
+		BottomOffset: bottomOffset,
+	}, nil
 }
 
 type Grid int
@@ -163,6 +268,7 @@ func (g Grid) PartsFor(meters int64) (prefix, label, suffix int) {
 	return prefix, label, suffix
 }
 
+// Size is the grid size in meters
 func (g Grid) Size() int64 { return int64(g) }
 
 var widths = map[Grid]int{
@@ -173,130 +279,10 @@ var widths = map[Grid]int{
 	Grid(10000): 4,
 }
 
+// Width is the number width
 func (g Grid) Width() int {
 	if w, ok := widths[g]; ok {
 		return w
 	}
 	return int(math.Log10(float64(g)))
-}
-
-func calculateStepOffsets(grid Grid, b, a1, a2 float64) (startOffset, endOffset, numberOfSteps, stepSize, length float64, a1Offset, a2Offset int) {
-
-	a := a2 - a1
-	// this is the overall length of the bar
-	length = math.Sqrt(b*b + a*a)
-
-	ratio := length / a
-
-	_, _, a1OffsetP := grid.PartsFor(int64(a1))
-	a1Offset = int(grid) - a1OffsetP
-	_, _, a2Offset = grid.PartsFor(int64(a2))
-	oLength := a - float64(a1Offset+a2Offset)
-
-	numberOfSteps = float64(int(oLength / float64(grid)))
-	stepSize = float64(grid) * ratio
-	startOffset = float64(a1Offset) * ratio
-	endOffset = float64(a2Offset) * ratio
-
-	return startOffset, endOffset, numberOfSteps, stepSize, length, a1Offset, a2Offset
-
-}
-
-func NewLngLat2(topLeft, bottomRight coord.LngLat, ellips coord.Ellipsoid, grid Grid) (Structure, error) {
-
-	tlUTM, err := utm.FromLngLat(topLeft, ellips)
-	if err != nil {
-		return Structure{}, err
-	}
-	trUTM, err := utm.FromLngLat(coord.LngLat{
-		Lng: bottomRight.Lng,
-		Lat: topLeft.Lat,
-	}, ellips)
-	if err != nil {
-		return Structure{}, err
-	}
-
-	blUTM, err := utm.FromLngLat(coord.LngLat{
-		Lng: topLeft.Lng,
-		Lat: bottomRight.Lat,
-	}, ellips)
-	if err != nil {
-		return Structure{}, err
-	}
-	brUTM, err := utm.FromLngLat(bottomRight, ellips)
-	if err != nil {
-		return Structure{}, err
-	}
-
-	log.Printf("\ntlUTM: %#v\ntrUTM: %#v", tlUTM, trUTM)
-	log.Printf("\nblUTM: %#v\nbrUTM: %#v", blUTM, brUTM)
-
-	nlStartOffset, _, nlNumberOfSteps, nlStepSize, nlLength, nlA1Offset, _ :=
-		calculateStepOffsets(grid,
-			tlUTM.Easting-blUTM.Easting, // b
-			blUTM.Northing,              // a1
-			tlUTM.Northing,              // a2
-		)
-	nrStartOffset, _, nrNumberOfSteps, nrStepSize, nrLength, nrA1Offset, _ :=
-		calculateStepOffsets(grid,
-			trUTM.Easting-brUTM.Easting, // b
-			brUTM.Northing,              // a1
-			trUTM.Northing,              // a2
-		)
-
-	ebStartOffset, _, ebNumberOfSteps, ebStepSize, ebLength, ebA1Offset, _ :=
-		calculateStepOffsets(grid,
-			blUTM.Northing-brUTM.Northing, // b
-			blUTM.Easting,                 // a1
-			brUTM.Easting,                 // a2
-		)
-	etStartOffset, _, etNumberOfSteps, etStepSize, etLength, etA1Offset, _ :=
-		calculateStepOffsets(grid,
-			tlUTM.Northing-trUTM.Northing, // b
-			tlUTM.Easting,                 // a1
-			trUTM.Easting,                 // a2
-		)
-
-	log.Printf(
-		"Easting Top: StartOffset: %v A1Offsetset: %v NumberOfSteps: %v StepSize: %v Lenght: %v",
-		etStartOffset,
-		etA1Offset,
-		etNumberOfSteps,
-		etStepSize,
-		etLength,
-	)
-
-	return Structure{
-		TopLeft:        topLeft,
-		BottomRight:    bottomRight,
-		Ellips:         ellips,
-		TopLeftUTM:     tlUTM,
-		TopRightUTM:    trUTM,
-		BottomLeftUTM:  blUTM,
-		BottomRightUTM: brUTM,
-
-		Grid: grid,
-		Northing: Offset{
-			Length: math.Max(nlLength, nrLength),
-
-			Steps:         int(math.Max(nlNumberOfSteps, nrNumberOfSteps)) + 1,
-			StartStepSize: nlStepSize,
-			StartOffset:   nlStartOffset,
-			EndStepSize:   nrStepSize,
-			EndOffset:     nrStartOffset,
-			A11Offset:     nlA1Offset,
-			A12Offset:     nrA1Offset,
-		},
-		Easting: Offset{
-			Length: math.Max(ebLength, etLength),
-
-			Steps:         int(math.Max(ebNumberOfSteps, etNumberOfSteps)) + 1,
-			StartStepSize: ebStepSize,
-			StartOffset:   ebStartOffset,
-			EndStepSize:   etStepSize,
-			EndOffset:     etStartOffset,
-			A11Offset:     ebA1Offset,
-			A12Offset:     etA1Offset,
-		},
-	}, nil
 }

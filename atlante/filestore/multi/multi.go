@@ -145,6 +145,17 @@ type FileWriter struct {
 	Writers []filestore.FileWriter
 }
 
+//Exists returns weather the fpath exists, and is not a directory.
+func (t FileWriter) Exists(fpath string) bool {
+	for _, fw := range t.Writers {
+		e, ok := fw.(filestore.Exister)
+		if ok {
+			return e.Exists(fpath)
+		}
+	}
+	return false
+}
+
 //Writer implements the filestore.FileWriter interface
 func (t FileWriter) Writer(fpath string, isIntermediate bool) (io.WriteCloser, error) {
 	var writer Writer
