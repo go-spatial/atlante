@@ -402,17 +402,54 @@ func LngLatCoord(lng, lat float64) coord.LngLat {
 }
 
 type PixelBox struct {
-	Starting    [2]float64
-	Ending      [2]float64
-	GroundPixel float64
+	Starting     [2]float64
+	Ending       [2]float64
+	GroundPixel  float64
+	LeftBuffer   float64
+	BottomBuffer float64
+	RightBuffer  float64
+	TopBuffer    float64
+	RowOffset    float64
+	ColOffset    float64
 }
 
-func PixelBounds(x1, y1, x2, y2 float64, groundPixel float64) PixelBox {
-	return PixelBox{
-		Starting:    [2]float64{x1, y1},
-		Ending:      [2]float64{x2, y2},
-		GroundPixel: groundPixel,
+func PixelBounds(x1, y1, x2, y2 float64, groundPixel float64, extraVals ...float64) PixelBox {
+	pbx := PixelBox{
+		Starting:     [2]float64{x1, y1},
+		Ending:       [2]float64{x2, y2},
+		GroundPixel:  groundPixel,
+		LeftBuffer:   10.0,
+		BottomBuffer: 10.0,
+		RightBuffer:  10.0,
+		TopBuffer:    10.0,
+		RowOffset:    0.0,
+		ColOffset:    0.0,
 	}
+	ln := len(extraVals)
+	if ln >= 1 {
+		pbx.LeftBuffer = extraVals[0]
+		pbx.BottomBuffer = extraVals[0]
+		pbx.RightBuffer = extraVals[0]
+		pbx.TopBuffer = extraVals[0]
+	}
+	if ln >= 2 {
+		pbx.BottomBuffer = extraVals[1]
+		pbx.TopBuffer = extraVals[1]
+	}
+	if ln >= 3 {
+		pbx.RightBuffer = extraVals[2]
+	}
+	if ln >= 4 {
+		pbx.TopBuffer = extraVals[3]
+	}
+	if ln >= 5 {
+		pbx.ColOffset = extraVals[4]
+		pbx.RowOffset = extraVals[4]
+	}
+	if ln >= 6 {
+		pbx.RowOffset = extraVals[5]
+	}
+	return pbx
 }
 
 func (pbx PixelBox) TransformLine(l geom.Line) geom.Line {
@@ -476,20 +513,33 @@ func TplDrawBars(topLeft, bottomRight coord.LngLat, pxlBox PixelBox, grid trelli
 				part.Hemi = "W."
 			}
 
-			for _, lblCol := range lblCols {
-				if lblCol != col {
-					continue
-				}
-				for row := 0; row < numberOfStepsNorthing; row++ {
-					startPt := structure.At(col, row)
-					endPt := structure.At(col, row+1)
-					pt := pxlBox.TransformPoint(geom.Point{
-						startPt[0] + ((endPt[0] - startPt[0]) / 2),
-						startPt[1] + ((endPt[1] - startPt[1]) / 2),
-					})
-					part.DrawAt(&output, pt[0], pt[1], ShowPartLabel)
-				}
+			for _, row := range lblRows {
+				startPt := structure.At(col, row)
+				endPt := structure.At(col, row+1)
+				pt := pxlBox.TransformPoint(geom.Point{
+					startPt[0] + ((endPt[0] - startPt[0]) / 2),
+					startPt[1] + ((endPt[1] - startPt[1]) / 2),
+				})
+				part.DrawAt(&output, pt[0], pt[1], ShowPartLabel)
+
 			}
+
+			/*
+				for _, lblCol := range lblCols {
+					if lblCol != col {
+						continue
+					}
+					for row := 0; row < numberOfStepsNorthing; row++ {
+						startPt := structure.At(col, row)
+						endPt := structure.At(col, row+1)
+						pt := pxlBox.TransformPoint(geom.Point{
+							startPt[0] + ((endPt[0] - startPt[0]) / 2),
+							startPt[1] + ((endPt[1] - startPt[1]) / 2),
+						})
+						part.DrawAt(&output, pt[0], pt[1], ShowPartLabel)
+					}
+				}
+			*/
 
 			// outter labels
 			show := ShowPartLabel
@@ -500,7 +550,7 @@ func TplDrawBars(topLeft, bottomRight coord.LngLat, pxlBox PixelBox, grid trelli
 				show = ShowPartAll
 			}
 			pt := pxlBox.TransformPoint(structure.At(col, -1))
-			pt[1] = pxlBox.Starting[1] + 50
+			pt[1] = pxlBox.Starting[1] + pxlBox.BottomBuffer
 			part.DrawAt(&output, pt[0], pt[1], show)
 
 			show = ShowPartLabel
@@ -509,7 +559,7 @@ func TplDrawBars(topLeft, bottomRight coord.LngLat, pxlBox PixelBox, grid trelli
 			}
 
 			pt = pxlBox.TransformPoint(structure.At(col, numberOfStepsNorthing))
-			pt[1] = pxlBox.Ending[1] - 10
+			pt[1] = pxlBox.Ending[1] - pxlBox.TopBuffer
 			part.DrawAt(&output, pt[0], pt[1], show)
 		}
 
@@ -533,20 +583,33 @@ func TplDrawBars(topLeft, bottomRight coord.LngLat, pxlBox PixelBox, grid trelli
 			if part.Coord < 0 {
 				part.Hemi = "S."
 			}
-			for _, lblRow := range lblRows {
-				if lblRow != row {
-					continue
-				}
-				for col := 0; col < numberOfStepsEasting; col++ {
-					startPt := structure.At(col, row)
-					endPt := structure.At(col+1, row)
-					pt := pxlBox.TransformPoint(geom.Point{
-						startPt[0] + ((endPt[0] - startPt[0]) / 2),
-						startPt[1] + ((endPt[1] - startPt[1]) / 2),
-					})
-					part.DrawAt(&output, pt[0], pt[1], ShowPartLabel)
-				}
+
+			for _, col := range lblCols {
+				startPt := structure.At(col, row)
+				endPt := structure.At(col+1, row)
+				pt := pxlBox.TransformPoint(geom.Point{
+					startPt[0] + ((endPt[0] - startPt[0]) / 2),
+					startPt[1] + ((endPt[1] - startPt[1]) / 2),
+				})
+				part.DrawAt(&output, pt[0], pt[1], ShowPartLabel)
 			}
+
+			/*
+				for _, lblRow := range lblRows {
+					if lblRow != row {
+						continue
+					}
+					for col := 0; col < numberOfStepsEasting; col++ {
+						startPt := structure.At(col, row)
+						endPt := structure.At(col+1, row)
+						pt := pxlBox.TransformPoint(geom.Point{
+							startPt[0] + ((endPt[0] - startPt[0]) / 2),
+							startPt[1] + ((endPt[1] - startPt[1]) / 2),
+						})
+						part.DrawAt(&output, pt[0], pt[1], ShowPartLabel)
+					}
+				}
+			*/
 
 			// outter labels
 			show := ShowPartLabel
@@ -557,14 +620,14 @@ func TplDrawBars(topLeft, bottomRight coord.LngLat, pxlBox PixelBox, grid trelli
 				show = ShowPartAll
 			}
 			pt := pxlBox.TransformPoint(structure.At(-1, row))
-			pt[0] = pxlBox.Starting[0] - 50
+			pt[0] = pxlBox.Starting[0] - pxlBox.LeftBuffer
 			part.DrawAt(&output, pt[0], pt[1], show)
 			show = ShowPartLabel
 			if part.IsLabelMod10() {
 				show |= ShowPartPrefix
 			}
 			pt = pxlBox.TransformPoint(structure.At(numberOfStepsEasting, row))
-			pt[0] = pxlBox.Ending[0] + 50
+			pt[0] = pxlBox.Ending[0] + pxlBox.RightBuffer
 			part.DrawAt(&output, pt[0], pt[1], show)
 
 		}
