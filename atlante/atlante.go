@@ -351,11 +351,14 @@ func GeneratePDF(ctx context.Context, sheet *Sheet, grid *grids.Cell, filenames 
 	if err != nil {
 		return err
 	}
+	if ctx.Err() != nil {
+		return ctx.Err()
+	}
 
 	useCached := false
 	if val, ok := os.LookupEnv("ATLANTE_USED_CACHED_IMAGES"); ok {
 		useCached, _ = strconv.ParseBool(val)
-		log.Infof("ATLANTE_USED_CHACED_IMAGES=%t", useCached)
+		log.Infof("ATLANTE_USED_CACHED_IMAGES=%t", useCached)
 	}
 
 	img := ImgStruct{
@@ -385,6 +388,14 @@ func GeneratePDF(ctx context.Context, sheet *Sheet, grid *grids.Cell, filenames 
 	})
 	file, err := multiWriter.Writer(filenames.SVG, true)
 	defer file.Close()
+	if err != nil {
+		sheet.EmitError("failed to copy files", err)
+		return err
+	}
+	if ctx.Err() != nil {
+		sheet.EmitError("generate pdf canceled", ctx.Err())
+		return ctx.Err()
+	}
 
 	// Fill out template
 	err = sheet.Execute(file, GridTemplateContext{
@@ -425,6 +436,10 @@ func GeneratePDF(ctx context.Context, sheet *Sheet, grid *grids.Cell, filenames 
 		log.Warnf("error generating pdf: %v", err)
 		sheet.EmitError("generate pdf failed", err)
 		return err
+	}
+	if ctx.Err() != nil {
+		sheet.EmitError("generate pdf canceled", ctx.Err())
+		return ctx.Err()
 	}
 
 	if len(multiWriter.Writers) > 1 {
