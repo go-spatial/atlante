@@ -3,11 +3,12 @@ package cmd
 import (
 	"context"
 	"fmt"
+	"log"
 	"os"
+	"os/signal"
 	"strings"
+	"syscall"
 	"time"
-
-	gdcmd "github.com/gdey/cmd"
 
 	"github.com/go-spatial/maptoolkit/atlante"
 	"github.com/go-spatial/maptoolkit/atlante/grids"
@@ -135,7 +136,7 @@ func rootCmdRun(cmd *cobra.Command, args []string) error {
 		cancel context.CancelFunc
 	)
 
-	defer gdcmd.New().Complete()
+	//defer gdcmd.New().Complete()
 
 	a, err := config.Load(configFile, dpi, cmd.Flag("dpi").Changed)
 	if err != nil {
@@ -158,13 +159,32 @@ func rootCmdRun(cmd *cobra.Command, args []string) error {
 	mbgl.StartSnapshotManager(ctx)
 
 	go func() {
+		sigch := make(chan os.Signal, 1)
+		signal.Notify(sigch)
 		done := ctx.Done()
-		cancelled := gdcmd.Cancelled()
-		select {
-		case <-done:
-			// no opt
-		case <-cancelled:
-			cancel()
+		//cancelled := gdcmd.Cancelled()
+		for {
+			select {
+			case <-done:
+				// no opt
+				return
+			case sig := <-sigch:
+				log.Printf("Got signal %v", sig)
+				sysSignal, ok := sig.(syscall.Signal)
+				if !ok {
+					break
+				}
+				switch sysSignal {
+				default:
+					break
+				case syscall.SIGABRT:
+				case syscall.SIGQUIT:
+				case syscall.SIGTERM:
+				case syscall.SIGKILL:
+				}
+				cancel()
+				return
+			}
 		}
 	}()
 
