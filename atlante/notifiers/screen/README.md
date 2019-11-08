@@ -1,13 +1,13 @@
 # screen notifier
 
-This notifier will print job compleations notification to the screen
+This notifier will print job completions notification to the screen
 
 ```toml
 
 ...
 
 [notifier]
-    type = "http"
+    type = "screen"
 
 ```
 
