@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"log"
 	"net/http"
 	"net/url"
 	"os"
@@ -65,7 +66,7 @@ func (ncr noCloserReader) Read(p []byte) (int, error) { return ncr.reader.Read(p
 // Close implements the Close method of the ReaderCloser interface
 func (ncr noCloserReader) Close() error { return nil }
 
-// NewReader will create a reader for the apporiate type of file described by
+// NewReader will create a reader for the appropriate type of file described by
 // the url provided.
 func NewReader(location *url.URL) (io.ReadCloser, error) {
 
@@ -78,6 +79,8 @@ func NewReader(location *url.URL) (io.ReadCloser, error) {
 		// check the conf file exists
 		filename := location.EscapedPath()
 		if _, err := os.Stat(filename); os.IsNotExist(err) {
+			wd, err := os.Getwd()
+			log.Printf("Could not find file: %v \n pwd: %v : %v", filename, wd, err)
 			return nil, ErrFileNotExists{Filename: filename, Err: err}
 		}
 

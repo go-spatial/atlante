@@ -7,7 +7,7 @@ import (
 	"github.com/go-spatial/maptoolkit/cmd/atlante/cmd"
 )
 
-// cleanupFns are functions that should be run beforing exiting.
+// cleanupFns are functions that should be run before exiting.
 var cleanupFns []func()
 
 func runRoot() <-chan error {

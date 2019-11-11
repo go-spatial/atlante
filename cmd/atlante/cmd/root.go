@@ -134,6 +134,13 @@ func rootCmdRun(cmd *cobra.Command, args []string) error {
 		ctx    context.Context
 		cancel context.CancelFunc
 	)
+	{
+		pid := os.Getpid()
+		fmt.Fprintf(cmd.OutOrStderr(), "[config] OS PID: %v\n", pid)
+		if pid != 1 {
+			fmt.Fprintf(cmd.OutOrStderr(), "[config] Parent PID: %v\n", os.Getppid())
+		}
+	}
 
 	//defer gdcmd.New().Complete()
 
@@ -144,13 +151,6 @@ func rootCmdRun(cmd *cobra.Command, args []string) error {
 			Msg:       fmt.Sprintf("[error] loading config: %v\n", err),
 			Err:       err,
 			ExitCode:  1,
-		}
-	}
-	{
-		pid := os.Getpid()
-		fmt.Fprintf(cmd.OutOrStderr(), "[config] OS PID: %v\n", pid)
-		if pid != 1 {
-			fmt.Fprintf(cmd.OutOrStderr(), "[config] Parent PID: %v\n", os.Getppid())
 		}
 	}
 
