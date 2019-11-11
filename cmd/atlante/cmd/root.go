@@ -68,7 +68,6 @@ func init() {
 
 	// Add server command
 	Root.AddCommand(Server)
-
 }
 
 // Root is the main cobra command
@@ -142,14 +141,22 @@ func rootCmdRun(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return ErrExitWith{
 			ShowUsage: true,
-			Msg:       fmt.Sprintf("error loading config: %v\n", err),
+			Msg:       fmt.Sprintf("[error] loading config: %v\n", err),
 			Err:       err,
 			ExitCode:  1,
 		}
 	}
+	{
+		pid := os.Getpid()
+		fmt.Fprintf(cmd.OutOrStderr(), "[config] OS PID: %v\n", pid)
+		if pid != 1 {
+			fmt.Fprintf(cmd.OutOrStderr(), "[config] Parent PID: %v\n", os.Getppid())
+		}
+	}
+
 	if timeout != 0 {
 		to := time.Duration(timeout) * time.Minute
-		fmt.Fprintf(cmd.OutOrStderr(), "setting timeout to: %v\n", to)
+		fmt.Fprintf(cmd.OutOrStderr(), "[config] timeout: %v\n", to)
 		ctx, cancel = context.WithDeadline(context.Background(), time.Now().Add(to))
 	} else {
 		ctx, cancel = context.WithCancel(context.Background())
@@ -192,7 +199,7 @@ func rootCmdRun(cmd *cobra.Command, args []string) error {
 		if err := os.Chdir(workDir); err != nil {
 			return ErrExitWith{
 				ShowUsage: true,
-				Msg:       fmt.Sprintf("error changing to working dir (%v), aborting", workDir),
+				Msg:       fmt.Sprintf("[error] changing to working dir (%v), aborting", workDir),
 				Err:       err,
 				ExitCode:  2,
 			}
@@ -202,7 +209,7 @@ func rootCmdRun(cmd *cobra.Command, args []string) error {
 	// Check to see if JOB is set, if it is decode it into a job struct.
 	generatedFiles, err := rootCmdParseArgs(ctx, a)
 	if err != nil {
-		fmt.Fprintf(cmd.OutOrStderr(), "error generating pdf\n")
+		fmt.Fprintf(cmd.OutOrStderr(), "[error] generating pdf\n")
 		eerr := ErrExitWith{
 			Err:       err,
 			ShowUsage: true,
@@ -211,13 +218,13 @@ func rootCmdRun(cmd *cobra.Command, args []string) error {
 		var strwriter strings.Builder
 		switch e := err.(type) {
 		case atlante.ErrUnknownSheetName:
-			fmt.Fprintf(&strwriter, "\terror unknown sheet name `%v`\n", string(e))
+			fmt.Fprintf(&strwriter, "\t[error] unknown sheet name `%v`\n", string(e))
 			fmt.Fprintf(&strwriter, "\tknown sheets\n")
 			for _, snm := range a.SheetNames() {
 				fmt.Fprintf(&strwriter, "\t\t%v\n", snm)
 			}
 		default:
-			fmt.Fprintf(&strwriter, "error generating pdf\n\t%v\n", err)
+			fmt.Fprintf(&strwriter, "[error] generating pdf\n\t%v\n", err)
 		}
 		eerr.Msg = strwriter.String()
 		return eerr
