@@ -10,6 +10,7 @@ RUN yum group install -y "Development Tools"
 # Install Go
 RUN curl -SL https://dl.google.com/go/go1.12.4.linux-amd64.tar.gz | tar -xzC /usr/local && mkdir -p /go/bin
 
+ENV GO111MODULE=on
 ENV GOROOT=/usr/local/go
 ENV GOPATH=/go
 ENV GOBIN=$GOPATH/bin
