@@ -14,6 +14,8 @@ import (
 
 	"github.com/go-spatial/geom"
 	"github.com/go-spatial/geom/planar/coord"
+	"github.com/go-spatial/maptoolkit/atlante/server/coordinator/field"
+	"github.com/go-spatial/maptoolkit/atlante/template/remote"
 	"github.com/go-spatial/maptoolkit/atlante/template/trellis"
 )
 
@@ -36,6 +38,24 @@ var funcMap = template.FuncMap{
 	"DrawBars":     TplDrawBars,
 	"asIntSlice":   IntSlice,
 	"pixel_bounds": PixelBounds,
+}
+
+// AddTemplateFunc will add the filestore based commands. It will panic if the command is already defined.
+func (sheet *Sheet) AddTemplateFuncs(funcMap template.FuncMap) template.FuncMap {
+	add := func(name string, fn interface{}) {
+		if _, ok := funcMap[name]; ok {
+			panic(fmt.Sprintf("func %v already defined", name))
+		}
+		funcMap[name] = fn
+	}
+	add("remote", sheet.templateFuncRemote)
+
+	return funcMap
+}
+
+func (sheet *Sheet) templateFuncRemote(loc string) (string, error) {
+	sheet.Emit(field.Processing{Description: fmt.Sprintf("remote file: %v", loc)})
+	return remote.Remote(loc, sheet.FuncFilestoreWriter, sheet.UseCached)
 }
 
 //tplFormat is a helper function for templates that will format the given

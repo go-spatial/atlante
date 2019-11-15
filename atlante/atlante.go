@@ -281,6 +281,12 @@ func GeneratePDF(ctx context.Context, sheet *Sheet, grid *grids.Cell, filenames 
 		return ErrNilGrid
 	}
 
+	useCached := false
+	if val, ok := os.LookupEnv("ATLANTE_USED_CACHED_IMAGES"); ok {
+		useCached, _ = strconv.ParseBool(val)
+		log.Infof("ATLANTE_USED_CACHED_IMAGES=%t", useCached)
+	}
+
 	sheet.Emit(field.Started{})
 
 	// TODO(gdey): use MdgID once we move to partial templates system
@@ -304,6 +310,9 @@ func GeneratePDF(ctx context.Context, sheet *Sheet, grid *grids.Cell, filenames 
 			multiWriter.Writers = append(multiWriter.Writers, shWriter)
 		}
 	}
+
+	sheet.FuncFilestoreWriter = multiWriter
+	sheet.UseCached = useCached
 
 	log.Infoln("filenames: ", filenames.IMG, filenames.SVG, filenames.PDF)
 
@@ -353,12 +362,6 @@ func GeneratePDF(ctx context.Context, sheet *Sheet, grid *grids.Cell, filenames 
 	}
 	if ctx.Err() != nil {
 		return ctx.Err()
-	}
-
-	useCached := false
-	if val, ok := os.LookupEnv("ATLANTE_USED_CACHED_IMAGES"); ok {
-		useCached, _ = strconv.ParseBool(val)
-		log.Infof("ATLANTE_USED_CACHED_IMAGES=%t", useCached)
 	}
 
 	img := ImgStruct{

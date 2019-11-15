@@ -53,6 +53,12 @@ type Sheet struct {
 	Width float64
 	// Height of the canvas in mm
 	Height float64
+
+	// This will be used by the template functions
+	FuncFilestoreWriter filestore.FileWriter
+
+	// UseCached tells remote file providers to use cached versions
+	UseCached bool
 }
 
 // NewSheet returns a new sheet
@@ -69,29 +75,30 @@ func NewSheet(name string, provider grids.Provider, dpi uint, desc string, style
 		return nil, err
 	}
 
-	t, err = template.New(svgTemplateFilename.String()).
-		Funcs(funcMap).
-		Option("missingkey=error").
-		Parse(string(tpl))
-	if err != nil {
-		return nil, err
-	}
-
 	scale := provider.CellSize()
-
-	return &Sheet{
+	sheet := &Sheet{
 		Name:                name,
 		Provider:            provider,
 		DPI:                 dpi,
 		Scale:               uint(scale),
 		Style:               style,
 		SvgTemplateFilename: svgTemplateFilename.String(),
-		svgTemplate:         t,
 		Filestore:           fs,
 		Desc:                desc,
 		Height:              DefaultHeightMM,
 		Width:               DefaultWidthMM,
-	}, nil
+	}
+
+	t, err = template.New(svgTemplateFilename.String()).
+		Funcs(sheet.AddTemplateFuncs(funcMap)).
+		Option("missingkey=error").
+		Parse(string(tpl))
+	if err != nil {
+		return nil, err
+	}
+	sheet.svgTemplate = t
+
+	return sheet, nil
 }
 
 // Execute the sheets template
