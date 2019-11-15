@@ -1,3 +1,14 @@
+# Environmental variables
+
+To turn on experimental cache support set the `ATLANTE_USED_CACHED_IMAGES` to a true value.
+
+```
+ATLANTE_USED_CACHED_IMAGES=1
+```
+
+Generated and remote assets will only be retrieved/generated if they don't already exist in the work directory.
+
+
 # Supported Template functions
 
 * to_upper : upper case the given string

@@ -36,9 +36,8 @@ func Remote(location string, fswriter filestore.FileWriter, useCached bool) (str
 	if err != nil {
 		return "", err
 	}
-	hostname := strings.ToLower(loc.Hostname())
-	normalizeURL := fmt.Sprintf("%v://%v/%v?%v#%v", loc.Scheme, hostname, loc.RawPath, loc.RawQuery, loc.Fragment)
-	shaBytes := sha1.Sum([]byte(normalizeURL))
+	loc.Host = strings.ToLower(loc.Hostname())
+	shaBytes := sha1.Sum([]byte(loc.String()))
 	shaFilename := fmt.Sprintf("%x", shaBytes)
 	svgBytes, err := urlutil.ReadAll(loc)
 	if err != nil {
