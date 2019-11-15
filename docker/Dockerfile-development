@@ -14,8 +14,8 @@ RUN yum -y install  https://centos7.iuscommunity.org/ius-release.rpm
 RUN yum -y install  git2u-all
 
 
-# Install go 1.11
-RUN curl -SL https://dl.google.com/go/go1.12.4.linux-amd64.tar.gz | tar -xzC /usr/local && mkdir -p /go/bin
+# Install go 1.13
+RUN curl -SL https://dl.google.com/go/go1.13.4.linux-amd64.tar.gz | tar -xzC /usr/local && mkdir -p /go/bin
 
 ENV GOROOT=/usr/local/go
 ENV GOPATH=/go
