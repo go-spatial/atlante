@@ -85,7 +85,7 @@ func init() {
 // that overall write operation stops and returns the error; it does not continue
 // down the list.
 //
-// This is heavily influnced by io.MultiWriter
+// This is heavily influenced by io.MultiWriter
 type Writer struct {
 	writers []io.WriteCloser
 }
