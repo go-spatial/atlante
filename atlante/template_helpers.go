@@ -38,6 +38,43 @@ var funcMap = template.FuncMap{
 	"DrawBars":     TplDrawBars,
 	"asIntSlice":   IntSlice,
 	"pixel_bounds": PixelBounds,
+	"join":         tplStringJoin,
+	"idx":          tplIndexOf,
+}
+
+func tplStringJoin(sep string, ps ...interface{}) string {
+	var parts = make([]string, len(ps))
+	for i, pstr := range ps {
+		parts[i] = fmt.Sprintf("%v", pstr)
+	}
+
+	return strings.Join(parts, sep)
+}
+
+func tplIndexOf(idx int, parts interface{}) (interface{}, error) {
+
+	v := reflect.ValueOf(parts)
+
+	if v.Kind() != reflect.Slice && v.Kind() != reflect.Array && v.Kind() != reflect.String {
+		return nil, fmt.Errorf("not slice/array/string type: %v", v.Kind())
+	}
+
+	vlen := v.Len()
+	if vlen == 0 {
+		return nil, nil
+	}
+
+	var i int
+	if idx < 0 {
+		i = vlen + idx
+	} else {
+		i = idx
+	}
+	fmt.Println("returning before idx", i)
+	i = i % vlen
+	fmt.Println("returning idx", i)
+
+	return v.Index(i).Interface(), nil
 }
 
 // AddTemplateFunc will add the filestore based commands. It will panic if the command is already defined.
