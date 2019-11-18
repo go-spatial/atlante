@@ -79,14 +79,7 @@ func tplIndexOf(idx int, parts interface{}) (interface{}, error) {
 
 // AddTemplateFunc will add the filestore based commands. It will panic if the command is already defined.
 func (sheet *Sheet) AddTemplateFuncs(funcMap template.FuncMap) template.FuncMap {
-	add := func(name string, fn interface{}) {
-		if _, ok := funcMap[name]; ok {
-			panic(fmt.Sprintf("func %v already defined", name))
-		}
-		funcMap[name] = fn
-	}
-	add("remote", sheet.templateFuncRemote)
-
+	funcMap["remote"] = sheet.templateFuncRemote
 	return funcMap
 }
 
