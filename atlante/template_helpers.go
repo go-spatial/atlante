@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"math"
 	"reflect"
 	"strconv"
@@ -521,9 +522,51 @@ func (pbx PixelBox) TransformPoint(pt geom.Point) geom.Point {
 	}
 }
 
-func TplDrawBars(topLeft, bottomRight coord.LngLat, pxlBox PixelBox, grid trellis.Grid, lblRows, lblCols []int, lblMeterOffset int, drawLines bool) (string, error) {
+func (pbx PixelBox) TransformPoints(pts ...geom.Point) []geom.Point {
+	rpts := make([]geom.Point, len(pts))
+	for i := range pts {
+		rpts[i][0] = pbx.Starting[0] + (pts[i][0] / pbx.GroundPixel)
+		rpts[i][1] = pbx.Starting[1] + (pts[i][1] / pbx.GroundPixel)
+	}
+	return rpts
+}
 
-	structure, err := trellis.NewLngLat(topLeft, bottomRight, trellis.WGS84Ellip, grid)
+func harvesinDistance(pt1, pt2 coord.LngLat, earth coord.Ellipsoid) float64 {
+
+	// Got from : https://www.movable-type.co.uk/scripts/latlong.html
+	R := earth.Radius
+	phi1 := pt1.LatInRadians()
+	phi2 := pt2.LatInRadians()
+
+	deltaCoord := coord.LngLat{
+		Lat: pt2.Lat - pt1.Lat,
+		Lng: pt2.Lng - pt1.Lng,
+	}
+
+	deltaPhi := deltaCoord.LatInRadians()
+	deltaLambda := deltaCoord.LngInRadians()
+
+	a := (math.Sin(deltaPhi/2) * math.Sin(deltaPhi/2)) +
+		(math.Cos(phi1)*math.Cos(phi2))*
+			(math.Sin(deltaLambda/2)*math.Sin(deltaLambda/2))
+
+	c := 2 * math.Atan2(math.Sqrt(a), math.Sqrt(1-a))
+	d := R * c
+	return d
+
+}
+
+func TplDrawBars(bottomLeft, topRight coord.LngLat, pxlBox PixelBox, grid trellis.Grid, lblRows, lblCols []int, lblMeterOffset int, drawLines bool) (string, error) {
+
+	topLeft := coord.LngLat{
+		Lng: bottomLeft.Lng,
+		Lat: topRight.Lat,
+	}
+	bottomRight := coord.LngLat{
+		Lng: topRight.Lng,
+		Lat: bottomLeft.Lat,
+	}
+	structure, err := trellis.NewLngLat(bottomLeft, topRight, trellis.WGS84Ellip, grid)
 	if err != nil {
 		return "", err
 	}
@@ -538,12 +581,25 @@ func TplDrawBars(topLeft, bottomRight coord.LngLat, pxlBox PixelBox, grid trelli
 	{
 
 		// Calculate the number of steps
-		numberOfStepsEasting := int(math.Abs(math.Ceil(structure.BottomRightUTM.Easting-structure.BottomLeftUTM.Easting) / float64(grid.Size())))
-		numberOfStepsNorthing := int(math.Abs(math.Ceil(structure.TopLeftUTM.Northing-structure.BottomLeftUTM.Northing)/float64(grid.Size()))) + 1
+		brEblE := structure.BottomRightUTM.Easting - structure.BottomLeftUTM.Easting
+		blEbrE := structure.BottomLeftUTM.Easting - structure.BottomRightUTM.Easting
+		log.Printf("BottomRight %g BottomLeft %g easting: %g : %g", structure.BottomRightUTM.Easting, structure.BottomLeftUTM.Easting, brEblE, blEbrE)
+		numberOfStepsEasting := int(math.Abs(math.Ceil(brEblE) / float64(grid.Size())))
+		log.Printf("before Number of Easting steps (cols): %v", numberOfStepsEasting)
+		numberOfStepsNorthing := int(math.Abs(math.Ceil(
+			harvesinDistance(bottomLeft, topLeft, trellis.WGS84Ellip) / float64(grid.Size()),
+		)))
+		log.Printf("Number of Northing steps (rows): %v", numberOfStepsNorthing)
+		numberOfStepsNorthing = int(math.Abs(math.Ceil(structure.TopLeftUTM.Northing-structure.BottomLeftUTM.Northing)/float64(grid.Size()))) + 1
+		numberOfStepsEasting = int(math.Abs(math.Ceil(
+			harvesinDistance(bottomLeft, bottomRight, trellis.WGS84Ellip) / float64(grid.Size()),
+		)))
+
 		part := LabelPart{
 			Grid: grid,
 			Unit: "m",
 		}
+		log.Printf("Number of Easting steps (cols): %v", numberOfStepsEasting)
 		for col := 0; col < numberOfStepsEasting; col++ {
 			if drawLines {
 				pt1 := structure.At(col, -1)
@@ -613,6 +669,7 @@ func TplDrawBars(topLeft, bottomRight coord.LngLat, pxlBox PixelBox, grid trelli
 			part.DrawAt(&output, pt[0], pt[1], show)
 		}
 
+		log.Printf("Number of Northing steps (rows): %v", numberOfStepsNorthing)
 		for row := 0; row < numberOfStepsNorthing; row++ {
 			if drawLines {
 				pt1 := structure.At(-1, row)

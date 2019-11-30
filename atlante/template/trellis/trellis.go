@@ -18,6 +18,10 @@ var WGS84Ellip = coord.Ellipsoid{
 	NATOCompatible: true,
 }
 
+func init() {
+	log.SetFlags(log.LstdFlags | log.Lshortfile)
+}
+
 type Offset struct {
 	A11Offset int // original non skewed offset
 	A12Offset int // original non skewed offset
@@ -45,6 +49,9 @@ type Vector struct {
 
 // Travel distance from at 0,0
 func (v Vector) Travel(dist float64) (x, y float64) {
+	if v.Theta == 0 {
+		return dist, dist
+	}
 	x = dist * math.Cos(v.Theta)
 	y = dist * math.Sin(v.Theta)
 	return x, y
@@ -62,6 +69,7 @@ func NewVector(line [2][2]float64) Vector {
 	adj := line[1][0] - line[0][0]
 	opp := line[1][1] - line[0][1]
 	hyp := math.Sqrt(adj*adj + opp*opp)
+	log.Printf("hyp(%v) == adj2(%v) * opp2(%v)", hyp, adj, opp)
 	theta := math.Acos(adj / hyp)
 	return Vector{
 		M:     m,
@@ -118,12 +126,19 @@ func (structure Structure) At(col, row int) [2]float64 {
 	size := int(structure.Grid.Size())
 
 	distY := float64(bottomOffset + (row * size))
-	y1 := distY * math.Sin(leftVector.Theta)
+	lx, ly := leftVector.Travel(distY)
+	if leftVector.Theta == 0 {
+		lx = 0
+	}
 
 	distX := float64(leftOffset + (col * size))
-	x, y := bottomVector.Travel(distX)
-	y -= y1
-	return [2]float64{x, y}
+	bx, by := bottomVector.Travel(distX)
+	if bottomVector.Theta == 0 {
+		by = 0
+	}
+	// subtracting as we are going up
+	// adding as we are going left to right
+	return [2]float64{bx - lx, by - ly}
 }
 
 func (structure Structure) NorthingBar(idx int) geom.Line {
@@ -188,26 +203,57 @@ func (structure Structure) EastingBar(idx int) geom.Line {
 	return geom.Line{{xstart, ystart}, {xend, yend}}
 }
 
-func NewLngLat(topLeft, bottomRight coord.LngLat, ellips coord.Ellipsoid, grid Grid) (Structure, error) {
+func harvesinDistance(pt1, pt2 coord.LngLat, earth coord.Ellipsoid) float64 {
+
+	// Got from : https://www.movable-type.co.uk/scripts/latlong.html
+	R := earth.Radius
+	phi1 := pt1.LatInRadians()
+	phi2 := pt2.LatInRadians()
+
+	deltaCoord := coord.LngLat{
+		Lat: pt2.Lat - pt1.Lat,
+		Lng: pt2.Lng - pt1.Lng,
+	}
+
+	deltaPhi := deltaCoord.LatInRadians()
+	deltaLambda := deltaCoord.LngInRadians()
+
+	a := (math.Sin(deltaPhi/2) * math.Sin(deltaPhi/2)) +
+		(math.Cos(phi1)*math.Cos(phi2))*
+			(math.Sin(deltaLambda/2)*math.Sin(deltaLambda/2))
+
+	c := 2 * math.Atan2(math.Sqrt(a), math.Sqrt(1-a))
+	d := R * c
+	return d
+
+}
+func NewLngLat(bottomLeft, topRight coord.LngLat, ellips coord.Ellipsoid, grid Grid) (Structure, error) {
+
+	topLeft := coord.LngLat{
+		Lng: bottomLeft.Lng,
+		Lat: topRight.Lat,
+	}
+	bottomRight := coord.LngLat{
+		Lng: topRight.Lng,
+		Lat: bottomLeft.Lat,
+	}
+	log.Printf("LatLng for bottomLeft:%v", bottomLeft)
+	log.Printf("LatLng for topLeft:%v", topLeft)
+	log.Printf("LatLng for bottomRight:%v", bottomRight)
+	log.Printf("LatLng for topRight:%v", topRight)
 
 	tlUTM, err := utm.FromLngLat(topLeft, ellips)
 	if err != nil {
 		return Structure{}, err
 	}
 	/*
-		trUTM, err := utm.FromLngLat(coord.LngLat{
-			Lng: bottomRight.Lng,
-			Lat: topLeft.Lat,
-		}, ellips)
+		trUTM, err := utm.FromLngLat(topRight, ellips)k
 		if err != nil {
 			return Structure{}, err
 		}
 	*/
 
-	blUTM, err := utm.FromLngLat(coord.LngLat{
-		Lng: topLeft.Lng,
-		Lat: bottomRight.Lat,
-	}, ellips)
+	blUTM, err := utm.FromLngLat(bottomLeft, ellips)
 	if err != nil {
 		return Structure{}, err
 	}
@@ -220,14 +266,40 @@ func NewLngLat(topLeft, bottomRight coord.LngLat, ellips coord.Ellipsoid, grid G
 		{blUTM.Easting, blUTM.Northing},
 		{tlUTM.Easting, tlUTM.Northing},
 	})
+	log.Printf("leftVector: b %v m %v theta: %v", leftVector.B, leftVector.M, leftVector.Theta)
+
+	adj := harvesinDistance(bottomLeft, topLeft, ellips)
+	log.Printf("tl - bl")
+	opp := tlUTM.Easting - blUTM.Easting
+
+	leftVector = NewVector([2][2]float64{
+		{0, 0},
+		{opp, adj},
+	})
+	log.Printf("leftVector: b %v m %v theta: %v", leftVector.B, leftVector.M, leftVector.Theta)
+
 	bottomVector := NewVector([2][2]float64{
 		{blUTM.Easting, blUTM.Northing},
 		{brUTM.Easting, brUTM.Northing},
 	})
+	log.Printf("BottomVector: b %v m %v theta: %v", bottomVector.B, bottomVector.M, bottomVector.Theta)
+
+	adj = harvesinDistance(bottomLeft, bottomRight, ellips)
+	opp = brUTM.Northing - blUTM.Northing
+
+	bottomVector = NewVector([2][2]float64{
+		{0, 0},
+		{adj, opp},
+	})
+	log.Printf("BottomVector: b %v m %v theta: %v", bottomVector.B, bottomVector.M, bottomVector.Theta)
+
+	log.Printf("BottomLTUTM: %v", blUTM)
+	log.Printf("BottomRTUTM: %v", brUTM)
 
 	_, _, bottomOffset := grid.PartsFor(int64(blUTM.Northing))
-	log.Printf("BottomLeft: %v --- offset: %v", blUTM.Northing, bottomOffset)
+	log.Printf("BottomLeft Northing: %g --- offset: %v", blUTM.Northing, bottomOffset)
 	_, _, leftOffset := grid.PartsFor(int64(blUTM.Easting))
+	log.Printf("BottomLeft Easting: %g --- offset: %v", blUTM.Easting, leftOffset)
 
 	size := int(grid.Size())
 
