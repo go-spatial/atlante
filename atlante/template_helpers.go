@@ -635,7 +635,7 @@ func TplDrawBars(bottomLeft, topRight coord.LngLat, pxlBox PixelBox, grid trelli
 			Unit: "m",
 		}
 		log.Printf("Number of Easting steps (cols): %v", numberOfStepsEasting)
-		for col := -1; col < numberOfStepsEasting+1; col++ {
+		for col := -1; col < numberOfStepsEasting+2; col++ {
 			colMeter := float64(structure.LeftOffset) + float64(col*size)
 			tx, ty := structure.BottomVector.Travel(colMeter)
 			pVector := structure.BottomVector.PerpendicularVector(tx, ty)
@@ -713,7 +713,7 @@ func TplDrawBars(bottomLeft, topRight coord.LngLat, pxlBox PixelBox, grid trelli
 		}
 
 		log.Printf("Number of Northing steps (rows): %v", numberOfStepsNorthing)
-		for row := 0; row < numberOfStepsNorthing; row++ {
+		for row := -1; row < numberOfStepsNorthing+2; row++ {
 			rowMeter := float64(row * size)
 			tx, ty := structure.LeftVector.Travel(rowMeter)
 			ty -= float64(structure.BottomOffset)
@@ -751,6 +751,35 @@ func TplDrawBars(bottomLeft, topRight coord.LngLat, pxlBox PixelBox, grid trelli
 					x:    pxlBox.Starting[0] - pxlBox.LeftBuffer,
 					y:    pt[1],
 				})
+				for _, col := range lblCols {
+					startColMeter := float64((col-1)*size) + float64(structure.LeftOffset)
+					endColMeter := float64(col*size) + float64(structure.LeftOffset)
+
+					btx, bty := structure.BottomVector.Travel(startColMeter)
+					leftVector := structure.BottomVector.PerpendicularVector(btx, bty)
+
+					startY := pVector.YFor(btx)
+					startX := leftVector.XFor(startY)
+
+					btx, bty = structure.BottomVector.Travel(endColMeter)
+					leftVector = structure.BottomVector.PerpendicularVector(btx, bty)
+
+					endY := pVector.YFor(btx)
+					endX := leftVector.XFor(startY)
+
+					pt = pxlBox.TransformPoint(geom.Point{
+						startX + ((endX - startX) / 2),
+						startY + ((endY - startY) / 2),
+					})
+
+					internalLbL = append(internalLbL, lblEntry{
+						lbl:  part,
+						show: ShowPartLabel,
+						x:    pt[0],
+						y:    pt[1],
+					})
+
+				}
 			}
 
 			/*
