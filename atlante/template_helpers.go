@@ -556,7 +556,19 @@ func harvesinDistance(pt1, pt2 coord.LngLat, earth coord.Ellipsoid) float64 {
 
 }
 
+type lblEntry struct {
+	lbl  LabelPart
+	show ShowParts
+	x, y float64
+}
+
+func (lbl lblEntry) DrawTo(w io.Writer) {
+	lbl.lbl.DrawAt(w, lbl.x, lbl.y, lbl.show)
+}
+
 func TplDrawBars(bottomLeft, topRight coord.LngLat, pxlBox PixelBox, grid trellis.Grid, lblRows, lblCols []int, lblMeterOffset int, drawLines bool) (string, error) {
+
+	const debug = true
 
 	topLeft := coord.LngLat{
 		Lng: bottomLeft.Lng,
@@ -571,10 +583,41 @@ func TplDrawBars(bottomLeft, topRight coord.LngLat, pxlBox PixelBox, grid trelli
 		return "", err
 	}
 
-	// Lines to be drawn
-	var lines []geom.Line
+	var (
+		// Lines to be drawn
+		lines       []geom.Line
+		internalLbL []lblEntry
+		externalLbl []lblEntry
 
-	var output strings.Builder
+		output               strings.Builder
+		size                 = int(grid.Size())
+		numberOfStepsEasting = int(
+			math.Abs(
+				math.Ceil(
+					harvesinDistance(bottomLeft, bottomRight, trellis.WGS84Ellip) / float64(size),
+				),
+			),
+		)
+		numberOfStepsNorthing = int(
+			math.Abs(
+				math.Ceil(
+					harvesinDistance(bottomLeft, topLeft, trellis.WGS84Ellip) / float64(size),
+				),
+			),
+		)
+
+		xValueInMeters = math.Abs(
+			math.Ceil(
+				harvesinDistance(bottomLeft, bottomRight, trellis.WGS84Ellip) + float64(size),
+			),
+		)
+		yValueInMeters = math.Abs(
+			math.Ceil(
+				harvesinDistance(bottomLeft, topLeft, trellis.WGS84Ellip)+float64(size),
+			),
+		) * -1
+	)
+
 	output.WriteString(`<g id="bars">`)
 
 	// draw the the northing lines (horizontal lines) -- the labels for these will be on the lblCol
@@ -584,32 +627,40 @@ func TplDrawBars(bottomLeft, topRight coord.LngLat, pxlBox PixelBox, grid trelli
 		brEblE := structure.BottomRightUTM.Easting - structure.BottomLeftUTM.Easting
 		blEbrE := structure.BottomLeftUTM.Easting - structure.BottomRightUTM.Easting
 		log.Printf("BottomRight %g BottomLeft %g easting: %g : %g", structure.BottomRightUTM.Easting, structure.BottomLeftUTM.Easting, brEblE, blEbrE)
-		numberOfStepsEasting := int(math.Abs(math.Ceil(brEblE) / float64(grid.Size())))
 		log.Printf("before Number of Easting steps (cols): %v", numberOfStepsEasting)
-		numberOfStepsNorthing := int(math.Abs(math.Ceil(
-			harvesinDistance(bottomLeft, topLeft, trellis.WGS84Ellip) / float64(grid.Size()),
-		)))
 		log.Printf("Number of Northing steps (rows): %v", numberOfStepsNorthing)
-		numberOfStepsNorthing = int(math.Abs(math.Ceil(structure.TopLeftUTM.Northing-structure.BottomLeftUTM.Northing)/float64(grid.Size()))) + 1
-		numberOfStepsEasting = int(math.Abs(math.Ceil(
-			harvesinDistance(bottomLeft, bottomRight, trellis.WGS84Ellip) / float64(grid.Size()),
-		)))
 
 		part := LabelPart{
 			Grid: grid,
 			Unit: "m",
 		}
 		log.Printf("Number of Easting steps (cols): %v", numberOfStepsEasting)
-		for col := 0; col < numberOfStepsEasting; col++ {
+		for col := -1; col < numberOfStepsEasting+1; col++ {
+			colMeter := float64(structure.LeftOffset) + float64(col*size)
+			tx, ty := structure.BottomVector.Travel(colMeter)
+			pVector := structure.BottomVector.PerpendicularVector(tx, ty)
+
 			if drawLines {
-				pt1 := structure.At(col, -1)
-				pt2 := structure.At(col, numberOfStepsNorthing)
-				ln := pxlBox.TransformLine(geom.Line{[2]float64(pt1), [2]float64(pt2)})
-				ln[0][1] = pxlBox.Starting[1]
-				ln[1][1] = pxlBox.Ending[1]
+				pt1y := ty + float64(size)
+				pt1x := pVector.XFor(pt1y)
+				pt2x := pVector.XFor(yValueInMeters)
+				ln := pxlBox.TransformLine(
+					geom.Line{
+						[2]float64{pt1x, pt1y},
+						[2]float64{pt2x, yValueInMeters},
+					},
+				)
 				lines = append(lines, ln)
-				//	lines = append(lines, pxlBox.TransformLine(structure.EastingBar(col)))
+				/*
+					pt1 := structure.At(col, -1)
+					pt2 := structure.At(col, numberOfStepsNorthing)
+					ln := pxlBox.TransformLine(geom.Line{[2]float64(pt1), [2]float64(pt2)})
+					//ln[0][1] = pxlBox.Starting[1]
+					//ln[1][1] = pxlBox.Ending[1]
+					lines = append(lines, ln)
+				*/
 			}
+
 			if len(lblCols) <= 0 {
 				continue
 			}
@@ -620,13 +671,23 @@ func TplDrawBars(bottomLeft, topRight coord.LngLat, pxlBox PixelBox, grid trelli
 			}
 
 			for _, row := range lblRows {
-				startPt := structure.At(col, row)
-				endPt := structure.At(col, row+1)
+				startRowMeter := float64(row * size)
+				endRowMeter := float64((row + 1) * size)
+				startX, startY := pVector.Travel(startRowMeter)
+				startY -= float64(structure.BottomOffset)
+				endX, endY := pVector.Travel(endRowMeter)
+				endY -= float64(structure.BottomOffset)
+
 				pt := pxlBox.TransformPoint(geom.Point{
-					startPt[0] + ((endPt[0] - startPt[0]) / 2),
-					startPt[1] + ((endPt[1] - startPt[1]) / 2),
+					startX + ((endX - startX) / 2),
+					startY + ((endY - startY) / 2),
 				})
-				part.DrawAt(&output, pt[0], pt[1], ShowPartLabel)
+				internalLbL = append(internalLbL, lblEntry{
+					lbl:  part,
+					show: ShowPartLabel,
+					x:    pt[0],
+					y:    pt[1],
+				})
 
 			}
 
@@ -642,300 +703,139 @@ func TplDrawBars(bottomLeft, topRight coord.LngLat, pxlBox PixelBox, grid trelli
 							startPt[0] + ((endPt[0] - startPt[0]) / 2),
 							startPt[1] + ((endPt[1] - startPt[1]) / 2),
 						})
-						part.DrawAt(&output, pt[0], pt[1], ShowPartLabel)
 					}
 				}
 			*/
 
 			// outter labels
-			show := ShowPartLabel
-			if part.IsLabelMod10() {
-				show |= ShowPartPrefix
-			}
-			if col == 0 {
-				show = ShowPartAll
-			}
-			pt := pxlBox.TransformPoint(structure.At(col, -1))
-			pt[1] = pxlBox.Starting[1] + pxlBox.BottomBuffer
-			part.DrawAt(&output, pt[0], pt[1], show)
+			/*
+				show := ShowPartLabel
+				if part.IsLabelMod10() {
+					show |= ShowPartPrefix
+				}
+				if col == 0 {
+					show = ShowPartAll
+				}
+				pt := pxlBox.TransformPoint(structure.At(col, -1))
+				pt[1] = pxlBox.Starting[1] + pxlBox.BottomBuffer
+				externalLbl = append(externalLbl, lblEntry{
+					lbl:  part,
+					show: show,
+					x:    pt[0],
+					y:    pt[1],
+				})
 
-			show = ShowPartLabel
-			if part.IsLabelMod10() {
-				show |= ShowPartPrefix
-			}
+				show = ShowPartLabel
+				if part.IsLabelMod10() {
+					show |= ShowPartPrefix
+				}
 
-			pt = pxlBox.TransformPoint(structure.At(col, numberOfStepsNorthing))
-			pt[1] = pxlBox.Ending[1] - pxlBox.TopBuffer
-			part.DrawAt(&output, pt[0], pt[1], show)
+				pt = pxlBox.TransformPoint(structure.At(col, numberOfStepsNorthing))
+				pt[1] = pxlBox.Ending[1] - pxlBox.TopBuffer
+			*/
 		}
 
 		log.Printf("Number of Northing steps (rows): %v", numberOfStepsNorthing)
 		for row := 0; row < numberOfStepsNorthing; row++ {
 			if drawLines {
-				pt1 := structure.At(-1, row)
-				pt2 := structure.At(numberOfStepsEasting, row)
-				ln := pxlBox.TransformLine(geom.Line{[2]float64(pt1), [2]float64(pt2)})
-				ln[0][0] = pxlBox.Starting[0]
-				ln[1][0] = pxlBox.Ending[0]
+				rowMeter := float64(row * size)
+				tx, ty := structure.LeftVector.Travel(rowMeter)
+				ty -= float64(structure.BottomOffset)
+				bottomVector := structure.LeftVector.PerpendicularVector(tx, ty)
+				pt1x := tx - float64(size)
+				pt1y, pt2y := bottomVector.YFor(pt1x), bottomVector.YFor(xValueInMeters)
+				ln := pxlBox.TransformLine(
+					geom.Line{
+						[2]float64{pt1x, pt1y},
+						[2]float64{xValueInMeters, pt2y},
+					},
+				)
 				lines = append(lines, ln)
+				/*
+					trellis.Debug = row == 0
+					pt1 := structure.At(-1, row)
+					pt2 := structure.At(numberOfStepsEasting+1, row)
+					ln := pxlBox.TransformLine(geom.Line{[2]float64(pt1), [2]float64(pt2)})
+					ln[0][0] = pxlBox.Starting[0]
+					ln[1][0] = pxlBox.Ending[0]
+					lines = append(lines, ln)
+					trellis.Debug = false
 
-				//lines = append(lines, pxlBox.TransformLine(structure.NorthingBar(row)))
+					//lines = append(lines, pxlBox.TransformLine(structure.NorthingBar(row)))
+				*/
 			}
-			if len(lblRows) <= 0 {
-				continue
-			}
-
-			part.Coord = int64(structure.BottomLeftUTM.Northing) + int64(structure.BottomOffset) + (int64(row) * grid.Size())
-			part.Hemi = "N."
-			if part.Coord < 0 {
-				part.Hemi = "S."
-			}
-
-			for _, col := range lblCols {
-				startPt := structure.At(col, row)
-				endPt := structure.At(col+1, row)
-				pt := pxlBox.TransformPoint(geom.Point{
-					startPt[0] + ((endPt[0] - startPt[0]) / 2),
-					startPt[1] + ((endPt[1] - startPt[1]) / 2),
-				})
-				part.DrawAt(&output, pt[0], pt[1], ShowPartLabel)
-			}
-
 			/*
-				for _, lblRow := range lblRows {
-					if lblRow != row {
-						continue
-					}
-					for col := 0; col < numberOfStepsEasting; col++ {
-						startPt := structure.At(col, row)
-						endPt := structure.At(col+1, row)
-						pt := pxlBox.TransformPoint(geom.Point{
-							startPt[0] + ((endPt[0] - startPt[0]) / 2),
-							startPt[1] + ((endPt[1] - startPt[1]) / 2),
-						})
-						part.DrawAt(&output, pt[0], pt[1], ShowPartLabel)
-					}
+				if len(lblRows) <= 0 {
+					continue
+				}
+
+				part.Coord = int64(structure.BottomLeftUTM.Northing) + int64(structure.BottomOffset) + (int64(row) * grid.Size())
+				part.Hemi = "N."
+				if part.Coord < 0 {
+					part.Hemi = "S."
+				}
+
+				for _, col := range lblCols {
+					startPt := structure.At(col, row)
+					endPt := structure.At(col+1, row)
+					pt := pxlBox.TransformPoint(geom.Point{
+						startPt[0] + ((endPt[0] - startPt[0]) / 2),
+						startPt[1] + ((endPt[1] - startPt[1]) / 2),
+					})
+					internalLbL = append(internalLbL, lblEntry{
+						lbl:  part,
+						show: ShowPartLabel,
+						x:    pt[0],
+						y:    pt[1],
+					})
 				}
 			*/
 
 			// outter labels
-			show := ShowPartLabel
-			if part.IsLabelMod10() {
-				show |= ShowPartPrefix
-			}
-			if row == 0 {
-				show = ShowPartAll
-			}
-			pt := pxlBox.TransformPoint(structure.At(-1, row))
-			pt[0] = pxlBox.Starting[0] - pxlBox.LeftBuffer
-			part.DrawAt(&output, pt[0], pt[1], show)
-			show = ShowPartLabel
-			if part.IsLabelMod10() {
-				show |= ShowPartPrefix
-			}
-			pt = pxlBox.TransformPoint(structure.At(numberOfStepsEasting, row))
-			pt[0] = pxlBox.Ending[0] + pxlBox.RightBuffer
-			part.DrawAt(&output, pt[0], pt[1], show)
+			/*
+				show := ShowPartLabel
+				if part.IsLabelMod10() {
+					show |= ShowPartPrefix
+				}
+				if row == 0 {
+					show = ShowPartAll
+				}
+				pt := pxlBox.TransformPoint(structure.At(-1, row))
+				pt[0] = pxlBox.Starting[0] - pxlBox.LeftBuffer
+				externalLbl = append(externalLbl, lblEntry{
+					lbl:  part,
+					show: show,
+					x:    pt[0],
+					y:    pt[1],
+				})
+				show = ShowPartLabel
+				if part.IsLabelMod10() {
+					show |= ShowPartPrefix
+				}
+				pt = pxlBox.TransformPoint(structure.At(numberOfStepsEasting, row))
+				pt[0] = pxlBox.Ending[0] + pxlBox.RightBuffer
+			*/
 
 		}
 
-		/*
-			for idx := 0; idx < 30; idx++ {
-				if idx >= 30 {
-					break
-				}
-
-				pt := structure.At(idx, idx)
-				pt[0] = pxlBox.Starting[0] + (pt[0] / pxlBox.GroundPixel)
-				pt[1] = pxlBox.Starting[1] + (pt[1] / pxlBox.GroundPixel)
-
-				fmt.Fprintf(&output, "<circle cx=\"%v\" cy=\"%v\" r=\"1\" stroke=\"black\" /> \n", pt[0], pt[1])
-				fmt.Fprintf(&output, "<text x=\"%v\" y=\"%v\" stroke=\"green\"> %v </text>\n", pt[0], pt[1], idx)
-
-			}
-		*/
 	}
 
-	/*
-		bo := float64(structure.BottomOffset) / pxlBox.GroundPixel
-		lo := float64(structure.LeftOffset) / pxlBox.GroundPixel
-		fmt.Fprintf(
-			&output,
-			`<line x1="%g" y1="%g" x2="%g" y2="%g" stroke="blue" stroke-width="1"  />`,
-			pxlBox.Starting[0],
-			pxlBox.Starting[1],
-			pxlBox.Starting[0],
-			pxlBox.Starting[1]-bo,
-		)
-		fmt.Fprintf(
-			&output,
-			`<line x1="%g" y1="%g" x2="%g" y2="%g" stroke="blue" stroke-width="1"  />`,
-			pxlBox.Starting[0],
-			pxlBox.Starting[1],
-			pxlBox.Starting[0]+lo,
-			pxlBox.Starting[1],
-		)
-
-		fmt.Fprintf(
-			&output,
-			"<text x=\"%v\" y=\"%v\" stroke=\"green\" font-size=\"8px\">%v</text>\n",
-			pxlBox.Starting[0],
-			pxlBox.Starting[1]-bo,
-			structure.BottomLeftUTM.Northing+float64(structure.BottomOffset),
-		)
-
-		fmt.Fprintf(&output, "<circle cx=\"%v\" cy=\"%v\" r=\"1\" stroke=\"black\" /> \n", pxlBox.Starting[0], pxlBox.Starting[1])
-		fmt.Fprintf(
-			&output,
-			"<text x=\"%v\" y=\"%v\" stroke=\"green\" font-size=\"8px\">%v,%v</text>\n",
-			pxlBox.Starting[0],
-			pxlBox.Starting[1],
-			structure.BottomLeftUTM.Easting,
-			structure.BottomLeftUTM.Northing,
-		)
-	*/
-
 	const lineFormat = `<line x1="%g" y1="%g" x2="%g" y2="%g" stroke="black" stroke-width="1"  />`
+	output.WriteString(`<g id="internal_lines" clip-path="url(#imageClip)">`)
 	fmt.Fprintf(&output, "<!--  number of lines: %v -->", len(lines))
 	for _, line := range lines {
 		fmt.Fprintf(&output, lineFormat, line[0][0], line[0][1], line[1][0], line[1][1])
 	}
+	for _, part := range internalLbL {
+		part.DrawTo(&output)
+	}
+
+	output.WriteString("</g>\n")
+	output.WriteString("<g >")
+	for _, part := range externalLbl {
+		part.DrawTo(&output)
+	}
+	output.WriteString("</g>\n")
 	output.WriteString("</g>\n")
 	return output.String(), nil
 }
-
-/*
-
-	// Draw the horizontal lines
-	output.WriteString(`<g id="horizontal_bars">`)
-	err = strt.NorthingBars(func(i int, bar trellis.Bar) error {
-
-		hemi := "N."
-		if bar.Start.Northing < 0 {
-			hemi = "S."
-		}
-
-		part := LabelPart{
-			Grid:  grid,
-			Coord: int64(bar.Start.Northing),
-			Hemi:  hemi,
-			Unit:  "m",
-		}
-
-		x1 := startingX
-		x2 := startingX + (bar.Length / groundPixel)
-		y1 := startingY - (bar.Y1 / groundPixel)
-		y2 := startingY - (bar.Y2 / groundPixel)
-
-		show := ShowPartLabel
-		if part.IsLabelMod10() {
-			show |= ShowPartPrefix
-		}
-
-		if i == 0 {
-			show = ShowPartAll
-		}
-
-		part.DrawAt(&output, x1-40, y1, show)
-
-		if drawLines {
-			fmt.Fprintf(&output, lineFormat, x1, y1, x2, y2)
-		}
-
-		show = ShowPartLabel
-		if part.IsLabelMod10() {
-			show |= ShowPartPrefix
-		}
-
-		part.DrawAt(&output, x2+40, y2, show)
-
-		lblCols = sort.IntSlice(lblCols)
-		colsidx := 0
-
-		strt.EastingBars(func(j int, bar1 trellis.Bar) error {
-			if colsidx >= len(lblCols) {
-				return nil
-			}
-			if lblCols[colsidx] != j {
-				return nil
-			}
-			colsidx++
-
-			x := startingX + ((bar1.X1 + float64(lblMeterOffset)) / groundPixel)
-			part.DrawAt(&output, x, y1, ShowPartLabel)
-
-			return nil
-
-		})
-
-		return nil
-
-	})
-	output.WriteString("</g>\n")
-
-	// Draw the vertical lines
-	output.WriteString(`<g id="vertical_bars">
-	`)
-	err = strt.EastingBars(func(i int, bar trellis.Bar) error {
-
-		x1 := startingX + (bar.X1 / groundPixel)
-		x2 := startingX + (bar.X2 / groundPixel)
-		y1 := startingY
-		y2 := startingY - (bar.Length / groundPixel)
-
-		if drawLines {
-			fmt.Fprintf(&output, lineFormat, x1, y1, x2, y2)
-		}
-
-		hemi := "E."
-		if bar.Start.Easting < 0 {
-			hemi = "W."
-		}
-
-		part := LabelPart{
-			Grid:  grid,
-			Coord: int64(bar.Start.Easting),
-			Hemi:  hemi,
-			Unit:  "m",
-		}
-
-		show := ShowPartLabel
-		if part.IsLabelMod10() {
-			show |= ShowPartPrefix
-		}
-
-		// Top
-		part.DrawAt(&output, x1, y2-25, show)
-
-		// Bottom
-		if i == 0 {
-			show = ShowPartAll
-		}
-		part.DrawAt(&output, x2, y1+25, show)
-
-		lblRows = sort.IntSlice(lblRows)
-		rowsidx := 0
-
-		strt.NorthingBars(func(j int, bar1 trellis.Bar) error {
-			if rowsidx >= len(lblRows) {
-				return nil
-			}
-			if lblRows[rowsidx] != j {
-				return nil
-			}
-			rowsidx++
-
-			y := startingY - ((bar1.Y1 + float64(lblMeterOffset)) / groundPixel)
-			part.DrawAt(&output, x1, y, ShowPartLabel)
-
-			return nil
-
-		})
-
-		return nil
-
-	})
-	output.WriteString("</g>\n")
-	output.WriteString("</g>\n")
-
-*/

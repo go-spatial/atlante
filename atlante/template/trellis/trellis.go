@@ -42,19 +42,118 @@ type Offset struct {
 }
 
 type Vector struct {
-	Theta float64
-	M     float64 // Slope
-	B     float64 // Y-Intercept
+	Theta    float64
+	M        float64 // Slope
+	InvM     float64
+	B        float64 // Y-Intercept
+	MDefined bool
+	X, Y     float64 // origin
 }
 
 // Travel distance from at 0,0
 func (v Vector) Travel(dist float64) (x, y float64) {
-	if v.Theta == 0 {
-		return dist, dist
+	if dist == 0 {
+		return v.X, v.Y
+	}
+	if v.M == 0 {
+		// horizontal or Vertical line
+		if !v.MDefined {
+			// Vertical line can only travel on the y
+			return v.X + 0, v.Y - dist
+		}
+		// Can only travel on the X
+		return v.X + dist, v.Y - 0
 	}
 	x = dist * math.Cos(v.Theta)
 	y = dist * math.Sin(v.Theta)
-	return x, y
+	return v.X + x, v.Y - y
+}
+func (v Vector) TravelM(dist float64) (x, y float64) {
+	if dist == 0 {
+		return v.X, v.Y
+	}
+
+	y1 := -v.Y
+
+	if v.M == 0 {
+		// horizontal or Vertical line
+		if !v.MDefined {
+			// Vertical line can only travel on the y
+			return v.X + 0, y1 - dist
+		}
+		// Can only travel on the X
+		return v.X + dist, y1 - 0
+	}
+
+	if dist > 0 {
+		x = v.X + +math.Sqrt((dist*dist)/(1+(v.M*v.M)))
+	} else {
+		x = v.X + +math.Sqrt((dist*dist)/(1+(v.M*v.M)))
+	}
+	y = (v.M * (x - v.X)) + y1
+
+	return x, -y
+}
+
+func (v Vector) YFor(x float64) float64 {
+	if !v.MDefined {
+		// v is vertical
+		return v.Y
+	}
+	return ((v.M * x) + v.B)
+}
+
+// If v is vertical this will return math.NaN
+func (v Vector) XFor(y float64) float64 {
+
+	if !v.MDefined {
+		// v is vertical
+		return math.NaN()
+	}
+	if v.M == 0 {
+		// v is horizontal
+		return v.X
+	}
+	return (y - v.B) / v.M
+}
+
+func (v Vector) PerpendicularVector(x, y float64) Vector {
+
+	if !v.MDefined {
+		// v is vertical
+		return Vector{
+			M:        0,
+			MDefined: true,
+			B:        0,
+			Theta:    -v.Theta,
+			X:        x,
+			Y:        y,
+		}
+	}
+
+	if v.M == 0 {
+		// v is horizontal
+		return Vector{
+			MDefined: false,
+			B:        0,
+			Theta:    -v.Theta,
+			X:        x,
+			Y:        y,
+		}
+	}
+
+	// need to figure out the new b based on x,y
+	b := y - (v.InvM * x)
+
+	return Vector{
+		M:        v.InvM,
+		InvM:     v.M,
+		MDefined: v.MDefined,
+		B:        b,
+		Theta:    -v.Theta,
+		X:        x,
+		Y:        y,
+	}
 }
 
 func NewVector(line [2][2]float64) Vector {
@@ -62,19 +161,25 @@ func NewVector(line [2][2]float64) Vector {
 	// vertical || horizontal
 	if !defined || m == 0 {
 		return Vector{
-			M: m,
-			B: b,
+			M:        m,
+			B:        b,
+			MDefined: defined,
 		}
 	}
+	invm := -1 * (1 / m)
 	adj := line[1][0] - line[0][0]
 	opp := line[1][1] - line[0][1]
 	hyp := math.Sqrt(adj*adj + opp*opp)
 	log.Printf("hyp(%v) == adj2(%v) * opp2(%v)", hyp, adj, opp)
 	theta := math.Acos(adj / hyp)
 	return Vector{
-		M:     m,
-		B:     b,
-		Theta: theta,
+		M:        m,
+		InvM:     invm,
+		B:        b,
+		Theta:    theta,
+		MDefined: defined,
+		X:        line[0][0],
+		Y:        line[0][1],
 	}
 
 }
@@ -118,27 +223,74 @@ type Structure struct {
 	BottomOffset int
 }
 
-func (structure Structure) At(col, row int) [2]float64 {
-	leftVector := structure.LeftVector
-	leftOffset := structure.LeftOffset
-	bottomVector := structure.BottomVector
-	bottomOffset := structure.BottomOffset
-	size := int(structure.Grid.Size())
+var Debug = false
 
-	distY := float64(bottomOffset + (row * size))
-	lx, ly := leftVector.Travel(distY)
+func (structure Structure) At1(col, row int) [2]float64 {
+	var (
+		bottomVector = structure.BottomVector
+		leftVector   = structure.LeftVector
+		//bottomOffset   = structure.BottomOffset
+		size           = int(structure.Grid.Size())
+		distX          = float64(structure.LeftOffset) + float64(col*size)
+		distY          = float64(structure.BottomOffset) + float64(row*size)
+		lx, ly, bx, by float64
+	)
+
+	log.Printf("BottomVector: b %g m %g theta: %g (%v)", bottomVector.B, bottomVector.M, bottomVector.Theta, bottomVector.Theta*(180/math.Pi))
+
+	lx, ly = leftVector.Travel(distY)
+	bx, by = bottomVector.Travel(distX)
+	//log.Printf("pVector: b %g m %g theta: %g (%v)", pVector.B, pVector.M, pVector.Theta, pVector.Theta*(180/math.Pi))
+	// horizontal or vertical lines
+	if Debug {
+		log.Printf("for (%v,%v): distY: %v distX: %v l(%v,%v) b(%v,%v)", col, row, distY, distX, lx, ly, bx, by)
+	}
+	return [2]float64{bx, -ly}
+}
+
+func (structure Structure) At(col, row int) [2]float64 {
+	var (
+		leftVector = structure.LeftVector
+		//leftOffset     = structure.LeftOffset
+		bottomVector   = structure.BottomVector
+		bottomOffset   = structure.BottomOffset
+		size           = int(structure.Grid.Size())
+		lx, ly, bx, by float64
+	)
+
+	distY := float64(row * size)
 	if leftVector.Theta == 0 {
 		lx = 0
+		ly = distY
+	} else {
+		lx, ly = leftVector.Travel(distY)
 	}
+	lx = float64(bottomOffset)
 
-	distX := float64(leftOffset + (col * size))
-	bx, by := bottomVector.Travel(distX)
+	/*
+		if leftVector.M > 0 {
+			lx *= -1
+		}
+	*/
+
+	distX := float64((col * size))
 	if bottomVector.Theta == 0 {
 		by = 0
+		bx = distX
+	} else {
+		bx, by = bottomVector.Travel(distX)
 	}
+	if bottomVector.M < 0 {
+		by *= -1
+	}
+
+	if Debug {
+		log.Printf("for (%v,%v): distY: %v distX: %v l(%v,%v) b(%v,%v)", col, row, distY, distX, lx, ly, bx, by)
+	}
+	pxly := by - ly
 	// subtracting as we are going up
 	// adding as we are going left to right
-	return [2]float64{bx - lx, by - ly}
+	return [2]float64{bx - lx, pxly}
 }
 
 func (structure Structure) NorthingBar(idx int) geom.Line {
@@ -246,12 +398,6 @@ func NewLngLat(bottomLeft, topRight coord.LngLat, ellips coord.Ellipsoid, grid G
 	if err != nil {
 		return Structure{}, err
 	}
-	/*
-		trUTM, err := utm.FromLngLat(topRight, ellips)k
-		if err != nil {
-			return Structure{}, err
-		}
-	*/
 
 	blUTM, err := utm.FromLngLat(bottomLeft, ellips)
 	if err != nil {
@@ -262,36 +408,26 @@ func NewLngLat(bottomLeft, topRight coord.LngLat, ellips coord.Ellipsoid, grid G
 		return Structure{}, err
 	}
 
-	leftVector := NewVector([2][2]float64{
-		{blUTM.Easting, blUTM.Northing},
-		{tlUTM.Easting, tlUTM.Northing},
-	})
-	log.Printf("leftVector: b %v m %v theta: %v", leftVector.B, leftVector.M, leftVector.Theta)
-
+	// Not using the harvesinDistance breaks england
 	adj := harvesinDistance(bottomLeft, topLeft, ellips)
 	log.Printf("tl - bl")
 	opp := tlUTM.Easting - blUTM.Easting
 
-	leftVector = NewVector([2][2]float64{
+	leftVector := NewVector([2][2]float64{
 		{0, 0},
 		{opp, adj},
 	})
 	log.Printf("leftVector: b %v m %v theta: %v", leftVector.B, leftVector.M, leftVector.Theta)
 
-	bottomVector := NewVector([2][2]float64{
-		{blUTM.Easting, blUTM.Northing},
-		{brUTM.Easting, brUTM.Northing},
-	})
-	log.Printf("BottomVector: b %v m %v theta: %v", bottomVector.B, bottomVector.M, bottomVector.Theta)
-
+	// Not using the harvesinDistance breaks england
 	adj = harvesinDistance(bottomLeft, bottomRight, ellips)
-	opp = brUTM.Northing - blUTM.Northing
+	opp = (brUTM.Northing - blUTM.Northing)
 
-	bottomVector = NewVector([2][2]float64{
+	bottomVector := NewVector([2][2]float64{
 		{0, 0},
 		{adj, opp},
 	})
-	log.Printf("BottomVector: b %v m %v theta: %v", bottomVector.B, bottomVector.M, bottomVector.Theta)
+	log.Printf("BottomVector: b %g m %g theta: %g (%v)", bottomVector.B, bottomVector.M, bottomVector.Theta, bottomVector.Theta*(180/math.Pi))
 
 	log.Printf("BottomLTUTM: %v", blUTM)
 	log.Printf("BottomRTUTM: %v", brUTM)
