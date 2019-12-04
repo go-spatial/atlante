@@ -653,15 +653,17 @@ func TplDrawBars(bottomLeft, topRight coord.LngLat, pxlBox PixelBox, grid trelli
 				lines = append(lines, ln)
 			}
 
-			if len(lblCols) <= 0 {
-				continue
-			}
 			part.Coord = int64(structure.BottomLeftUTM.Easting) + int64(structure.LeftOffset) + (int64(col) * grid.Size())
 			part.Hemi = "E."
 			if part.Coord < 0 {
 				part.Hemi = "W."
 			}
 
+			/*
+				if len(lblCols) <= 0 {
+					continue
+				}
+			*/
 			pt := pxlBox.TransformPoint(geom.Point{tx, ty})
 			if col >= 0 && col < numberOfStepsEasting {
 				// outter label
@@ -680,11 +682,20 @@ func TplDrawBars(bottomLeft, topRight coord.LngLat, pxlBox PixelBox, grid trelli
 				})
 
 				for _, row := range lblRows {
-					startRowMeter := float64(row * size)
-					startY := ty - startRowMeter
-					endY := startY - float64(size)
-					startX := pVector.XFor(startY)
-					endX := pVector.XFor(endY)
+					startRowMeter := float64((row - 1) * size)
+					endRowMeter := float64(row * size)
+
+					ltx, lty := structure.LeftVector.Travel(startRowMeter)
+					lty -= float64(structure.BottomOffset)
+					bottomVector := structure.LeftVector.PerpendicularVector(ltx, lty)
+					startX := pVector.XFor(lty)
+					startY := bottomVector.YFor(startX)
+
+					ltx, lty = structure.LeftVector.Travel(endRowMeter)
+					lty -= float64(structure.BottomOffset)
+					bottomVector = structure.LeftVector.PerpendicularVector(ltx, lty)
+					endX := pVector.XFor(lty)
+					endY := bottomVector.YFor(endX)
 
 					pt = pxlBox.TransformPoint(geom.Point{
 						startX + ((endX - startX) / 2),
@@ -703,13 +714,14 @@ func TplDrawBars(bottomLeft, topRight coord.LngLat, pxlBox PixelBox, grid trelli
 
 		log.Printf("Number of Northing steps (rows): %v", numberOfStepsNorthing)
 		for row := 0; row < numberOfStepsNorthing; row++ {
+			rowMeter := float64(row * size)
+			tx, ty := structure.LeftVector.Travel(rowMeter)
+			ty -= float64(structure.BottomOffset)
+			pVector := structure.LeftVector.PerpendicularVector(tx, ty)
+
 			if drawLines {
-				rowMeter := float64(row * size)
-				tx, ty := structure.LeftVector.Travel(rowMeter)
-				ty -= float64(structure.BottomOffset)
-				bottomVector := structure.LeftVector.PerpendicularVector(tx, ty)
 				pt1x := tx - float64(size)
-				pt1y, pt2y := bottomVector.YFor(pt1x), bottomVector.YFor(xValueInMeters)
+				pt1y, pt2y := pVector.YFor(pt1x), pVector.YFor(xValueInMeters)
 				ln := pxlBox.TransformLine(
 					geom.Line{
 						[2]float64{pt1x, pt1y},
@@ -717,19 +729,42 @@ func TplDrawBars(bottomLeft, topRight coord.LngLat, pxlBox PixelBox, grid trelli
 					},
 				)
 				lines = append(lines, ln)
-				/*
-					trellis.Debug = row == 0
-					pt1 := structure.At(-1, row)
-					pt2 := structure.At(numberOfStepsEasting+1, row)
-					ln := pxlBox.TransformLine(geom.Line{[2]float64(pt1), [2]float64(pt2)})
-					ln[0][0] = pxlBox.Starting[0]
-					ln[1][0] = pxlBox.Ending[0]
-					lines = append(lines, ln)
-					trellis.Debug = false
-
-					//lines = append(lines, pxlBox.TransformLine(structure.NorthingBar(row)))
-				*/
 			}
+			part.Coord = int64(structure.BottomLeftUTM.Northing) + int64(structure.BottomOffset) + (int64(row) * grid.Size())
+			part.Hemi = "N."
+			if part.Coord < 0 {
+				part.Hemi = "S."
+			}
+			pt := pxlBox.TransformPoint(geom.Point{tx, ty})
+			if row >= 0 && row < numberOfStepsNorthing {
+				// outter label
+				show := ShowPartLabel
+				if part.IsLabelMod10() {
+					show |= ShowPartPrefix
+				}
+				if row == 0 {
+					show = ShowPartAll
+				}
+				externalLbl = append(externalLbl, lblEntry{
+					lbl:  part,
+					show: show,
+					x:    pxlBox.Starting[0] - pxlBox.LeftBuffer,
+					y:    pt[1],
+				})
+			}
+
+			/*
+				trellis.Debug = row == 0
+				pt1 := structure.At(-1, row)
+				pt2 := structure.At(numberOfStepsEasting+1, row)
+				ln := pxlBox.TransformLine(geom.Line{[2]float64(pt1), [2]float64(pt2)})
+				ln[0][0] = pxlBox.Starting[0]
+				ln[1][0] = pxlBox.Ending[0]
+				lines = append(lines, ln)
+				trellis.Debug = false
+
+				//lines = append(lines, pxlBox.TransformLine(structure.NorthingBar(row)))
+			*/
 			/*
 				if len(lblRows) <= 0 {
 					continue
