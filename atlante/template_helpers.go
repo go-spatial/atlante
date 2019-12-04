@@ -651,14 +651,6 @@ func TplDrawBars(bottomLeft, topRight coord.LngLat, pxlBox PixelBox, grid trelli
 					},
 				)
 				lines = append(lines, ln)
-				/*
-					pt1 := structure.At(col, -1)
-					pt2 := structure.At(col, numberOfStepsNorthing)
-					ln := pxlBox.TransformLine(geom.Line{[2]float64(pt1), [2]float64(pt2)})
-					//ln[0][1] = pxlBox.Starting[1]
-					//ln[1][1] = pxlBox.Ending[1]
-					lines = append(lines, ln)
-				*/
 			}
 
 			if len(lblCols) <= 0 {
@@ -670,45 +662,9 @@ func TplDrawBars(bottomLeft, topRight coord.LngLat, pxlBox PixelBox, grid trelli
 				part.Hemi = "W."
 			}
 
-			for _, row := range lblRows {
-				startRowMeter := float64(row * size)
-				endRowMeter := float64((row + 1) * size)
-				startX, startY := pVector.Travel(startRowMeter)
-				startY -= float64(structure.BottomOffset)
-				endX, endY := pVector.Travel(endRowMeter)
-				endY -= float64(structure.BottomOffset)
-
-				pt := pxlBox.TransformPoint(geom.Point{
-					startX + ((endX - startX) / 2),
-					startY + ((endY - startY) / 2),
-				})
-				internalLbL = append(internalLbL, lblEntry{
-					lbl:  part,
-					show: ShowPartLabel,
-					x:    pt[0],
-					y:    pt[1],
-				})
-
-			}
-
-			/*
-				for _, lblCol := range lblCols {
-					if lblCol != col {
-						continue
-					}
-					for row := 0; row < numberOfStepsNorthing; row++ {
-						startPt := structure.At(col, row)
-						endPt := structure.At(col, row+1)
-						pt := pxlBox.TransformPoint(geom.Point{
-							startPt[0] + ((endPt[0] - startPt[0]) / 2),
-							startPt[1] + ((endPt[1] - startPt[1]) / 2),
-						})
-					}
-				}
-			*/
-
-			// outter labels
-			/*
+			pt := pxlBox.TransformPoint(geom.Point{tx, ty})
+			if col >= 0 && col < numberOfStepsEasting {
+				// outter label
 				show := ShowPartLabel
 				if part.IsLabelMod10() {
 					show |= ShowPartPrefix
@@ -716,23 +672,33 @@ func TplDrawBars(bottomLeft, topRight coord.LngLat, pxlBox PixelBox, grid trelli
 				if col == 0 {
 					show = ShowPartAll
 				}
-				pt := pxlBox.TransformPoint(structure.At(col, -1))
-				pt[1] = pxlBox.Starting[1] + pxlBox.BottomBuffer
 				externalLbl = append(externalLbl, lblEntry{
 					lbl:  part,
 					show: show,
 					x:    pt[0],
-					y:    pt[1],
+					y:    pxlBox.Starting[1] + pxlBox.BottomBuffer,
 				})
 
-				show = ShowPartLabel
-				if part.IsLabelMod10() {
-					show |= ShowPartPrefix
+				for _, row := range lblRows {
+					startRowMeter := float64(row * size)
+					startY := ty - startRowMeter
+					endY := startY - float64(size)
+					startX := pVector.XFor(startY)
+					endX := pVector.XFor(endY)
+
+					pt = pxlBox.TransformPoint(geom.Point{
+						startX + ((endX - startX) / 2),
+						startY + ((endY - startY) / 2),
+					})
+					internalLbL = append(internalLbL, lblEntry{
+						lbl:  part,
+						show: ShowPartLabel,
+						x:    pt[0],
+						y:    pt[1],
+					})
 				}
 
-				pt = pxlBox.TransformPoint(structure.At(col, numberOfStepsNorthing))
-				pt[1] = pxlBox.Ending[1] - pxlBox.TopBuffer
-			*/
+			}
 		}
 
 		log.Printf("Number of Northing steps (rows): %v", numberOfStepsNorthing)
