@@ -6,10 +6,12 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
 
+	"github.com/go-spatial/geom"
 	"github.com/go-spatial/maptoolkit/atlante"
 	"github.com/go-spatial/maptoolkit/atlante/grids"
 	"github.com/go-spatial/maptoolkit/cmd/atlante/config"
@@ -52,6 +54,10 @@ var (
 	showJob    bool
 	workDir    string
 	timeout    uint8
+	srid       int
+	boundsStr  string
+	bounds     [4]float64
+	haveBounds bool
 )
 
 func init() {
@@ -65,6 +71,8 @@ func init() {
 	Root.Flags().BoolVar(&showJob, "show-job", false, "print out the job string for the parameters, and exit. If job is given, print out string representation of the job")
 	Root.Flags().StringVarP(&workDir, "workdir", "o", "", "workdir to find the assets and leave the output")
 	Root.Flags().Uint8Var(&timeout, "timeout", 0, "timeout in minutes, 0 means no timeout.")
+	Root.Flags().IntVar(&srid, "srid", 4326, "the srid for the bounds")
+	Root.Flags().StringVar(&boundsStr, "bounds", "", "the bounds to use to generate the map")
 
 	// Add server command
 	Root.AddCommand(Server)
@@ -91,6 +99,7 @@ func generatePDFForJob(ctx context.Context, a *atlante.Atlante, jobstr string) (
 func rootCmdParseArgs(ctx context.Context, a *atlante.Atlante) (*atlante.GeneratedFiles, error) {
 	a.JobID = jobid
 	switch {
+
 	case showJob:
 		switch {
 		case job != "":
@@ -102,12 +111,20 @@ func rootCmdParseArgs(ctx context.Context, a *atlante.Atlante) (*atlante.Generat
 			fmt.Fprintln(os.Stdout, proto.MarshalTextString(jb))
 		default:
 			sname := a.NormalizeSheetName(sheetName, true)
-			mdgID := grids.NewMDGID(mdgid)
 			sheet, err := a.SheetFor(sname)
 			if err != nil {
 				return nil, err
 			}
-			grid, err := sheet.CellForMDGID(mdgID)
+
+			var grid *grids.Cell
+
+			if haveBounds {
+				ext := geom.Extent{float64(bounds[0]), float64(bounds[1]), float64(bounds[2]), float64(bounds[3])}
+				grid, err = sheet.CellForBounds(ext, uint(srid))
+			} else {
+				mdgID := grids.NewMDGID(mdgid)
+				grid, err = sheet.CellForMDGID(mdgID)
+			}
 			if err != nil {
 				return nil, err
 			}
@@ -122,10 +139,42 @@ func rootCmdParseArgs(ctx context.Context, a *atlante.Atlante) (*atlante.Generat
 		return nil, nil
 	case job != "":
 		return generatePDFForJob(ctx, a, job)
+	case haveBounds:
+		// We have bounds to deal with.
+		sname := a.NormalizeSheetName(sheetName, true)
+		ext := geom.Extent{float64(bounds[0]), float64(bounds[1]), float64(bounds[2]), float64(bounds[3])}
+		return a.GeneatePDFBounds(ctx, sname, ext, uint(srid), "")
 	default:
 		sname := a.NormalizeSheetName(sheetName, true)
 		return a.GeneratePDFMDGID(ctx, sname, grids.NewMDGID(mdgid), "")
 	}
+}
+
+func parseBounds() error {
+	if boundsStr == "" {
+		return nil
+	}
+	parts := strings.Split(boundsStr, ",")
+	var floatParts []float64
+	for i := range parts {
+		part := strings.ReplaceAll(parts[i], " ", "")
+		if part == "" {
+			continue
+		}
+		flt, err := strconv.ParseFloat(part, 64)
+		if err != nil {
+			return err
+		}
+		floatParts = append(floatParts, flt)
+	}
+	if len(floatParts) != 4 {
+	}
+	bounds[0] = floatParts[0]
+	bounds[1] = floatParts[1]
+	bounds[2] = floatParts[2]
+	bounds[3] = floatParts[3]
+	haveBounds = true
+	return nil
 }
 
 func rootCmdRun(cmd *cobra.Command, args []string) error {
@@ -134,6 +183,15 @@ func rootCmdRun(cmd *cobra.Command, args []string) error {
 		ctx    context.Context
 		cancel context.CancelFunc
 	)
+	if err := parseBounds(); err != nil {
+		return ErrExitWith{
+			ShowUsage: true,
+			Msg:       fmt.Sprintf("[error] bounds incorrect: %\n", err),
+			Err:       err,
+			ExitCode:  1,
+		}
+
+	}
 	{
 		pid := os.Getpid()
 		fmt.Fprintf(cmd.OutOrStderr(), "[config] OS PID: %v\n", pid)
@@ -141,8 +199,6 @@ func rootCmdRun(cmd *cobra.Command, args []string) error {
 			fmt.Fprintf(cmd.OutOrStderr(), "[config] Parent PID: %v\n", os.Getppid())
 		}
 	}
-
-	//defer gdcmd.New().Complete()
 
 	a, err := config.Load(configFile, dpi, cmd.Flag("dpi").Changed)
 	if err != nil {
@@ -203,6 +259,14 @@ func rootCmdRun(cmd *cobra.Command, args []string) error {
 				Err:       err,
 				ExitCode:  2,
 			}
+		}
+	}
+
+	if len(bounds) > 4 {
+		return ErrExitWith{
+			ShowUsage: true,
+			Msg:       fmt.Sprintf("[error] bounds should only be 4 values"),
+			ExitCode:  2,
 		}
 	}
 

@@ -48,6 +48,7 @@ const (
 // the CellFor* methods should return a nil cell, and ErrNotFound
 // error
 type Provider interface {
+	CellForBounds(bounds geom.Extent, srid uint) (*Cell, error)
 	CellForLatLng(lat, lng float64, srid uint) (*Cell, error)
 	CellForMDGID(mgdID *MDGID) (*Cell, error)
 	CellSize() CellSize

@@ -5,6 +5,7 @@ import (
 	"crypto/x509"
 	"fmt"
 	"io/ioutil"
+	"log"
 	"strconv"
 	"sync"
 	"time"
@@ -33,6 +34,7 @@ type Provider struct {
 	cellSize         grids.CellSize
 	queryLngLat      string
 	queryMDGID       string
+	queryBounds      string
 }
 
 const (
@@ -89,6 +91,8 @@ const (
 	ConfigKeyQueryMDGID = "query_mdgid"
 	// ConfigKeyQueryLngLat is the sql for getting grid values from a lng lat value.
 	ConfigKeyQueryLngLat = "query_lnglat"
+	// ConfigKeyQueryBounds is the sql for getting grid values from a bounds value
+	ConfigKeyQueryBounds = "query_bounds"
 
 	// SQLGeometryField is the expected sql field name for the geometry
 	SQLGeometryField = "geometry"
@@ -207,12 +211,8 @@ func NewGridProvider(config grids.ProviderConfig) (grids.Provider, error) {
 	queryLngLat, _ = config.String(ConfigKeyQueryLngLat, &queryLngLat)
 	var queryMDGID string
 	queryMDGID, _ = config.String(ConfigKeyQueryMDGID, &queryMDGID)
-	if (queryLngLat != "" || queryMDGID != "") && (queryLngLat == "" || queryMDGID == "") {
-		if queryLngLat == "" {
-			return nil, ErrMissingQueryMDGID
-		}
-		return nil, ErrMissingQueryLngLat
-	}
+	var queryBounds string
+	queryBounds, _ = config.String(ConfigKeyQueryBounds, &queryBounds)
 
 	connConfig := pgx.ConnConfig{
 		Host:     host,
@@ -243,6 +243,7 @@ func NewGridProvider(config grids.ProviderConfig) (grids.Provider, error) {
 		cellSize:         grids.CellSize(scale),
 		queryLngLat:      queryLngLat,
 		queryMDGID:       queryMDGID,
+		queryBounds:      queryBounds,
 	}
 	if p.pool, err = pgx.NewConnPool(p.config); err != nil {
 		return nil, fmt.Errorf("failed while creating connection pool: %v", err)
@@ -320,7 +321,72 @@ func (p *Provider) CellSize() grids.CellSize {
 	return p.cellSize
 }
 
-// CellForLatLng returns a grid cell object that matches the cloest grid cell.
+// CellForBounds get the cell for the given bounds
+func (p *Provider) CellForBounds(bounds geom.Extent, srid uint) (*grids.Cell, error) {
+	const selectQuery = `
+		SELECT
+		  mdg_id,
+		  sheet,
+		  series,
+		  nrn,
+
+  swlat,
+  swlon AS swlng,
+  nelat,
+  nelon AS nelng,
+
+		  country,
+		  last_edite AS edited_by,
+		  last_edi_1 AS edited_at
+		FROM
+		  grids.grid50K
+		WHERE
+		  ST_Intersects(
+		    wkb_geometry,
+		    ST_Transform(
+		      ST_SetSRID(
+		        ST_MakeEnvelope($1,$2,$3,$4),
+		        $5
+		      ),
+		      4326
+		    )
+		  )
+		LIMIT 1;
+		`
+	query := selectQuery
+	if p.queryBounds != "" {
+		query = p.queryBounds
+	}
+
+	log.Printf("Running SQL: %v\n%v", selectQuery, bounds)
+
+	// bounds is sw,ne
+	row := p.pool.QueryRow(query, bounds[0], bounds[1], bounds[2], bounds[3], srid)
+	//row := p.pool.QueryRow(query, bounds[0], bounds[1], srid)
+
+	cell, err := p.cellFromRow(row)
+	if err != nil {
+		return nil, err
+	}
+	cell.Sw = &grids.Cell_LatLng{
+		Lng: float32(bounds[0]),
+		Lat: float32(bounds[1]),
+	}
+	cell.Ne = &grids.Cell_LatLng{
+		Lng: float32(bounds[2]),
+		Lat: float32(bounds[3]),
+	}
+	latlen, lnglen := grids.CalculateSecLengths(bounds[2])
+	swDMS := grids.ToDMS(bounds[0], bounds[1])
+	neDMS := grids.ToDMS(bounds[2], bounds[3])
+	cell.SwDms = &grids.Cell_LatLngDMS{Lat: swDMS[0].String(), Lng: swDMS[1].String()}
+	cell.NeDms = &grids.Cell_LatLngDMS{Lat: neDMS[0].String(), Lng: neDMS[1].String()}
+	cell.Len = &grids.Cell_LatLng{Lat: float32(latlen), Lng: float32(lnglen)}
+
+	return cell, nil
+}
+
+// CellForLatLng returns a grid cell object that matches the closest grid cell.
 func (p *Provider) CellForLatLng(lat, lng float64, srid uint) (*grids.Cell, error) {
 	const selectQuery = `
 SELECT
