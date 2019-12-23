@@ -1,11 +1,12 @@
 package grid5k
 
 import (
-	"github.com/prometheus/common/log"
 	"fmt"
+	"github.com/prometheus/common/log"
 	"math"
 
 	"github.com/gdey/errors"
+	"github.com/go-spatial/geom"
 	"github.com/go-spatial/maptoolkit/atlante/grids"
 )
 
@@ -67,6 +68,11 @@ func NewGridProvider(config grids.ProviderConfig) (grids.Provider, error) {
 // CellSize returns the grid cell size
 func (*Provider) CellSize() grids.CellSize { return grids.CellSize5K }
 
+// CellForBounds returns a grid cell for the given bounds
+func (p *Provider) CellForBounds(bounds geom.Extent, srid uint) (*grids.Cell, error) {
+	return p.Provider.CellForBounds(bounds, srid)
+}
+
 // CellForLatLng returns a grid cell for the given Lat Lng
 func (p *Provider) CellForLatLng(lat, lng float64, srid uint) (*grids.Cell, error) {
 	grd, err := p.Provider.CellForLatLng(lat, lng, srid)
@@ -82,7 +88,7 @@ func (p *Provider) CellForLatLng(lat, lng float64, srid uint) (*grids.Cell, erro
 
 // CellForMDGID returns a grid cell for the given mdgid
 func (p *Provider) CellForMDGID(mdgid *grids.MDGID) (*grids.Cell, error) {
-	log.Infof("Getting mdgid %v",mdgid)
+	log.Infof("Getting mdgid %v", mdgid)
 	part := mdgid.Part
 	mdgid.Part = 0
 	grd, err := p.Provider.CellForMDGID(mdgid)
@@ -101,8 +107,8 @@ func adjustGrid(grid *grids.Cell) (*grids.Cell, error) {
 
 	if part <= 1 {
 		grid.Mdgid.Part = 1
-	} 
-	n,s,w,e := coords5kSheet(grid)
+	}
+	n, s, w, e := coords5kSheet(grid)
 	grid.Ne.Lat = float32(n)
 	grid.Sw.Lat = float32(s)
 	grid.Sw.Lng = float32(w)
@@ -110,7 +116,7 @@ func adjustGrid(grid *grids.Cell) (*grids.Cell, error) {
 	return grid, nil
 }
 
-func coords5kSheet(grid *grids.Cell)(n,s,w,e float64) {
+func coords5kSheet(grid *grids.Cell) (n, s, w, e float64) {
 
 	const (
 		sqrSide = 0.025
@@ -127,14 +133,14 @@ func coords5kSheet(grid *grids.Cell)(n,s,w,e float64) {
 	part := int(grid.Mdgid.Part)
 	if part < 1 {
 		part = 1
-	} 
+	}
 	if part > 100 {
-		return 0.0,0.0,0.0,0.0
+		return 0.0, 0.0, 0.0, 0.0
 	}
 
-	var a,b float64
+	var a, b float64
 
-	// TODO(gdey): There is something weird about this math. We need to take a look 
+	// TODO(gdey): There is something weird about this math. We need to take a look
 	// at what is going on there and if the gridding is correct.
 	// parts are numbered from 1 - 100
 	//
@@ -159,22 +165,21 @@ func coords5kSheet(grid *grids.Cell)(n,s,w,e float64) {
 		a = 0.0
 		b = float64(part)
 	default:
-	 a, b = float64(int(part/10)), float64(int(part%10))
+		a, b = float64(int(part/10)), float64(int(part%10))
 	}
 
-
 	if b == 0.0 {
-		n = float64(ne.GetLat()) - (a * sqrSide)+ sqrSide
+		n = float64(ne.GetLat()) - (a * sqrSide) + sqrSide
 		s = n - sqrSide
 		w = float64(ne.GetLng()) - width
 		e = float64(ne.GetLng())
 	} else {
 		n = float64(ne.GetLat()) - (a * sqrSide)
 		s = n - sqrSide
-		w = float64(sw.GetLng()) + ((b-1) * width)
+		w = float64(sw.GetLng()) + ((b - 1) * width)
 		e = w + width
 	}
-	return n,s,w,e
+	return n, s, w, e
 
 }
 

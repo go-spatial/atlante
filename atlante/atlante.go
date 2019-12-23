@@ -12,6 +12,7 @@ import (
 	"sync"
 	"text/template"
 
+	"github.com/go-spatial/geom"
 	"github.com/go-spatial/geom/planar/coord"
 	"github.com/go-spatial/maptoolkit/atlante/template/trellis"
 
@@ -569,6 +570,19 @@ func (a *Atlante) GeneratePDFMDGID(ctx context.Context, sheetName string, mdgID 
 	}
 
 	cell, err := sheet.CellForMDGID(mdgID)
+	if err != nil {
+		return nil, err
+	}
+	return a.generatePDF(ctx, sheet, cell, filenameTemplate)
+}
+
+func (a *Atlante) GeneatePDFBounds(ctx context.Context, sheetName string, bounds geom.Extent, srid uint, filenameTemplate string) (*GeneratedFiles, error) {
+	sheet, err := a.SheetFor(sheetName)
+	if err != nil {
+		return nil, err
+	}
+
+	cell, err := sheet.CellForBounds(bounds, srid)
 	if err != nil {
 		return nil, err
 	}

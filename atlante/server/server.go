@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/go-spatial/geom"
 	"github.com/go-spatial/maptoolkit/atlante/server/coordinator/field"
 	"github.com/go-spatial/maptoolkit/atlante/server/coordinator/null"
 	"github.com/golang/protobuf/ptypes"
@@ -284,12 +285,12 @@ func (s *Server) URLRoot(r *http.Request) string {
 	return fmt.Sprintf("%v://%v", s.GetScheme(r), s.GetHostName(r))
 }
 
-// GridInfoHandler will writer to the writer information about the requested grid. The params should contain a `sheet_name` and either an `mgdid` entry
+// GridInfoHandler will write to the writer information about the requested grid. The params should contain a `sheet_name` and either an `mgdid` entry
 // or a `lat` and `lng` entries.
 // if an non-empty `mgdid` string is there it will be used to attempt to retrieve grid information based on that value.
 // if a `lat` and `lng` entries is given the mgdid grid containing that point will be used instead.
 // if both are provided, then the mdgid will be used, and the lat/lng keys will be ignored.
-// if neigher are provided or if the value is bad then a 400 status code will be returned.
+// if neither are provided or if the value is bad then a 400 status code will be returned.
 // Requires
 func (s *Server) GridInfoHandler(w http.ResponseWriter, request *http.Request, urlParams map[string]string) {
 
@@ -405,16 +406,22 @@ func (s *Server) GridInfoHandler(w http.ResponseWriter, request *http.Request, u
 // if the job has not be submitted before
 func (s *Server) QueueHandler(w http.ResponseWriter, request *http.Request, urlParams map[string]string) {
 	// TODO(gdey): this initial version will not do job tracking.
-	// meaning every request to the handler will get a job enqued into the
+	// meaning every request to the handler will get a job enqueued into the
 	// queueing system.
 	if s.Coordinator == nil {
 		s.Coordinator = &null.Provider{}
 	}
 
-	var ji struct {
-		MdgID     string `json:"mdgid"`
-		MdgIDPart uint32 `json:"sheet_number,omitempty"`
-	}
+	var (
+		ji struct {
+			MdgID     *string      `json:"mdgid,omitempty"`
+			MdgIDPart uint32       `json:"sheet_number,omitempty"`
+			Bounds    *geom.Extent `json:"bounds,omitempty"`
+			Srid      uint         `json:"srid,omitempty"`
+		}
+		cell *grids.Cell
+		err  error
+	)
 
 	// Get json body
 	bdy, err := ioutil.ReadAll(request.Body)
@@ -428,9 +435,8 @@ func (s *Server) QueueHandler(w http.ResponseWriter, request *http.Request, urlP
 		badRequest(w, "unable to unmarshal json: %v", err)
 		return
 	}
-	mdgid := grids.MDGID{
-		Id:   ji.MdgID,
-		Part: ji.MdgIDPart,
+	if ji.Bounds == nil && ji.MdgID == nil {
+		badRequest(w, "mdgid or bounds must be given")
 	}
 
 	sheetName, ok := urlParams[string(ParamsKeySheetname)]
@@ -447,10 +453,30 @@ func (s *Server) QueueHandler(w http.ResponseWriter, request *http.Request, urlP
 		badRequest(w, "error getting sheet(%v):%v", sheetName, err)
 		return
 	}
-	cell, err := sheet.CellForMDGID(&mdgid)
-	if err != nil {
-		badRequest(w, "error getting grid(%v):%v", mdgid.AsString(), err)
-		return
+	if ji.Srid == 0 {
+		ji.Srid = 4326
+	}
+
+	// We need to figure out what type of information we have to build
+	// the cell from.
+	if ji.Bounds != nil {
+		// Assume bounds first
+		cell, err = sheet.CellForBounds(*ji.Bounds, ji.Srid)
+		if err != nil {
+			badRequest(w, "error getting grid(%v):%v", *ji.Bounds, err)
+			return
+		}
+
+	} else {
+		mdgid := grids.MDGID{
+			Id:   *ji.MdgID,
+			Part: ji.MdgIDPart,
+		}
+		cell, err = sheet.CellForMDGID(&mdgid)
+		if err != nil {
+			badRequest(w, "error getting grid(%v):%v", mdgid.AsString(), err)
+			return
+		}
 	}
 
 	qjob := atlante.Job{
@@ -512,7 +538,7 @@ func (s *Server) QueueHandler(w http.ResponseWriter, request *http.Request, urlP
 	}
 }
 
-// SheetInfoHandler takes a job from a post and enqueues it on the configured queue
+// SheetInfoHandler takes a job from a post and enqueue it on the configured queue
 // if the job has not be submitted before
 func (s *Server) SheetInfoHandler(w http.ResponseWriter, request *http.Request, urlParams map[string]string) {
 	type sheetInfo struct {
@@ -653,6 +679,8 @@ func (s *Server) RegisterRoutes(r *httptreemux.TreeMux) {
 	if s.Queue != nil {
 		log.Infof("registering: POST /sheets/:sheetname/mdgid")
 		group.POST("/mdgid", s.QueueHandler)
+		log.Infof("registering: POST /sheets/:sheetname/bounds")
+		group.POST("/bounds",s.QueueHandler)
 	}
 
 	log.Infof("registering: GET  /jobs")
