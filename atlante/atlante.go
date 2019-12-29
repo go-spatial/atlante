@@ -3,7 +3,6 @@ package atlante
 import (
 	"context"
 	"fmt"
-	"image/png"
 	"io"
 	"os"
 	"path/filepath"
@@ -20,154 +19,38 @@ import (
 	fsfile "github.com/go-spatial/maptoolkit/atlante/filestore/file"
 	fsmulti "github.com/go-spatial/maptoolkit/atlante/filestore/multi"
 	"github.com/go-spatial/maptoolkit/atlante/grids"
-	"github.com/go-spatial/maptoolkit/atlante/internal/resolution"
 	"github.com/go-spatial/maptoolkit/atlante/notifiers"
 	_ "github.com/go-spatial/maptoolkit/atlante/notifiers/http"
 	"github.com/go-spatial/maptoolkit/atlante/server/coordinator/field"
 	"github.com/go-spatial/maptoolkit/mbgl/bounds"
-	"github.com/go-spatial/maptoolkit/mbgl/image"
-	mbgl "github.com/go-spatial/maptoolkit/mbgl/image"
 	"github.com/go-spatial/maptoolkit/svg2pdf"
 	"github.com/prometheus/common/log"
 )
 
-// ImgStruct is a wrapper around an image that makes the image available to the
-// the template, and allows for the image to be encoded only if it's requested.
-type ImgStruct struct {
-	filename     string
-	filestore    filestore.FileWriter
-	intermediate bool
-	// Have we generated the file?
-	// This will allow us to generate the file only when requested
-	generated bool
-	// useCached  will only generate if the file does not already exist in the filestore,
-	// and the file store supports filestore.Exister interface
-	useCached                 bool
-	lck                       sync.Mutex
-	image                     *mbgl.Image
-	startGenerationCallBack   func()
-	endGenerationCallBack     func()
-	generationFailureCallBack func(err error)
-}
-
-// Height returns the height of the image
-func (img ImgStruct) Height() int { return img.image.Bounds().Dy() }
-
-// Width returns the width of the image
-func (img ImgStruct) Width() int { return img.image.Bounds().Dx() }
-
-// Filename returns the file name of the image
-func (img *ImgStruct) Filename() (string, error) {
-	if img == nil {
-		return "", nil
-	}
-	// User only cares about filename if img.image is nil
-	if img.generated || img.image == nil {
-		return img.filename, nil
-	}
-	// We need to generate the file and then return the filename
-	fname, err := img.generateImage()
-	if err != nil {
-		log.Infof("Go error generating image: %v", err)
-	}
-	return fname, err
-}
-
-// Close closes out any open resources
-func (img ImgStruct) Close() {
-	if !img.generated || img.image == nil {
-		return
-	}
-	img.image.Close()
-}
-
-// generateIamge is use to generate the image we want to store in the filestore
-func (img *ImgStruct) generateImage() (fn string, err error) {
-	if img.generated {
-		return img.filename, nil
-	}
-
-	// If we don't have an image to generator.
-	// User only cares about the filename
-	if img.image == nil {
-		img.generated = true
-		return img.filename, nil
-	}
-
-	// No file store to write out the image.
-	// User only cares about the filename
-	if img.filestore == nil {
-		img.generated = true
-		return img.filename, nil
-	}
-
-	if img.useCached {
-		log.Infof("usedCached is on")
-		if exister, ok := img.filestore.(filestore.Exister); ok {
-			log.Infof("Is exister")
-			if exister.Exists(img.filename) {
-				return img.filename, nil
-			}
-		}
-	}
-
-	// generateImage is use to create the image into the filestore
-	img.lck.Lock()
-	defer img.lck.Unlock()
-	if img.generated {
-		return img.filename, nil
-	}
-	if img.startGenerationCallBack != nil {
-		img.startGenerationCallBack()
-	}
-	if img.generationFailureCallBack != nil {
-		defer func() {
-			if err != nil {
-				img.generationFailureCallBack(err)
-			}
-		}()
-	}
-
-	if err = img.image.GenerateImage(); err != nil {
-		return "", err
-	}
-
-	file, err := img.filestore.Writer(img.filename, img.intermediate)
-	if err != nil {
-		return "", err
-	}
-
-	if file == nil {
-		img.generated = true
-		return img.filename, nil
-	}
-	defer file.Close()
-
-	if err = img.image.GenerateImage(); err != nil {
-		log.Infof("got err %v generating image", err)
-		return "", err
-	}
-
-	if err := png.Encode(file, img.image); err != nil {
-		return "", err
-	}
-
-	// Clean up the backing store.
-	if img.endGenerationCallBack != nil {
-		img.endGenerationCallBack()
-	}
-	img.generated = true
-	return img.filename, nil
-}
-
 type GridTemplateContext struct {
-	Image         *ImgStruct
-	GroundMeasure float64
-	Grid          *grids.Cell
-	DPI           uint
-	Scale         uint
-	Zoom          float64
+	Image *Img
+	Grid  *grids.Cell
 }
+
+// SetImageDimension will set the image's desired Dimensions
+// If Bounds is not nil, this will force the scale and GroundMeasure to be recalculated for the image
+func (grctx GridTemplateContext) SetImageDimension(width, height float64) string {
+	grctx.Image.SetWidthHeight(width,height)
+	return ""
+}
+
+func (grctx GridTemplateContext) GroundMeasure() float64 { 
+	gm := grctx.Image.GroundMeasure() 
+	log.Infof("ground measure is: %v",gm)
+	return gm
+}
+func (grctx GridTemplateContext) Zoom() float64          { return grctx.Image.Zoom() }
+func (grctx GridTemplateContext) Scale() uint            { return grctx.Image.Scale }
+func (grctx GridTemplateContext) DPI() uint              { 
+	dpi :=  grctx.Image.DPI
+	log.Infof("dpi is: %v",dpi)
+	return dpi
+ }
 
 func (grctx GridTemplateContext) DrawBars(gridSize int, pxlBox PixelBox, lblRows, lblCols []int, lblMeterOffset int) (string, error) {
 
@@ -317,8 +200,6 @@ func GeneratePDF(ctx context.Context, sheet *Sheet, grid *grids.Cell, filenames 
 
 	log.Infoln("filenames: ", filenames.IMG, filenames.SVG, filenames.PDF)
 
-	const tilesize = 4096 / 2
-
 	/*
 		TODO(gdey): Keeping this for now. Not sure if we need this, or if the
 					zoom calculation taking dpi into considertion is all that's
@@ -327,62 +208,31 @@ func GeneratePDF(ctx context.Context, sheet *Sheet, grid *grids.Cell, filenames 
 		ppiRatio := float64(sheet.DPI) / 96.0
 	*/
 
-	zoom := grid.ZoomForScaleDPI(sheet.Scale, sheet.DPI)
-
-	nground := resolution.Ground(
-		resolution.MercatorEarthCircumference,
-		zoom,
-		float64(grid.GetSw().GetLat()),
-	)
-
-	// Generate the PNG
-	prj := bounds.ESPG3857
-	width, height := grid.WidthHeightForZoom(zoom)
-	latLngCenterPt := grid.CenterPtForZoom(zoom)
-	log.Infoln("width", width, "height", height)
-	log.Infoln("zoom", zoom, "Scale", sheet.Scale, "dpi", sheet.DPI, "ground measure", nground)
-
-	centerPt := bounds.LatLngToPoint(prj, latLngCenterPt[0], latLngCenterPt[1], zoom, tilesize)
-	dstimg, err := image.New(
-		ctx,
-		prj,
-		int(width), int(height),
-		centerPt,
-		zoom,
-		// TODO(gdey): Need to remove this hack and figure out how to used the
-		// ppi value as well as set the correct scale on the svg/pdf document
-		// that is produced later on. (https://github.com/go-spatial/maptoolkit/issues/13)
-		1.0, // ppiRatio, (we adjust the zoom)
-		0.0, // Bearing
-		0.0, // Pitch
-		sheet.Style,
-		"", "",
-	)
-	if err != nil {
-		return err
-	}
-	if ctx.Err() != nil {
-		return ctx.Err()
-	}
-
-	img := ImgStruct{
-		filename:     filenames.IMG,
-		image:        dstimg,
-		filestore:    multiWriter,
-		intermediate: true,
-		useCached:    useCached,
-		startGenerationCallBack: func() {
+	img := Img{
+		File: &filestore.File{
+			Store:          multiWriter,
+			Name:           filenames.IMG,
+			IsIntermediate: true,
+			UseCached:      useCached,
+		},
+		StartGenerationCallback: func() {
 			sheet.Emit(field.Processing{
 				Description: fmt.Sprintf("intermediate file: %v", filenames.IMG),
 			})
 		},
-		generationFailureCallBack: func(err error) {
+		FailGenerationCallback: func(err error) {
 			sheet.EmitError(
 				fmt.Sprintf("failed to generate intermediate file: %v", filenames.IMG),
 				err,
 			)
 		},
+		DPI:        sheet.DPI,
+		Grid:       grid,
+		Projection: bounds.ESPG3857,
+		Scale:      sheet.Scale,
+		Style:      sheet.Style,
 	}
+
 	defer func() {
 		img.Close()
 	}()
@@ -403,12 +253,8 @@ func GeneratePDF(ctx context.Context, sheet *Sheet, grid *grids.Cell, filenames 
 
 	// Fill out template
 	err = sheet.Execute(file, GridTemplateContext{
-		Image:         &img,
-		DPI:           sheet.DPI,
-		Scale:         sheet.Scale,
-		Zoom:          zoom,
-		GroundMeasure: nground,
-		Grid:          grid,
+		Image: &img,
+		Grid:  grid,
 	})
 	if err != nil {
 		sheet.EmitError("template processing failure", err)
