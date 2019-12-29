@@ -2,6 +2,8 @@ package resolution
 
 import (
 	"math"
+
+	"github.com/prometheus/common/log"
 )
 
 const (
@@ -19,6 +21,7 @@ func Zoom(earthCircumference float64, scale uint, dpi uint, lat float64) float64
 	width := math.Cos(lat * Rad)
 	ground := float64(scale) * MeterPerInch / float64(dpi)
 	mapWidth := (width * earthCircumference) / ground
+	log.Infof("Zoom: ground %v m/px, width %v m, mapWidth %v px size %v", ground, width, mapWidth, mapWidth/TileSize)
 	return math.Log2(mapWidth / TileSize)
 
 }
@@ -31,10 +34,16 @@ func Ground(earthCircumfrence float64, zoom float64, lat float64) float64 {
 	return width * earthCircumfrence / mapWidth
 }
 
+func GroundFromMapWidth(earthCircumfrence float64, mapWidth float64, lat float64) float64 {
+	width := math.Cos(lat * Rad)
+	log.Infof("bounds width: %v", width)
+	return width * earthCircumfrence / mapWidth
+}
+
 // Scale returns the map scale for the given ground resolution and dpi
 // Formula from https://docs.microsoft.com/en-us/bingmaps/articles/bing-maps-tile-system
-func Scale(dpi uint, ground float64) float64 {
-	return ground * (float64(dpi) / MeterPerInch)
+func Scale(dpi uint, ground float64) uint {
+	return uint(ground * (float64(dpi) / MeterPerInch))
 }
 
 // ZoomForGround returns the zoom for the given ground resolution
