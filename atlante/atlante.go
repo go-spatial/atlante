@@ -30,6 +30,9 @@ import (
 type GridTemplateContext struct {
 	Image *Img
 	Grid  *grids.Cell
+	Width float64
+	Height float64
+
 }
 
 // SetImageDimension will set the image's desired Dimensions
@@ -251,10 +254,13 @@ func GeneratePDF(ctx context.Context, sheet *Sheet, grid *grids.Cell, filenames 
 		return ctx.Err()
 	}
 
+	widthpts, heightpts := float64(sheet.WidthInPoints(72)), float64(sheet.HeightInPoints(72))
 	// Fill out template
 	err = sheet.Execute(file, GridTemplateContext{
 		Image: &img,
 		Grid:  grid,
+		Width: widthpts,
+		Height: heightpts,
 	})
 	if err != nil {
 		sheet.EmitError("template processing failure", err)
@@ -280,7 +286,6 @@ func GeneratePDF(ctx context.Context, sheet *Sheet, grid *grids.Cell, filenames 
 		Description: fmt.Sprintf("generate file: %v ", filenames.PDF),
 	})
 
-	widthpts, heightpts := float64(sheet.WidthInPoints(72)), float64(sheet.HeightInPoints(72))
 	log.Infof("pdf %v,%v", widthpts, heightpts)
 	if err = svg2pdf.GeneratePDF(svgfn, pdffn, widthpts, heightpts); err != nil {
 		log.Warnf("error generating pdf: %v", err)
