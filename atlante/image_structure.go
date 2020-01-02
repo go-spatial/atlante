@@ -61,27 +61,29 @@ func (img *Img) initDynamicWidthHeight() {
 
 }
 func (img *Img) initStaticWidthHeight(tilesize float64) {
+	var err error
 	log.Infof("Using static width and height: tilesize: %v", tilesize)
-	grid := img.Grid
-
-	lat := float64(grid.GetSw().GetLat())
-	for _, val := range []float64{1, 2, 4, 8, 16} {
-		gm := resolution.GroundFromMapWidth(
-			resolution.MercatorEarthCircumference,
-			img.width*(4096/val),
-			lat,
+	log.Infof("img.Grid %v", img.Grid)
+	log.Infof("img.Grid Ne %v", img.Grid.GetNe())
+	if img.width <= img.height {
+		img.groundMeasure, err = resolution.GroundFromMapWidth(
+			img.Grid.Sw.CoordLngLat(),
+			img.Grid.Ne.CoordLngLat(),
+			img.width,
 		)
-		scale := resolution.Scale(img.DPI, gm)
-		log.Infof("gm 4096/%v (%v) == %v : %v", val, 4096/val, gm, scale)
-	}
+	} else {
+		img.groundMeasure, err = resolution.GroundFromMapHeight(
+			img.Grid.Sw.CoordLngLat(),
+			img.Grid.Ne.CoordLngLat(),
+			img.height,
+		)
 
-	img.groundMeasure = resolution.GroundFromMapWidth(
-		resolution.MercatorEarthCircumference,
-		img.width*tilesize,
-		lat,
-	)
+	}
+	if err != nil {
+		panic(err)
+	}
 	img.Scale = resolution.Scale(img.DPI, img.groundMeasure)
-	img.zoom = grid.ZoomForScaleDPI(img.Scale, img.DPI)
+	img.zoom = img.Grid.ZoomForScaleDPI(img.Scale, img.DPI)
 }
 
 func (img *Img) initImage(ctx context.Context) (*mbgl.Image, error) {

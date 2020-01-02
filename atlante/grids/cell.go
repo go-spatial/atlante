@@ -13,6 +13,7 @@ import (
 	"github.com/golang/protobuf/ptypes"
 
 	"github.com/go-spatial/geom"
+	"github.com/go-spatial/geom/planar/coord"
 	"github.com/go-spatial/geom/spherical"
 	"github.com/go-spatial/maptoolkit/atlante/internal/resolution"
 	"github.com/go-spatial/maptoolkit/mbgl/bounds"
@@ -338,6 +339,13 @@ func (latlng *Cell_LatLng) ToUTMInfo() *UTMInfo {
 	return &UTMInfo{
 		Zone: uint32(z),
 		Hemi: h,
+	}
+}
+
+func (latlng *Cell_LatLng) CoordLngLat() coord.LngLat {
+	return coord.LngLat{
+		Lng: float64(latlng.Lng),
+		Lat: float64(latlng.Lat),
 	}
 }
 
