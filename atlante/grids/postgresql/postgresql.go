@@ -377,10 +377,14 @@ func (p *Provider) CellForBounds(bounds geom.Extent, srid uint) (*grids.Cell, er
 		Lat: float32(bounds[3]),
 	}
 	latlen, lnglen := grids.CalculateSecLengths(float64(cell.Ne.Lat))
-	swDMS := grids.ToDMS(float64(cell.Sw.Lat), float64(cell.Sw.Lng))
-	neDMS := grids.ToDMS(float64(cell.Ne.Lat), float64(cell.Ne.Lng))
-	cell.SwDms = &grids.Cell_LatLngDMS{Lat: swDMS[0].String(), Lng: swDMS[1].String()}
-	cell.NeDms = &grids.Cell_LatLngDMS{Lat: neDMS[0].String(), Lng: neDMS[1].String()}
+	cell.SwDms = nil
+	cell.NeDms = nil
+	/*
+		swDMS := grids.ToDMS(float64(cell.Sw.Lat), float64(cell.Sw.Lng))
+		neDMS := grids.ToDMS(float64(cell.Ne.Lat), float64(cell.Ne.Lng))
+		cell.SwDms = &grids.Cell_LatLngDMS{Lat: swDMS[0].AsString(1), Lng: swDMS[1].AsString(1)}
+		cell.NeDms = &grids.Cell_LatLngDMS{Lat: neDMS[0].AsString(1), Lng: neDMS[1].AsString(1)}
+	*/
 	cell.Len = &grids.Cell_LatLng{Lat: float32(latlen), Lng: float32(lnglen)}
 	log.Printf("cell: %v", cell)
 

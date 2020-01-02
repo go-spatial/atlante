@@ -242,7 +242,7 @@ func (c *Cell) Hemi() string {
 func (c *Cell) NELatDMS() (string, error) {
 	dms := c.GetNeDms().GetLat()
 	if dms == "" {
-		dms = c.GetNe().ToDMS()[0].String()
+		dms = c.GetNe().ToDMS()[0].AsString(1)
 	}
 	return dms, nil
 }
@@ -251,7 +251,7 @@ func (c *Cell) NELatDMS() (string, error) {
 func (c *Cell) NELngDMS() (string, error) {
 	dms := c.GetNeDms().GetLng()
 	if dms == "" {
-		dms = c.GetNe().ToDMS()[1].String()
+		dms = c.GetNe().ToDMS()[1].AsString(1)
 	}
 	return dms, nil
 }
@@ -260,7 +260,7 @@ func (c *Cell) NELngDMS() (string, error) {
 func (c *Cell) SWLatDMS() (string, error) {
 	dms := c.GetSwDms().GetLat()
 	if dms == "" {
-		dms = c.GetSw().ToDMS()[0].String()
+		dms = c.GetSw().ToDMS()[0].AsString(1)
 	}
 	return dms, nil
 }
@@ -269,7 +269,7 @@ func (c *Cell) SWLatDMS() (string, error) {
 func (c *Cell) SWLngDMS() (string, error) {
 	dms := c.GetSwDms().GetLng()
 	if dms == "" {
-		dms = c.GetSw().ToDMS()[1].String()
+		dms = c.GetSw().ToDMS()[1].AsString(1)
 	}
 	return dms, nil
 }
@@ -383,7 +383,12 @@ type DMS struct {
 }
 
 // String returns the string representation.
-func (dms DMS) String() string {
+func (dms DMS) String() string { return dms.AsString(0) }
+
+func (dms DMS) AsString(prec uint) string {
+	if prec != 0 {
+		return fmt.Sprintf("%d°%d'%.*f\"%c", dms.Degree, dms.Minute, prec, dms.Second, dms.Hemisphere)
+	}
 	return fmt.Sprintf("%d°%d'%f\"%c", dms.Degree, dms.Minute, dms.Second, dms.Hemisphere)
 }
 
