@@ -33,12 +33,13 @@ type Img struct {
 	FailGenerationCallback  func(error)
 
 	// Did we already generate the base image
-	generated     bool
-	lck           sync.Mutex
-	image         *mbgl.Image
-	width, height float64
-	groundMeasure float64
-	zoom          float64
+	generated           bool
+	lck                 sync.Mutex
+	image               *mbgl.Image
+	width, height       float64
+	imgWidth, imgHeight float64
+	groundMeasure       float64
+	zoom                float64
 
 	// staticWidthHeight determines if the Width and Height for this was statically defined
 	// if so, then we need to dynamically figure out the scale from the bounds, if bounds is
@@ -57,9 +58,11 @@ func (img *Img) initDynamicWidthHeight() {
 		float64(grid.GetSw().GetLat()),
 	)
 	img.width, img.height = grid.WidthHeightForZoom(zoom)
+	img.imgWidth, img.imgHeight = img.width, img.height
 	img.zoom = zoom
 
 }
+
 func (img *Img) initStaticWidthHeight(tilesize float64) {
 	var err error
 	log.Infof("Using static width and height: tilesize: %v", tilesize)
@@ -82,8 +85,16 @@ func (img *Img) initStaticWidthHeight(tilesize float64) {
 	if err != nil {
 		panic(err)
 	}
+	img.imgWidth, img.imgHeight, err = resolution.BoundsPixelWidthHeight(
+		img.Grid.Sw.CoordLngLat(),
+		img.Grid.Ne.CoordLngLat(),
+		img.groundMeasure,
+	)
+	if err != nil {
+		panic(err)
+	}
 	img.Scale = resolution.Scale(img.DPI, img.groundMeasure)
-	img.zoom = img.Grid.ZoomForScaleDPI(img.Scale, img.DPI)
+	img.zoom = img.Grid.ZoomForScaleDPI(img.Scale, img.DPI) - 1
 }
 
 func (img *Img) initImage(ctx context.Context) (*mbgl.Image, error) {
@@ -117,7 +128,7 @@ func (img *Img) initImage(ctx context.Context) (*mbgl.Image, error) {
 		ctx,
 
 		img.Projection,
-		int(img.width), int(img.height),
+		int(img.imgWidth), int(img.imgHeight),
 		centerPt,
 		img.zoom,
 		// TODO(gdey): Need to remove this hack and figure out how to used the

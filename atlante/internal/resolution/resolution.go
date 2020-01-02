@@ -72,34 +72,51 @@ from: https://sentinelhub-py.readthedocs.io/en/latest/_modules/sentinelhub/geo_u
 	return round(abs(east2 - east1) / resx), round(abs(north2 - north1) / resy)
 */
 
-func GroundFromMapWidth(se, nw coord.LngLat, imageWidth float64) (float64,error) {
+func BoundsPixelWidthHeight(sw, ne coord.LngLat, gm float64) (float64, float64, error) {
+	utmSw, err := utm.FromLngLat(sw, WGS84Ellipsoid)
+	if err != nil {
+		return 0,0,err
+	}
+	utmNe, err := utm.FromLngLat(ne, WGS84Ellipsoid)
+	if err != nil {
+		return 0,0,err
+	}
 
-	utmSe, err := utm.FromLngLat(se,WGS84Ellipsoid)
+	width := math.Abs(utmNe.Easting-utmSw.Easting) / gm
+	height := math.Abs(utmNe.Northing-utmSw.Northing) / gm
+	return width, height,nil
+
+}
+
+func GroundFromMapWidth(sw, ne coord.LngLat, imageWidth float64) (float64,error) {
+
+	utmSw, err := utm.FromLngLat(sw,WGS84Ellipsoid)
 	if err != nil {
 		return 0, err
 	}
-	utmNw, err := utm.FromLngLat(nw,WGS84Ellipsoid)
+	utmNe, err := utm.FromLngLat(ne,WGS84Ellipsoid)
 	if err != nil {
 		return 0, err
 	}
 
-	gm :=  math.Abs(utmNw.Easting - utmSe.Easting)/imageWidth
-	log.Infof("easting1 %v easting2 %v  gm %v", utmNw.Easting, utmSe.Easting, gm)
+	gm :=  math.Abs(utmNe.Easting - utmSw.Easting)/imageWidth
+	log.Infof("easting1 %v easting2 %v  gm %v", utmNe.Easting, utmSw.Easting, gm)
 	return gm,nil
 }
-func GroundFromMapHeight(se, nw coord.LngLat, imageHeight float64) (float64,error) {
 
-	utmSe, err := utm.FromLngLat(se,WGS84Ellipsoid)
+func GroundFromMapHeight(sw, ne coord.LngLat, imageHeight float64) (float64,error) {
+
+	utmSw, err := utm.FromLngLat(sw,WGS84Ellipsoid)
 	if err != nil {
 		return 0, err
 	}
-	utmNw, err := utm.FromLngLat(nw,WGS84Ellipsoid)
+	utmNe, err := utm.FromLngLat(ne,WGS84Ellipsoid)
 	if err != nil {
 		return 0, err
 	}
 
-	gm :=  math.Abs(utmNw.Northing - utmSe.Northing)/imageHeight
-	log.Infof("northing1 %v northing2 %v  gm %v", utmNw.Northing, utmSe.Northing, gm)
+	gm :=  math.Abs(utmNe.Northing - utmSw.Northing)/imageHeight
+	log.Infof("northing1 %v northing2 %v  gm %v", utmNe.Northing, utmSw.Northing, gm)
 	return gm,nil
 }
 
