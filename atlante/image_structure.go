@@ -94,6 +94,7 @@ func (img *Img) initStaticWidthHeight(tilesize float64) {
 		panic(err)
 	}
 	img.Scale = resolution.Scale(img.DPI, img.groundMeasure)
+	// adjust the zoom as we are 256 tiles based
 	img.zoom = img.Grid.ZoomForScaleDPI(img.Scale, img.DPI) - 1
 }
 
