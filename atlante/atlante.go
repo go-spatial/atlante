@@ -28,32 +28,38 @@ import (
 )
 
 type GridTemplateContext struct {
-	Image *Img
-	Grid  *grids.Cell
-	Width float64
+	Image  *Img
+	Grid   *grids.Cell
+	Width  float64
 	Height float64
+}
 
+func (grctx *GridTemplateContext) SetWidthHeight(w float64, h float64) string {
+	grctx.Width = w
+	grctx.Height = h
+	log.Infof("Setting page size to %v x %v",w,h)
+	return ""
 }
 
 // SetImageDimension will set the image's desired Dimensions
 // If Bounds is not nil, this will force the scale and GroundMeasure to be recalculated for the image
 func (grctx GridTemplateContext) SetImageDimension(width, height float64) string {
-	grctx.Image.SetWidthHeight(width,height)
+	grctx.Image.SetWidthHeight(width, height)
 	return ""
 }
 
-func (grctx GridTemplateContext) GroundMeasure() float64 { 
-	gm := grctx.Image.GroundMeasure() 
-	log.Infof("ground measure is: %v",gm)
+func (grctx GridTemplateContext) GroundMeasure() float64 {
+	gm := grctx.Image.GroundMeasure()
+	log.Infof("ground measure is: %v", gm)
 	return gm
 }
-func (grctx GridTemplateContext) Zoom() float64          { return grctx.Image.Zoom() }
-func (grctx GridTemplateContext) Scale() uint            { return grctx.Image.Scale }
-func (grctx GridTemplateContext) DPI() uint              { 
-	dpi :=  grctx.Image.DPI
-	log.Infof("dpi is: %v",dpi)
+func (grctx GridTemplateContext) Zoom() float64 { return grctx.Image.Zoom() }
+func (grctx GridTemplateContext) Scale() uint   { return grctx.Image.Scale }
+func (grctx GridTemplateContext) DPI() uint {
+	dpi := grctx.Image.DPI
+	log.Infof("dpi is: %v", dpi)
 	return dpi
- }
+}
 
 func (grctx GridTemplateContext) DrawBars(gridSize int, pxlBox PixelBox, lblRows, lblCols []int, lblMeterOffset int) (string, error) {
 
@@ -255,13 +261,14 @@ func GeneratePDF(ctx context.Context, sheet *Sheet, grid *grids.Cell, filenames 
 	}
 
 	widthpts, heightpts := float64(sheet.WidthInPoints(72)), float64(sheet.HeightInPoints(72))
-	// Fill out template
-	err = sheet.Execute(file, GridTemplateContext{
-		Image: &img,
-		Grid:  grid,
-		Width: widthpts,
+	gtc := &GridTemplateContext{
+		Image:  &img,
+		Grid:   grid,
+		Width:  widthpts,
 		Height: heightpts,
-	})
+	}
+	// Fill out template
+	err = sheet.Execute(file,gtc)
 	if err != nil {
 		sheet.EmitError("template processing failure", err)
 		log.Warnf("error trying to fillout sheet template")
@@ -286,8 +293,8 @@ func GeneratePDF(ctx context.Context, sheet *Sheet, grid *grids.Cell, filenames 
 		Description: fmt.Sprintf("generate file: %v ", filenames.PDF),
 	})
 
-	log.Infof("pdf %v,%v", widthpts, heightpts)
-	if err = svg2pdf.GeneratePDF(svgfn, pdffn, widthpts, heightpts); err != nil {
+	log.Infof("pdf %v,%v", gtc.Width, gtc.Height)
+	if err = svg2pdf.GeneratePDF(svgfn, pdffn, gtc.Width, gtc.Height); err != nil {
 		log.Warnf("error generating pdf: %v", err)
 		sheet.EmitError("generate pdf failed", err)
 		return err

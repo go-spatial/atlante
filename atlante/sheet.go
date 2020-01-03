@@ -102,7 +102,7 @@ func NewSheet(name string, provider grids.Provider, dpi uint, desc string, style
 }
 
 // Execute the sheets template
-func (sheet *Sheet) Execute(wr io.Writer, tplContext GridTemplateContext) error {
+func (sheet *Sheet) Execute(wr io.Writer, tplContext *GridTemplateContext) error {
 	return sheet.svgTemplate.Execute(wr, tplContext)
 }
 

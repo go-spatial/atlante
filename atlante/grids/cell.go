@@ -457,6 +457,6 @@ func zoneFromLatLng(lat, lng float64) int {
 		}
 	}
 	// Recast from [-180,180) to [0,360).
-	// the w<-> is then divieded into 60 zones from 1-60.
+	// the w<-> is then divided into 60 zones from 1-60.
 	return int((lng+180)/6) + 1
 }
