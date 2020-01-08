@@ -102,6 +102,29 @@ Returns:
 }
 ```
 
+4. `POST /sheets/${sheet_name}/bounds` will cause the pdf generation the job to start.
+
+Expected:
+
+```js
+{
+   "bounds" : []number, // this should be four number min_lng, min_lat, max_lng,max_lat
+   "srid"   : number    // this the srid defaults to 4326 
+   
+}
+```
+
+Returns:
+```js
+{
+   "mdgid" : string,
+   "sheet_number" : null | number,
+   "job_id" : number,
+   "status" : "requested" | "started" | "processing" | "completed",
+}
+```
+
+
 5. `GET /jobs` will return the latest 100 jobs
 
 Returns:
