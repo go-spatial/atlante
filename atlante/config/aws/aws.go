@@ -1,11 +1,12 @@
 package aws
 
 import (
+	"os"
+
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/credentials"
-	"github.com/go-spatial/tegola/dict"
-	"os"
 	"github.com/aws/aws-sdk-go/aws/session"
+	"github.com/go-spatial/tegola/dict"
 )
 
 const (
@@ -38,10 +39,9 @@ const (
 
 	// ConfigKeyAWSSecretKey the aws secret key [optional] defaults to ""
 	ConfigKeyAWSSecretKey = "aws_secret_access_key"
-
 )
 
-func NewSession(cfg dict.Dicter) (sess *session.Session, err error){
+func NewSession(cfg dict.Dicter) (sess *session.Session, err error) {
 	// check for region env var
 	region := os.Getenv(EnvAWSRegion)
 	if region == "" {

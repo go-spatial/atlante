@@ -1,6 +1,7 @@
 package postgresql
 
 import (
+	"crypto/sha1"
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
@@ -368,6 +369,7 @@ func (p *Provider) CellForBounds(bounds geom.Extent, srid uint) (*grids.Cell, er
 	if err != nil {
 		return nil, err
 	}
+
 	cell.Sw = &grids.Cell_LatLng{
 		Lng: float32(bounds[0]),
 		Lat: float32(bounds[1]),
@@ -386,6 +388,11 @@ func (p *Provider) CellForBounds(bounds geom.Extent, srid uint) (*grids.Cell, er
 		cell.NeDms = &grids.Cell_LatLngDMS{Lat: neDMS[0].AsString(1), Lng: neDMS[1].AsString(1)}
 	*/
 	cell.Len = &grids.Cell_LatLng{Lat: float32(latlen), Lng: float32(lnglen)}
+
+	h := sha1.New()
+	fmt.Fprintf(h, "%#V %v %v", bounds, srid, time.Now())
+	cell.MetaData["filename"] = fmt.Sprintf("%x", h.Sum(nil))
+
 	log.Printf("cell: %v", cell)
 
 	return cell, nil
@@ -705,6 +712,8 @@ func (p *Provider) cellFromRows(rows *pgx.Rows) (*grids.Cell, error) {
 		nelatDMS, nelngDMS = nedms[0].String(), nedms[1].String()
 	}
 
+	metadata := make(map[string]string)
+
 	return grids.NewCell(
 		mdgid,                                 // mdgid
 		[2]float64{*swlat, *swlng},            // sw
@@ -719,7 +728,7 @@ func (p *Provider) cellFromRows(rows *pgx.Rows) (*grids.Cell, error) {
 		series,                                // series
 		[2]string{swlatDMS, swlngDMS},         // sw dms
 		[2]string{nelatDMS, nelngDMS},         // ne dms
-		nil,                                   // metadata
+		metadata,                              // metadata
 	), nil
 
 }

@@ -143,6 +143,8 @@ Returns:
          //  for processing it will be the item being processed
          //  for failed it will be the reason it failed
         "description" : string, 
+        "pdf_url":  null | url, // if null or empty string, pdf has not be generated
+        "last_generated" :  null | date, // last time the pdf was generated 
      },
   }
   //...
@@ -167,6 +169,8 @@ Returns:
          //  for processing it will be the item being processed
          //  for failed it will be the reason it failed
         "description" : string, 
+        "pdf_url":  null | url, // if null or empty string, pdf has not be generated
+        "last_generated" :  null | date, // last time the pdf was generated 
      },
   },
 

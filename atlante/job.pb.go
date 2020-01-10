@@ -5,9 +5,10 @@ package atlante
 
 import (
 	fmt "fmt"
+	math "math"
+
 	grids "github.com/go-spatial/maptoolkit/atlante/grids"
 	proto "github.com/golang/protobuf/proto"
-	math "math"
 )
 
 // Reference imports to suppress errors if they are not otherwise used.

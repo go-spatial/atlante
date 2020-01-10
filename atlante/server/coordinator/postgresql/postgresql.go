@@ -291,7 +291,7 @@ func ConfigTLS(sslMode string, sslKey string, sslCert string, sslRootCert string
 	return nil
 }
 
-// NewJob retuns a new coordinator job based on the atlante job description
+// NewJob returns a new coordinator job based on the atlante job description
 func (p *Provider) NewJob(job *atlante.Job) (jb *coordinator.Job, err error) {
 	if job == nil {
 		return nil, coordinator.ErrNilAtlanteJob
@@ -408,7 +408,7 @@ VALUES($1,$2,$3);
 	}
 	return nil
 }
-func logScanError(err error) {
+func logScanError(err error, query string) {
 	switch e := err.(type) {
 	case ErrNoQueueID:
 		log.Infof("no queuid for job %v, skipping", int(e))
@@ -416,7 +416,8 @@ func logScanError(err error) {
 		log.Infof("invalid status entries for job %v, skipping", e.Job)
 	default:
 		if err != pgx.ErrNoRows {
-			log.Infof("got error scanning job skipping: %V", err)
+			log.Infof("got error scanning job skipping: '%v'", err)
+			log.Infof("sql: %v", query)
 		}
 	}
 }
@@ -429,6 +430,7 @@ func scanRow(row rowScanner) (*coordinator.Job, error) {
 
 		jobid       int
 		mdgid       string
+		jobdata     string
 		sheetNumber int
 		sheetName   string
 		queueIDp    *string
@@ -436,6 +438,7 @@ func scanRow(row rowScanner) (*coordinator.Job, error) {
 		status      *string
 		desc        *string
 		updated     *time.Time
+		ajob        *atlante.Job
 	)
 
 	if err := row.Scan(
@@ -444,6 +447,7 @@ func scanRow(row rowScanner) (*coordinator.Job, error) {
 		&sheetNumber,
 		&sheetName,
 		&queueIDp,
+		&jobdata,
 		&enqueued,
 		&status,
 		&desc,
@@ -474,6 +478,11 @@ func scanRow(row rowScanner) (*coordinator.Job, error) {
 	if updated == nil {
 		updated = &zeroTime
 	}
+
+	if jobdata != "" {
+		ajob, _ = atlante.Base64UnmarshalJob(jobdata)
+	}
+
 	return &coordinator.Job{
 		JobID:      fmt.Sprintf("%v", jobid),
 		QJobID:     *queueIDp,
@@ -483,6 +492,7 @@ func scanRow(row rowScanner) (*coordinator.Job, error) {
 		Status:     field.Status{s},
 		EnqueuedAt: enqueued,
 		UpdatedAt:  *updated,
+		AJob:       ajob,
 	}, nil
 
 }
@@ -496,7 +506,8 @@ SELECT
 	job.mdgid,
 	job.sheet_number,
 	job.sheet_name,
-    job.queue_id,
+	job.queue_id,
+	job.job_data,
     job.created as enqueued,
     jobstatus.status,
     jobstatus.description,
@@ -529,13 +540,14 @@ LIMIT 2;
 	rows, err := p.pool.Query(query, mdgid, sheetNumber, sheetName)
 	if err != nil {
 		log.Errorf("postgresql: unable to preform query: %v", err)
+		log.Errorf("postgresql: sql: %v", query)
 		return nil
 	}
 	defer rows.Close()
 	for rows.Next() {
 		jb, err := scanRow(rows)
 		if err != nil {
-			logScanError(err)
+			logScanError(err, query)
 			continue
 		}
 		jobs = append(jobs, jb)
@@ -552,7 +564,8 @@ SELECT
     job.mdgid,
     job.sheet_number,
     job.sheet_name,
-    job.queue_id,
+	job.queue_id,
+	job.job_data,
     job.created as enqueued,
     jobstatus.status,
     jobstatus.description,
@@ -574,7 +587,7 @@ ORDER BY jobstatus.id desc limit 1;
 	row := p.pool.QueryRow(query, id)
 	jb, err = scanRow(row)
 	if err != nil {
-		logScanError(err)
+		logScanError(err, query)
 		return nil, false
 	}
 	return jb, true
@@ -623,6 +636,7 @@ SELECT
     job.sheet_number,
     job.sheet_name,
     job.queue_id,
+	job.job_data,
     job.created as enqueued,
     jobstatus.status,
     jobstatus.description,
@@ -656,7 +670,7 @@ ORDER BY jobstatus.id desc
 	for rows.Next() {
 		jb, err := scanRow(rows)
 		if err != nil {
-			logScanError(err)
+			logScanError(err, query)
 			continue
 		}
 		jobs = append(jobs, jb)
