@@ -162,7 +162,6 @@ func setHeaders(h map[string]string, w http.ResponseWriter) {
 
 func badRequest(w http.ResponseWriter, reasonFmt string, data ...interface{}) {
 	str := fmt.Sprintf(reasonFmt, data...)
-	log.Infof("got error: %v", str)
 	setHeaders(map[string]string{HTTPErrorHeader: str}, w)
 	w.WriteHeader(http.StatusBadRequest)
 }
@@ -328,12 +327,10 @@ func (s *Server) GridInfoHandler(w http.ResponseWriter, request *http.Request, u
 
 	// check to see if the mdgid key was given.
 	if mdgidStr, ok := urlParams[string(ParamsKeyMDGID)]; ok {
-		log.Infof("MDGID route %v", mdgidStr)
 		mdgid = grids.NewMDGID(mdgidStr)
 		cell, err = sheet.CellForMDGID(mdgid)
 		if err != nil {
 			if err == grids.ErrNotFound {
-				log.Infof("%v: failed to find grid for mdgid: %v", sheetName, mdgidStr)
 				setHeaders(nil, w)
 				w.WriteHeader(http.StatusNotFound)
 				return
@@ -370,7 +367,6 @@ func (s *Server) GridInfoHandler(w http.ResponseWriter, request *http.Request, u
 		cell, err = sheet.CellForLatLng(lat, lng, srid)
 		if err != nil {
 			if err == grids.ErrNotFound {
-				log.Infof("%v: failed to find lat/lng: %v,%v,%v", sheetName, lat, lng, srid)
 				setHeaders(nil, w)
 				w.WriteHeader(http.StatusNotFound)
 				return
@@ -583,7 +579,6 @@ func (s *Server) JobInfoHandler(w http.ResponseWriter, request *http.Request, ur
 		return
 	}
 	if job.AJob != nil {
-		log.Infof("Attempting to get pdfurl, for %v", jobid)
 		sheetName := job.SheetName
 		sheetName = s.Atlante.NormalizeSheetName(sheetName, false)
 		sheet, err := s.Atlante.SheetFor(sheetName)
@@ -595,10 +590,7 @@ func (s *Server) JobInfoHandler(w http.ResponseWriter, request *http.Request, ur
 				job.PDF = pdfURL.String()
 				job.LastGen = pdfURL.TimeString()
 			}
-		} else {
-			log.Infof("got error getting sheet: %v %v", sheetName, err)
-
-		}
+		} 
 	}
 
 	setHeaders(nil, w)
@@ -649,7 +641,6 @@ func (s *Server) JobsHandler(w http.ResponseWriter, request *http.Request, urlPa
 // NotificationHandler is an http handle for worker job progress notifications
 func (s *Server) NotificationHandler(w http.ResponseWriter, request *http.Request, urlParams map[string]string) {
 
-	log.Infof("Got a post to Notification: %v", urlParams)
 	jobid, ok := urlParams[string(ParamsKeyJobID)]
 	if !ok {
 		// We need a sheetnumber.
@@ -660,7 +651,6 @@ func (s *Server) NotificationHandler(w http.ResponseWriter, request *http.Reques
 
 	job, ok := s.Coordinator.FindByJobID(jobid)
 	if !ok {
-		log.Infof("failed to find job: %v", jobid)
 		setHeaders(nil, w)
 		w.WriteHeader(http.StatusNotFound)
 		return
@@ -675,13 +665,11 @@ func (s *Server) NotificationHandler(w http.ResponseWriter, request *http.Reques
 	}
 
 	var si field.Status
-	log.Infof("Body: %s", bdy)
 	err = json.Unmarshal(bdy, &si)
 	if err != nil {
 		badRequest(w, "unable to unmarshal json: %v", err)
 		return
 	}
-	log.Infof("Status: %v", si)
 
 	if err := s.Coordinator.UpdateField(job, si); err != nil {
 		serverError(w, "failed to update job %v: %v", jobid, err)
