@@ -146,6 +146,10 @@ func NewCell(
 		dmsNE[0], dmsNE[1] = dms[0].String(), dms[1].String()
 	}
 
+	if metadata == nil {
+		metadata = make(map[string]string)
+	}
+
 	return &Cell{
 		Mdgid: NewMDGID(mdgid),
 		Sw:    swlatlng,

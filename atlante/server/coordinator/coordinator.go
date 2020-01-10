@@ -25,6 +25,9 @@ type Job struct {
 	Status     field.Status `json:"status"`
 	EnqueuedAt time.Time    `json:"enqueued_at"`
 	UpdatedAt  time.Time    `json:"updated_at"`
+	AJob       *atlante.Job `json:"-"`
+	PDF        string       `json:"pdf_url"`
+	LastGen    string       `json:"last_generated"` // RFC 3339 format
 }
 
 type Provider interface {
@@ -71,5 +74,6 @@ func NewJob(jobID string, ajob *atlante.Job) *Job {
 		Status:     field.Status{field.Requested{}},
 		EnqueuedAt: t,
 		UpdatedAt:  t,
+		AJob:       ajob,
 	}
 }
