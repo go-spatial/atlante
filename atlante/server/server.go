@@ -432,6 +432,7 @@ func (s *Server) QueueHandler(w http.ResponseWriter, request *http.Request, urlP
 	}
 	if ji.Bounds == nil && ji.MdgID == nil {
 		badRequest(w, "mdgid or bounds must be given")
+		return
 	}
 
 	sheetName, ok := urlParams[string(ParamsKeySheetname)]
@@ -492,6 +493,7 @@ func (s *Server) QueueHandler(w http.ResponseWriter, request *http.Request, urlP
 		case field.Requested, field.Started:
 			// Job is already there just return
 			// info about the old job.
+			setHeaders(nil, w)
 			if err = json.NewEncoder(w).Encode(jb); err != nil {
 				serverError(w, "failed marshal json: %v", err)
 			}
@@ -590,7 +592,7 @@ func (s *Server) JobInfoHandler(w http.ResponseWriter, request *http.Request, ur
 				job.PDF = pdfURL.String()
 				job.LastGen = pdfURL.TimeString()
 			}
-		} 
+		}
 	}
 
 	setHeaders(nil, w)
