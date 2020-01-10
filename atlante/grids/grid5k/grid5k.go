@@ -2,8 +2,9 @@ package grid5k
 
 import (
 	"fmt"
-	"github.com/prometheus/common/log"
 	"math"
+
+	"github.com/prometheus/common/log"
 
 	"github.com/gdey/errors"
 	"github.com/go-spatial/geom"

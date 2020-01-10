@@ -37,7 +37,7 @@ type GridTemplateContext struct {
 func (grctx *GridTemplateContext) SetWidthHeight(w float64, h float64) string {
 	grctx.Width = w
 	grctx.Height = h
-	log.Infof("Setting page size to %v x %v",w,h)
+	log.Infof("Setting page size to %v x %v", w, h)
 	return ""
 }
 
@@ -268,7 +268,7 @@ func GeneratePDF(ctx context.Context, sheet *Sheet, grid *grids.Cell, filenames 
 		Height: heightpts,
 	}
 	// Fill out template
-	err = sheet.Execute(file,gtc)
+	err = sheet.Execute(file, gtc)
 	if err != nil {
 		sheet.EmitError("template processing failure", err)
 		log.Warnf("error trying to fillout sheet template")

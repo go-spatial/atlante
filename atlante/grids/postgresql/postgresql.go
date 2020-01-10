@@ -5,7 +5,6 @@ import (
 	"crypto/x509"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"strconv"
 	"sync"
 	"time"
@@ -16,6 +15,7 @@ import (
 	"github.com/go-spatial/maptoolkit/atlante/grids"
 	"github.com/go-spatial/tegola"
 	"github.com/jackc/pgx"
+	"github.com/prometheus/common/log"
 )
 
 // Name is the name of the provider type
@@ -358,7 +358,7 @@ func (p *Provider) CellForBounds(bounds geom.Extent, srid uint) (*grids.Cell, er
 		query = p.queryBounds
 	}
 
-	log.Printf("Running SQL: %v\n%v", selectQuery, bounds)
+	//log.Infof("Running SQL: %v\n%v", selectQuery, bounds)
 
 	// bounds is sw,ne
 	row := p.pool.QueryRow(query, bounds[0], bounds[1], bounds[2], bounds[3], srid)
@@ -386,7 +386,7 @@ func (p *Provider) CellForBounds(bounds geom.Extent, srid uint) (*grids.Cell, er
 		cell.NeDms = &grids.Cell_LatLngDMS{Lat: neDMS[0].AsString(1), Lng: neDMS[1].AsString(1)}
 	*/
 	cell.Len = &grids.Cell_LatLng{Lat: float32(latlen), Lng: float32(lnglen)}
-	log.Printf("cell: %v", cell)
+	log.Infof("cell: %v", cell)
 
 	return cell, nil
 }
@@ -432,6 +432,8 @@ LIMIT 1;
 	if p.queryLngLat != "" {
 		query = p.queryLngLat
 	}
+
+	//log.Infof("lat/lng sql: %v",query)
 
 	row := p.pool.QueryRow(query, lng, lat, srid)
 

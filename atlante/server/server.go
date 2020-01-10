@@ -137,6 +137,7 @@ var (
 	// DefaultCORSHeaders define the default CORS response headers added to all requests
 	DefaultCORSHeaders = map[string]string{
 		"Access-Control-Allow-Origin":  "*",
+		"Access-Control-Allow-Headers": "*",
 		"Access-Control-Allow-Methods": "DELETE, GET, POST, PUT, OPTIONS",
 	}
 )
@@ -162,12 +163,14 @@ func setHeaders(h map[string]string, w http.ResponseWriter) {
 func badRequest(w http.ResponseWriter, reasonFmt string, data ...interface{}) {
 	str := fmt.Sprintf(reasonFmt, data...)
 	log.Infof("got error: %v", str)
-	w.Header().Set(HTTPErrorHeader, str)
+	setHeaders(map[string]string{HTTPErrorHeader: str}, w)
 	w.WriteHeader(http.StatusBadRequest)
 }
 
 func serverError(w http.ResponseWriter, reasonFmt string, data ...interface{}) {
-	w.Header().Set(HTTPErrorHeader, fmt.Sprintf(reasonFmt, data...))
+	setHeaders(map[string]string{
+		HTTPErrorHeader: fmt.Sprintf(reasonFmt, data...),
+	}, w)
 	w.WriteHeader(http.StatusInternalServerError)
 }
 
@@ -318,6 +321,7 @@ func (s *Server) GridInfoHandler(w http.ResponseWriter, request *http.Request, u
 
 	sheet, err := s.Atlante.SheetFor(sheetName)
 	if err != nil {
+		log.Infof("Failed to get sheet %v, %v", sheetName, err)
 		badRequest(w, "error getting sheet(%v):%v", sheetName, err)
 		return
 	}
@@ -329,6 +333,8 @@ func (s *Server) GridInfoHandler(w http.ResponseWriter, request *http.Request, u
 		cell, err = sheet.CellForMDGID(mdgid)
 		if err != nil {
 			if err == grids.ErrNotFound {
+				log.Infof("%v: failed to find grid for mdgid: %v", sheetName, mdgidStr)
+				setHeaders(nil, w)
 				w.WriteHeader(http.StatusNotFound)
 				return
 			}
@@ -364,6 +370,8 @@ func (s *Server) GridInfoHandler(w http.ResponseWriter, request *http.Request, u
 		cell, err = sheet.CellForLatLng(lat, lng, srid)
 		if err != nil {
 			if err == grids.ErrNotFound {
+				log.Infof("%v: failed to find lat/lng: %v,%v,%v", sheetName, lat, lng, srid)
+				setHeaders(nil, w)
 				w.WriteHeader(http.StatusNotFound)
 				return
 			}
@@ -391,13 +399,13 @@ func (s *Server) GridInfoHandler(w http.ResponseWriter, request *http.Request, u
 	// Ask the coordinator for the status:
 	jobs := s.Coordinator.FindByJob(&atlante.Job{SheetName: sheetName, Cell: cell})
 
-	// content type
-	w.Header().Add("Content-Type", "application/json")
-
-	// cache control headers (no-cache)
-	w.Header().Add("Cache-Control", "no-cache, no-store, must-revalidate")
-	w.Header().Add("Pragma", "no-cache")
-	w.Header().Add("Expires", "0")
+	setHeaders(map[string]string{
+		"Content-Type":  "application/json",
+		"Cache-Control": "no-cache, no-store, must-revalidate",
+		"Pragma":        "no-cache",
+		"Expires":       "0",
+	},
+		w)
 
 	encodeCellAsJSON(w, cell, pdfURL, latp, lngp, jobs)
 }
@@ -532,6 +540,7 @@ func (s *Server) QueueHandler(w http.ResponseWriter, request *http.Request, urlP
 		field.Status{field.Requested{}},
 	)
 
+	setHeaders(nil, w)
 	if err = json.NewEncoder(w).Encode(jb); err != nil {
 		serverError(w, "failed marshal json: %v", err)
 		return
@@ -560,6 +569,7 @@ func (s *Server) SheetInfoHandler(w http.ResponseWriter, request *http.Request, 
 		})
 	}
 
+	setHeaders(nil, w)
 	err := json.NewEncoder(w).Encode(newSheets)
 	if err != nil {
 		serverError(w, "failed to marshal json: %v", err)
@@ -582,6 +592,7 @@ func (s *Server) JobInfoHandler(w http.ResponseWriter, request *http.Request, ur
 		return
 	}
 
+	setHeaders(nil, w)
 	if err := json.NewEncoder(w).Encode(job); err != nil {
 		serverError(w, "failed to marshal json: %v", err)
 	}
@@ -600,6 +611,8 @@ func (s *Server) JobsHandler(w http.ResponseWriter, request *http.Request, urlPa
 	if jobs == nil {
 		jobs = []*coordinator.Job{}
 	}
+
+	setHeaders(nil, w)
 	err = json.NewEncoder(w).Encode(jobs)
 	if err != nil {
 		serverError(w, "failed to marshal json: %v", err)
@@ -621,6 +634,7 @@ func (s *Server) NotificationHandler(w http.ResponseWriter, request *http.Reques
 	job, ok := s.Coordinator.FindByJobID(jobid)
 	if !ok {
 		log.Infof("failed to find job: %v", jobid)
+		setHeaders(nil, w)
 		w.WriteHeader(http.StatusNotFound)
 		return
 	}
@@ -645,6 +659,7 @@ func (s *Server) NotificationHandler(w http.ResponseWriter, request *http.Reques
 	if err := s.Coordinator.UpdateField(job, si); err != nil {
 		serverError(w, "failed to update job %v: %v", jobid, err)
 	}
+	setHeaders(nil, w)
 	w.WriteHeader(http.StatusNoContent)
 }
 
@@ -652,6 +667,7 @@ func (s *Server) NotificationHandler(w http.ResponseWriter, request *http.Reques
 // TODO(gdey): make the handler more intelligent as we understand more about the environment.
 func (*Server) HealthCheckHandler(w http.ResponseWriter, _ *http.Request, _ map[string]string) {
 	// We always return a 200 while we are able to serve requests.
+	setHeaders(nil, w)
 	w.WriteHeader(http.StatusOK)
 	return
 }
@@ -680,7 +696,7 @@ func (s *Server) RegisterRoutes(r *httptreemux.TreeMux) {
 		log.Infof("registering: POST /sheets/:sheetname/mdgid")
 		group.POST("/mdgid", s.QueueHandler)
 		log.Infof("registering: POST /sheets/:sheetname/bounds")
-		group.POST("/bounds",s.QueueHandler)
+		group.POST("/bounds", s.QueueHandler)
 	}
 
 	log.Infof("registering: GET  /jobs")

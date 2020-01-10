@@ -4,7 +4,6 @@ package grids
 
 import (
 	"fmt"
-	"log"
 	"math"
 	"strconv"
 	"strings"
@@ -402,7 +401,7 @@ func toDMS(v float64) (d int64, m int64, s float64) {
 
 // ToDMS will take a lat/lon value and convert it to a DMS value
 func ToDMS(lat, lng float64) (todms [2]DMS) {
-	defer func() { log.Printf("converted %v, %v to %v", lat, lng, todms) }()
+	//defer func() { log.Printf("converted %v, %v to %v", lat, lng, todms) }()
 	latD, latM, latS := toDMS(lat)
 	latH := 'N'
 	if lat < 0 {
