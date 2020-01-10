@@ -19,9 +19,9 @@ const (
 
 // TODO(gdey) : get a proper projection system
 var WGS84Ellipsoid = coord.Ellipsoid{
-	Name: "WSG_84",
-	Radius: MercatorEarthRadius,
-	Eccentricity: 0.00669438,
+	Name:           "WSG_84",
+	Radius:         MercatorEarthRadius,
+	Eccentricity:   0.00669438,
 	NATOCompatible: true,
 }
 
@@ -75,49 +75,49 @@ from: https://sentinelhub-py.readthedocs.io/en/latest/_modules/sentinelhub/geo_u
 func BoundsPixelWidthHeight(sw, ne coord.LngLat, gm float64) (float64, float64, error) {
 	utmSw, err := utm.FromLngLat(sw, WGS84Ellipsoid)
 	if err != nil {
-		return 0,0,err
+		return 0, 0, err
 	}
 	utmNe, err := utm.FromLngLat(ne, WGS84Ellipsoid)
 	if err != nil {
-		return 0,0,err
+		return 0, 0, err
 	}
 
 	width := math.Abs(utmNe.Easting-utmSw.Easting) / gm
 	height := math.Abs(utmNe.Northing-utmSw.Northing) / gm
-	return width, height,nil
+	return width, height, nil
 
 }
 
-func GroundFromMapWidth(sw, ne coord.LngLat, imageWidth float64) (float64,error) {
+func GroundFromMapWidth(sw, ne coord.LngLat, imageWidth float64) (float64, error) {
 
-	utmSw, err := utm.FromLngLat(sw,WGS84Ellipsoid)
+	utmSw, err := utm.FromLngLat(sw, WGS84Ellipsoid)
 	if err != nil {
 		return 0, err
 	}
-	utmNe, err := utm.FromLngLat(ne,WGS84Ellipsoid)
+	utmNe, err := utm.FromLngLat(ne, WGS84Ellipsoid)
 	if err != nil {
 		return 0, err
 	}
 
-	gm :=  math.Abs(utmNe.Easting - utmSw.Easting)/imageWidth
+	gm := math.Abs(utmNe.Easting-utmSw.Easting) / imageWidth
 	log.Infof("easting1 %v easting2 %v  gm %v", utmNe.Easting, utmSw.Easting, gm)
-	return gm,nil
+	return gm, nil
 }
 
-func GroundFromMapHeight(sw, ne coord.LngLat, imageHeight float64) (float64,error) {
+func GroundFromMapHeight(sw, ne coord.LngLat, imageHeight float64) (float64, error) {
 
-	utmSw, err := utm.FromLngLat(sw,WGS84Ellipsoid)
+	utmSw, err := utm.FromLngLat(sw, WGS84Ellipsoid)
 	if err != nil {
 		return 0, err
 	}
-	utmNe, err := utm.FromLngLat(ne,WGS84Ellipsoid)
+	utmNe, err := utm.FromLngLat(ne, WGS84Ellipsoid)
 	if err != nil {
 		return 0, err
 	}
 
-	gm :=  math.Abs(utmNe.Northing - utmSw.Northing)/imageHeight
+	gm := math.Abs(utmNe.Northing-utmSw.Northing) / imageHeight
 	log.Infof("northing1 %v northing2 %v  gm %v", utmNe.Northing, utmSw.Northing, gm)
-	return gm,nil
+	return gm, nil
 }
 
 // Scale returns the map scale for the given ground resolution and dpi

@@ -279,8 +279,8 @@ func (s *Server) GetScheme(r *http.Request) string {
 	}
 }
 
-// URLRoot builds a stirng containing the scheme, host and prot based on a combination of user defined values,
-// headers and request parameters. The funciton is public so it can be overridden for other implementation.
+// URLRoot builds a string containing the scheme, host and prot based on a combination of user defined values,
+// headers and request parameters. The function is public so it can be overridden for other implementation.
 func (s *Server) URLRoot(r *http.Request) string {
 	return fmt.Sprintf("%v://%v", s.GetScheme(r), s.GetHostName(r))
 }
@@ -374,18 +374,9 @@ func (s *Server) GridInfoHandler(w http.ResponseWriter, request *http.Request, u
 	}
 
 	// Figure out the PDF URL
-	if pather, ok := sheet.Filestore.(filestore.Pather); ok {
+	{
 		gf := s.Atlante.FilenamesForCell(sheetName, cell)
-		pdfURL, err = pather.PathURL(mdgid.AsString(), gf.PDF, false)
-		if err != nil {
-			if err == filestore.ErrUnsupportedOperation {
-				// no opt
-			} else if e, ok := err.(filestore.ErrPath); ok && e.Err == filestore.ErrFileDoesNotExist {
-				// no opt
-			} else {
-				log.Warnf("filestore error: %v", e)
-			}
-		}
+		pdfURL, _ = sheet.GetURL(mdgid.AsString(), gf.PDF, false)
 	}
 
 	// Ask the coordinator for the status:
@@ -402,7 +393,7 @@ func (s *Server) GridInfoHandler(w http.ResponseWriter, request *http.Request, u
 	encodeCellAsJSON(w, cell, pdfURL, latp, lngp, jobs)
 }
 
-// QueueHandler takes a job from a post and enqueues it on the configured queue
+// QueueHandler takes a job from a post and queues it on the configured queue
 // if the job has not be submitted before
 func (s *Server) QueueHandler(w http.ResponseWriter, request *http.Request, urlParams map[string]string) {
 	// TODO(gdey): this initial version will not do job tracking.
@@ -581,6 +572,24 @@ func (s *Server) JobInfoHandler(w http.ResponseWriter, request *http.Request, ur
 		w.WriteHeader(http.StatusNotFound)
 		return
 	}
+	if job.AJob != nil {
+		log.Infof("Attempting to get pdfurl, for %v", jobid)
+		sheetName := job.SheetName
+		sheetName = s.Atlante.NormalizeSheetName(sheetName, false)
+		sheet, err := s.Atlante.SheetFor(sheetName)
+		if err == nil {
+			// let's see if we can fill out the pdf and LastGen parts
+			mdgid := job.MdgID
+			gf := s.Atlante.FilenamesForCell(sheetName, job.AJob.Cell)
+			if pdfURL, ok := sheet.GetURL(mdgid, gf.PDF, false); ok {
+				job.PDF = pdfURL.String()
+				job.LastGen = pdfURL.TimeString()
+			}
+		} else {
+			log.Infof("got error getting sheet: %v %v", sheetName, err)
+
+		}
+	}
 
 	if err := json.NewEncoder(w).Encode(job); err != nil {
 		serverError(w, "failed to marshal json: %v", err)
@@ -599,6 +608,24 @@ func (s *Server) JobsHandler(w http.ResponseWriter, request *http.Request, urlPa
 	// Make sure we always encode an empty array.
 	if jobs == nil {
 		jobs = []*coordinator.Job{}
+	}
+	for i := range jobs {
+		if jobs[i] == nil || jobs[i].AJob == nil {
+			continue
+		}
+		sheetName := jobs[i].SheetName
+		sheetName = s.Atlante.NormalizeSheetName(sheetName, false)
+		sheet, err := s.Atlante.SheetFor(sheetName)
+		if err != nil {
+			continue
+		}
+		// let's see if we can fill out the pdf and LastGen parts
+		mdgid := jobs[i].MdgID
+		gf := s.Atlante.FilenamesForCell(sheetName, jobs[i].AJob.Cell)
+		if pdfURL, ok := sheet.GetURL(mdgid, gf.PDF, false); ok {
+			jobs[i].PDF = pdfURL.String()
+			jobs[i].LastGen = pdfURL.TimeString()
+		}
 	}
 	err = json.NewEncoder(w).Encode(jobs)
 	if err != nil {
@@ -680,7 +707,7 @@ func (s *Server) RegisterRoutes(r *httptreemux.TreeMux) {
 		log.Infof("registering: POST /sheets/:sheetname/mdgid")
 		group.POST("/mdgid", s.QueueHandler)
 		log.Infof("registering: POST /sheets/:sheetname/bounds")
-		group.POST("/bounds",s.QueueHandler)
+		group.POST("/bounds", s.QueueHandler)
 	}
 
 	log.Infof("registering: GET  /jobs")

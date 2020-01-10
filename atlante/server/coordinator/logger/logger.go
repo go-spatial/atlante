@@ -85,7 +85,7 @@ func (p *Provider) UpdateField(job *coordinator.Job, fields ...field.Value) erro
 				log.Infof("unknown status: %t", status)
 			}
 		default:
-			log.Infof("unkown field[%v] %t", i, fld)
+			log.Infof("unknown field[%v] %t", i, fld)
 			return errors.String("unknown field type")
 		}
 	}

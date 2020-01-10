@@ -143,7 +143,7 @@ func rootCmdParseArgs(ctx context.Context, a *atlante.Atlante) (*atlante.Generat
 		// We have bounds to deal with.
 		sname := a.NormalizeSheetName(sheetName, true)
 		ext := geom.Extent{float64(bounds[0]), float64(bounds[1]), float64(bounds[2]), float64(bounds[3])}
-		return a.GeneatePDFBounds(ctx, sname, ext, uint(srid), "")
+		return a.GeneratePDFBounds(ctx, sname, ext, uint(srid), "")
 	default:
 		sname := a.NormalizeSheetName(sheetName, true)
 		return a.GeneratePDFMDGID(ctx, sname, grids.NewMDGID(mdgid), "")

@@ -13,6 +13,7 @@ import (
 	"github.com/go-spatial/maptoolkit/atlante/internal/urlutil"
 	"github.com/go-spatial/maptoolkit/atlante/notifiers"
 	"github.com/go-spatial/maptoolkit/atlante/server/coordinator/field"
+	"github.com/prometheus/common/log"
 )
 
 const (
@@ -147,6 +148,31 @@ func (sheet *Sheet) EmitError(desc string, err error) error {
 		Description: desc,
 		Error:       err,
 	})
+}
+
+func (sheet *Sheet) GetURL(mdgid string, filename string, intermediate bool) (filestore.URLInfo, bool) {
+	var (
+		pdfURL filestore.URLInfo
+	)
+	if sheet == nil {
+		return pdfURL, false
+	}
+	pather, ok := sheet.Filestore.(filestore.Pather)
+	if !ok {
+		return pdfURL, false
+	}
+	pdfURL, err := pather.PathURL(mdgid, filename, intermediate)
+	if err != nil {
+		if err == filestore.ErrUnsupportedOperation {
+			// no opt
+		} else if e, ok := err.(filestore.ErrPath); ok && e.Err == filestore.ErrFileDoesNotExist {
+			// no opt
+		} else {
+			log.Warnf("filestore error: %v", e)
+		}
+		return pdfURL, false
+	}
+	return pdfURL, true
 }
 
 // NormalizeSheetName will return a normalized version of the sheetname, or if the sheet

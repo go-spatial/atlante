@@ -37,7 +37,7 @@ type GridTemplateContext struct {
 func (grctx *GridTemplateContext) SetWidthHeight(w float64, h float64) string {
 	grctx.Width = w
 	grctx.Height = h
-	log.Infof("Setting page size to %v x %v",w,h)
+	log.Infof("Setting page size to %v x %v", w, h)
 	return ""
 }
 
@@ -151,7 +151,7 @@ func NewFilenameTemplate(fnTemplate string) (*filenameTemplate, error) {
 	return &ft, err
 }
 
-const DefaultFilenameTemplate = "{{.SheetName}}_{{.Grid.ReferenceNumber}}.{{.Ext}}"
+const DefaultFilenameTemplate = "{{.SheetName}}_{{if .Grid.MetaData.filename}}{{.Grid.MetaData.filename}}{{else}}{{.Grid.ReferenceNumber}}{{end}}.{{.Ext}}"
 
 // Filenames geneate the various filename for the different types we need
 func (ft filenameTemplate) Filename(sheetName string, grid *grids.Cell, wd string, ext string) string {
@@ -268,7 +268,7 @@ func GeneratePDF(ctx context.Context, sheet *Sheet, grid *grids.Cell, filenames 
 		Height: heightpts,
 	}
 	// Fill out template
-	err = sheet.Execute(file,gtc)
+	err = sheet.Execute(file, gtc)
 	if err != nil {
 		sheet.EmitError("template processing failure", err)
 		log.Warnf("error trying to fillout sheet template")
@@ -356,6 +356,29 @@ func (a *Atlante) FilenamesForCell(sheetName string, cell *grids.Cell) *Generate
 	return NewGeneratedFilesFromTpl(filenameGenerator, sheetName, cell, a.workDirectory)
 }
 
+func (a *Atlante) generatePDF(ctx context.Context, sheet *Sheet, grid *grids.Cell, filenameTemplate string) (*GeneratedFiles, error) {
+	filenames, err := a.filenamesForCell(sheet.Name, grid, filenameTemplate)
+	if err != nil {
+		return nil, err
+	}
+	if a.Notifier != nil && a.JobID != "" {
+		sheet.Emitter, err = a.Notifier.NewEmitter(a.JobID)
+		if err != nil {
+			sheet.Emitter = nil
+			log.Warnf("Failed to init emitter: %v", err)
+		}
+	}
+	err = GeneratePDF(ctx, sheet, grid, filenames)
+	if sheet.Emitter != nil {
+		if err != nil {
+			sheet.Emitter.Emit(field.Failed{Error: err})
+		} else {
+			sheet.Emitter.Emit(field.Completed{})
+		}
+	}
+	return filenames, err
+}
+
 func (a *Atlante) GeneratePDFLatLng(ctx context.Context, sheetName string, lat, lng float64, srid uint64, filenameTemplate string) (*GeneratedFiles, error) {
 	if a == nil {
 		return nil, ErrNilAtlanteObject
@@ -387,35 +410,16 @@ func (a *Atlante) GeneratePDFLatLng(ctx context.Context, sheetName string, lat, 
 
 }
 
-func (a *Atlante) generatePDF(ctx context.Context, sheet *Sheet, grid *grids.Cell, filenameTemplate string) (*GeneratedFiles, error) {
-	filenames, err := a.filenamesForCell(sheet.Name, grid, filenameTemplate)
-	if err != nil {
-		return nil, err
-	}
-	if a.Notifier != nil && a.JobID != "" {
-		sheet.Emitter, err = a.Notifier.NewEmitter(a.JobID)
-		if err != nil {
-			sheet.Emitter = nil
-			log.Warnf("Failed to init emitter: %v", err)
-		}
-	}
-	err = GeneratePDF(ctx, sheet, grid, filenames)
-	if sheet.Emitter != nil {
-		if err != nil {
-			sheet.Emitter.Emit(field.Failed{Error: err})
-		} else {
-			sheet.Emitter.Emit(field.Completed{})
-		}
-	}
-	return filenames, err
-}
-
 func (a *Atlante) GeneratePDFJob(ctx context.Context, job Job, filenameTemplate string) (*GeneratedFiles, error) {
 	cell := job.Cell
 	sheet, err := a.SheetFor(job.SheetName)
 	if err != nil {
 		return nil, err
 	}
+	if cell.MetaData == nil {
+		cell.MetaData = make(map[string]string)
+	}
+	cell.MetaData["job_id"] = job.MetaData["job_id"]
 	a.JobID = job.MetaData["job_id"]
 	return a.generatePDF(ctx, sheet, cell, filenameTemplate)
 }
@@ -434,7 +438,7 @@ func (a *Atlante) GeneratePDFMDGID(ctx context.Context, sheetName string, mdgID 
 	return a.generatePDF(ctx, sheet, cell, filenameTemplate)
 }
 
-func (a *Atlante) GeneatePDFBounds(ctx context.Context, sheetName string, bounds geom.Extent, srid uint, filenameTemplate string) (*GeneratedFiles, error) {
+func (a *Atlante) GeneratePDFBounds(ctx context.Context, sheetName string, bounds geom.Extent, srid uint, filenameTemplate string) (*GeneratedFiles, error) {
 	sheet, err := a.SheetFor(sheetName)
 	if err != nil {
 		return nil, err
@@ -444,5 +448,6 @@ func (a *Atlante) GeneatePDFBounds(ctx context.Context, sheetName string, bounds
 	if err != nil {
 		return nil, err
 	}
+
 	return a.generatePDF(ctx, sheet, cell, filenameTemplate)
 }
