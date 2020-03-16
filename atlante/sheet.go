@@ -65,6 +65,9 @@ type Sheet struct {
 	UseCached bool
 }
 
+// loadTemplateDir will load additional tempalates if the location is local and there is
+// a directory called `templates` in the base of location. It will load all file with
+// the extention `.tpl` from the `templates` directory
 func loadTemplateDir(t *template.Template, location *url.URL) (*template.Template, error) {
 	if urlutil.IsRemote(location) {
 		return t, nil

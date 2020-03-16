@@ -22,6 +22,16 @@ import (
 	"github.com/go-spatial/maptoolkit/atlante/template/trellis"
 )
 
+const (
+	ArgsKeyX            = "X"
+	ArgsKeyY            = "Y"
+	ArgsKeyWidth        = "Width"
+	ArgsKeyHeight       = "Height"
+	ArgsKeyNumberOfRows = "Number-Of-Rows"
+	ArgsKeyNumberOfCols = "Number-Of-Cols"
+	ArgsKeyFlipY        = "Flip-Y"
+)
+
 var funcMap = template.FuncMap{
 	"to_upper":           strings.ToUpper,
 	"to_lower":           strings.ToLower,
@@ -921,7 +931,7 @@ func (sg *simpleGrid) ColLabel(col int) string {
 }
 
 func simpleGridFromArgs(args tplArgs) (*simpleGrid, error) {
-	if vals := args.Required("X", "Y", "Width", "Height"); len(vals) != 0 {
+	if vals := args.Required(ArgsKeyX, ArgsKeyY, ArgsKeyWidth, ArgsKeyHeight); len(vals) != 0 {
 		return nil, fmt.Errorf("Missing required keys: (%v)", strings.Join(vals, ","))
 	}
 	var (
@@ -930,38 +940,38 @@ func simpleGridFromArgs(args tplArgs) (*simpleGrid, error) {
 		YFlip        bool
 		err          error
 	)
-	if args.Has("Number-Of-Rows") {
-		NumberOfRows, err = args.GetAsUint("Number-Of-Rows")
+	if args.Has(ArgsKeyNumberOfRows) {
+		NumberOfRows, err = args.GetAsUint(ArgsKeyNumberOfRows)
 		if err != nil {
 			return nil, err
 		}
 		NumberOfCols = NumberOfRows
 	}
-	if args.Has("Number-Of-Cols") {
-		NumberOfCols, err = args.GetAsUint("Number-Of-Cols")
+	if args.Has(ArgsKeyNumberOfCols) {
+		NumberOfCols, err = args.GetAsUint(ArgsKeyNumberOfCols)
 		if err != nil {
 			return nil, err
 		}
 	}
-	if args.Has("Flip-Y") {
-		YFlip, err = args.GetAsBool("Flip-Y")
+	if args.Has(ArgsKeyFlipY) {
+		YFlip, err = args.GetAsBool(ArgsKeyFlipY)
 		if err != nil {
 			return nil, err
 		}
 	}
-	x, err := args.GetAsFloat64("X")
+	x, err := args.GetAsFloat64(ArgsKeyX)
 	if err != nil {
 		return nil, err
 	}
-	y, err := args.GetAsFloat64("Y")
+	y, err := args.GetAsFloat64(ArgsKeyY)
 	if err != nil {
 		return nil, err
 	}
-	width, err := args.GetAsFloat64("Width")
+	width, err := args.GetAsFloat64(ArgsKeyWidth)
 	if err != nil {
 		return nil, err
 	}
-	height, err := args.GetAsFloat64("Height")
+	height, err := args.GetAsFloat64(ArgsKeyHeight)
 	if err != nil {
 		return nil, err
 	}

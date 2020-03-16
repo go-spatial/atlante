@@ -165,13 +165,4 @@ func (grate *Grating) PositionFor(row, col int) geom.Point {
 		grate.XForCol(col),
 		grate.YForRow(row),
 	}
-	rowOffset := (float64(row) * grate.Height)
-	if grate.FlipY {
-		rowOffset *= -1
-	}
-	colOffset := (float64(col) * grate.Width)
-	return geom.Point{
-		grate.Extent[0] + colOffset,
-		grate.Extent[1] + rowOffset,
-	}
 }
