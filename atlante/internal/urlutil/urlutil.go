@@ -5,12 +5,13 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"log"
 	"net/http"
 	"net/url"
 	"os"
 	"strings"
 	"time"
+
+	"github.com/prometheus/common/log"
 )
 
 // ErrRemoteFile is an error that was caused when trying to access a remote file.
@@ -80,7 +81,7 @@ func NewReader(location *url.URL) (io.ReadCloser, error) {
 		filename := location.EscapedPath()
 		if _, err := os.Stat(filename); os.IsNotExist(err) {
 			wd, err := os.Getwd()
-			log.Printf("Could not find file: %v \n pwd: %v : %v", filename, wd, err)
+			log.Errorf("Could not find file: %v \n pwd: %v : %v", filename, wd, err)
 			return nil, ErrFileNotExists{Filename: filename, Err: err}
 		}
 
@@ -111,6 +112,20 @@ func NewReader(location *url.URL) (io.ReadCloser, error) {
 
 	}
 
+}
+
+// IsRemote returns if the url points to a remote resource
+func IsRemote(location *url.URL) bool {
+	if location == nil {
+		return false
+	}
+	loc := strings.ToLower(location.Scheme)
+	switch loc {
+	case "", "file":
+		return false
+	default:
+		return true
+	}
 }
 
 // ReadAll will return all bytes from the url location

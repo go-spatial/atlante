@@ -5,42 +5,83 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
 	"math"
 	"reflect"
-	"strconv"
 	"strings"
 	"text/template"
 	"time"
 
+	"github.com/gdey/as"
+	"github.com/prometheus/common/log"
+
 	"github.com/go-spatial/geom"
 	"github.com/go-spatial/geom/planar/coord"
 	"github.com/go-spatial/maptoolkit/atlante/server/coordinator/field"
+	"github.com/go-spatial/maptoolkit/atlante/template/grating"
 	"github.com/go-spatial/maptoolkit/atlante/template/remote"
 	"github.com/go-spatial/maptoolkit/atlante/template/trellis"
 )
 
 var funcMap = template.FuncMap{
-	"to_upper":     strings.ToUpper,
-	"to_lower":     strings.ToLower,
-	"format":       tplFormat,
-	"now":          time.Now,
-	"div":          tplMathDiv,
-	"add":          tplMathAdd,
-	"sub":          tplMathSub,
-	"mul":          tplMathMul,
-	"neg":          tplMathNeg,
-	"abs":          tplMathAbs,
-	"seq":          tplSeq,
-	"new_toggler":  tplNewToggle,
-	"rounder_for":  tplRoundTo,
-	"rounder3":     tplRound3,
-	"first":        tplFirstNonZero,
-	"DrawBars":     TplDrawBars,
-	"asIntSlice":   IntSlice,
-	"pixel_bounds": PixelBounds,
-	"join":         tplStringJoin,
-	"idx":          tplIndexOf,
+	"to_upper":           strings.ToUpper,
+	"to_lower":           strings.ToLower,
+	"format":             tplFormat,
+	"now":                time.Now,
+	"div":                tplMathDiv,
+	"add":                tplMathAdd,
+	"sub":                tplMathSub,
+	"mul":                tplMathMul,
+	"neg":                tplMathNeg,
+	"abs":                tplMathAbs,
+	"seq":                tplSeq,
+	"new_toggler":        tplNewToggle,
+	"rounder_for":        tplRoundTo,
+	"rounder3":           tplRound3,
+	"first":              tplFirstNonZero,
+	"DrawBars":           TplDrawBars,
+	"asIntSlice":         IntSlice,
+	"pixel_bounds":       PixelBounds,
+	"join":               tplStringJoin,
+	"split":              tplStringSplit,
+	"idx":                tplIndexOf,
+	"point":              tplNewPoint,
+	"SimpleGridFromArgs": simpleGridFromArgs,
+	"args":               NewTplArgs,
+	"check_args":         checkArgs,
+	"indent":             Indent,
+	"log_info":           infoln,
+}
+
+func infoln(template string, vals ...interface{}) string {
+	values := []interface{}{template}
+	values = append(values, vals...)
+	str := fmt.Sprint(values...)
+	log.Infoln(str)
+
+	return fmt.Sprintf("<!-- %v -->\n", str)
+}
+
+func Indent(spaces interface{}, content string) (string, error) {
+	spc, ok := as.Int(spaces)
+	if !ok {
+		return content, fmt.Errorf("Indent space needs to be a number")
+	}
+	content = strings.TrimSpace(content)
+	var newBuff strings.Builder
+	spacer := strings.Repeat("\t", spc)
+	lines := strings.Split(content, "\n")
+	for i := range lines {
+		newBuff.WriteString(spacer)
+		newBuff.WriteString(lines[i])
+		newBuff.WriteString("\n")
+	}
+	return newBuff.String(), nil
+}
+
+func tplNewPoint(x, y interface{}) geom.Point {
+	xF64, _ := as.Float64(x)
+	yF64, _ := as.Float64(y)
+	return geom.Point{xF64, yF64}
 }
 
 func tplStringJoin(sep string, ps ...interface{}) string {
@@ -51,34 +92,28 @@ func tplStringJoin(sep string, ps ...interface{}) string {
 
 	return strings.Join(parts, sep)
 }
-
-func tplIndexOf(idx int, parts interface{}) (interface{}, error) {
-
-	v := reflect.ValueOf(parts)
-
-	if v.Kind() != reflect.Slice && v.Kind() != reflect.Array && v.Kind() != reflect.String {
-		return nil, fmt.Errorf("not slice/array/string type: %v", v.Kind())
+func tplStringSplit(sep string, it interface{}) ([]string, error) {
+	str, ok := as.String(it)
+	if !ok {
+		return nil, fmt.Errorf("%v is not a string", it)
 	}
-
-	vlen := v.Len()
-	if vlen == 0 {
-		return nil, nil
-	}
-
-	var i int
-	if idx < 0 {
-		i = vlen + idx
-	} else {
-		i = idx
-	}
-	fmt.Println("returning before idx", i)
-	i = i % vlen
-	fmt.Println("returning idx", i)
-
-	return v.Index(i).Interface(), nil
+	return strings.Split(str, sep), nil
 }
 
-// AddTemplateFunc will add the filestore based commands. It will panic if the command is already defined.
+func tplIndexOf(idxArg interface{}, partsArgs interface{}) (interface{}, error) {
+
+	idx, ok := as.Int(idxArg)
+	if !ok {
+		return nil, fmt.Errorf("first argument should be a number")
+	}
+	parts, err := as.InterfaceSlice(partsArgs)
+	if err != nil {
+		return nil, err
+	}
+	return parts[idx], nil
+}
+
+// AddTemplateFuncs will add the filestore based commands. It will panic if the command is already defined.
 func (sheet *Sheet) AddTemplateFuncs(funcMap template.FuncMap) template.FuncMap {
 	funcMap["remote"] = sheet.templateFuncRemote
 	return funcMap
@@ -99,51 +134,13 @@ func tplFormat(format string, data interface{}) string {
 	return fmt.Sprintf(format, data)
 }
 
-func toFloat64(a interface{}) (float64, bool) {
-	switch aa := a.(type) {
-	case int:
-		return float64(aa), true
-	case int8:
-		return float64(aa), true
-	case int16:
-		return float64(aa), true
-	case int32:
-		return float64(aa), true
-	case int64:
-		return float64(aa), true
-	case uint:
-		return float64(aa), true
-	case uint8:
-		return float64(aa), true
-	case uint16:
-		return float64(aa), true
-	case uint32:
-		return float64(aa), true
-	case uint64:
-		return float64(aa), true
-	case float32:
-		return float64(aa), true
-	case float64:
-		return aa, true
-	case complex64:
-		return float64(real(aa)), true
-	case complex128:
-		return float64(real(aa)), true
-	case string:
-		b, err := strconv.ParseFloat(aa, 64)
-		return b, err == nil
-	default:
-		return 0.0, false
-	}
-}
-
 func tplMathDiv(av, bv interface{}) (float64, error) {
 	// we will convert the values to float64
-	a, ok := toFloat64(av)
+	a, ok := as.Float64(av)
 	if !ok {
 		return 0, fmt.Errorf("first value (%t) needs to be a number", av)
 	}
-	b, ok := toFloat64(bv)
+	b, ok := as.Float64(bv)
 	if !ok {
 		return 0, fmt.Errorf("second value (%t) needs to be a number", bv)
 	}
@@ -155,11 +152,11 @@ func tplMathDiv(av, bv interface{}) (float64, error) {
 
 func tplMathMul(av, bv interface{}) (float64, error) {
 	// we will convert the values to float64
-	a, ok := toFloat64(av)
+	a, ok := as.Float64(av)
 	if !ok {
 		return 0, fmt.Errorf("first value (%v) needs to be a number", av)
 	}
-	b, ok := toFloat64(bv)
+	b, ok := as.Float64(bv)
 	if !ok {
 		return 0, fmt.Errorf("second value (%v) needs to be a number", bv)
 	}
@@ -168,11 +165,11 @@ func tplMathMul(av, bv interface{}) (float64, error) {
 
 func tplMathSub(av, bv interface{}) (float64, error) {
 	// we will convert the values to float64
-	a, ok := toFloat64(av)
+	a, ok := as.Float64(av)
 	if !ok {
 		return 0, fmt.Errorf("first value (%v) needs to be a number", av)
 	}
-	b, ok := toFloat64(bv)
+	b, ok := as.Float64(bv)
 	if !ok {
 		return 0, fmt.Errorf("second value (%v) needs to be a number", bv)
 	}
@@ -181,11 +178,11 @@ func tplMathSub(av, bv interface{}) (float64, error) {
 
 func tplMathAdd(av, bv interface{}) (float64, error) {
 	// we will convert the values to float64
-	a, ok := toFloat64(av)
+	a, ok := as.Float64(av)
 	if !ok {
 		return 0, fmt.Errorf("first value (%v) needs to be a number", av)
 	}
-	b, ok := toFloat64(bv)
+	b, ok := as.Float64(bv)
 	if !ok {
 		return 0, fmt.Errorf("second value (%v) needs to be a number", bv)
 	}
@@ -194,7 +191,7 @@ func tplMathAdd(av, bv interface{}) (float64, error) {
 
 func tplMathNeg(av interface{}) (float64, error) {
 	// we will convert the values to float64
-	a, ok := toFloat64(av)
+	a, ok := as.Float64(av)
 	if !ok {
 		return 0, fmt.Errorf("value (%v) needs to be a number", av)
 	}
@@ -203,14 +200,17 @@ func tplMathNeg(av interface{}) (float64, error) {
 
 func tplMathAbs(av interface{}) (float64, error) {
 	// we will convert the values to float64
-	a, ok := toFloat64(av)
+	a, ok := as.Float64(av)
 	if !ok {
 		return 0, fmt.Errorf("value (%v) needs to be a number", av)
 	}
 	return math.Abs(a), nil
 }
 
-func tplSeq(start float64, num uint, inc float64) []float64 {
+func tplSeq(startArg float64, numArg uint, incArg float64) []float64 {
+	start, _ := as.Float64(startArg)
+	num, _ := as.Uint(numArg)
+	inc, _ := as.Float64(incArg)
 	if num == 0 {
 		return []float64{}
 	}
@@ -259,15 +259,17 @@ func tplNewToggle(strs ...string) *tplToggle {
 	}
 }
 
-func tplRound(x float64, unit int) float64 {
+func tplRound(xArg interface{}, unitArg interface{}) float64 {
+	x, _ := as.Float64(xArg)
+	unit, _ := as.Int(unitArg)
 	factor := math.Pow10(unit)
 
 	return math.Round(x*factor) / factor
 }
 
-func tplRound3(x float64) float64 { return tplRound(x, 3) }
-func tplRoundTo(unit int) func(float64) float64 {
-	return func(x float64) float64 { return tplRound(x, unit) }
+func tplRound3(x interface{}) float64 { return tplRound(x, 3) }
+func tplRoundTo(unit interface{}) func(interface{}) float64 {
+	return func(x interface{}) float64 { return tplRound(x, unit) }
 }
 
 // IsZero reports whether v is a zero value for its type.
@@ -328,7 +330,7 @@ func isZero(v reflect.Value) bool {
 	default:
 		// This should never happens, but will act as a safeguard for
 		// later, as a default value doesn't makes sense here.
-		panic(&reflect.ValueError{"reflect.Value.IsZero", v.Kind()})
+		panic(&reflect.ValueError{Method: "reflect.Value.IsZero", Kind: v.Kind()})
 
 	}
 
@@ -405,51 +407,32 @@ func (lp LabelPart) DrawAt(w io.Writer, x, y float64, show ShowParts) {
 }
 
 func IntSlice(vals ...interface{}) ([]int, error) {
-	ints := make([]int, 0, len(vals))
+	var (
+		ok bool
+	)
+	ints := make([]int, len(vals))
 	for i := range vals {
-		switch v := vals[i].(type) {
-		case int8:
-			ints = append(ints, int(v))
-		case int16:
-			ints = append(ints, int(v))
-		case int32:
-			ints = append(ints, int(v))
-		case int:
-			ints = append(ints, v)
-		case int64:
-			ints = append(ints, int(v))
-		case uint8:
-			ints = append(ints, int(v))
-		case uint16:
-			ints = append(ints, int(v))
-		case uint32:
-			ints = append(ints, int(v))
-		case uint:
-			ints = append(ints, int(v))
-		case uint64:
-			ints = append(ints, int(v))
-		case float64:
-			ints = append(ints, int(v))
-		case float32:
-			ints = append(ints, int(v))
-		case string:
-			a, err := strconv.Atoi(v)
-			if err != nil {
-				return ints, err
-			}
-			ints = append(ints, a)
-		default:
-			return ints, fmt.Errorf("unknown int value at %v: '%v' ", i, v)
+		ints[i], ok = as.Int(vals[i])
+		if !ok {
+			return ints, fmt.Errorf("unknown int value at %v: '%v' ", i, vals[i])
 		}
 	}
 	return ints, nil
 }
 
-func LngLatCoord(lng, lat float64) coord.LngLat {
-	return coord.LngLat{
-		Lng: lng,
-		Lat: lat,
+func LngLatCoord(lngArg, latArg interface{}) (lnglat coord.LngLat, err error) {
+	var (
+		ok bool
+	)
+	lnglat.Lng, ok = as.Float64(lngArg)
+	if !ok {
+		return lnglat, fmt.Errorf("unknown lng value '%v' ", lngArg)
 	}
+	lnglat.Lat, ok = as.Float64(latArg)
+	if !ok {
+		return lnglat, fmt.Errorf("unknown lat value '%v' ", latArg)
+	}
+	return lnglat, nil
 }
 
 type PixelBox struct {
@@ -464,6 +447,14 @@ type PixelBox struct {
 	ColOffset    float64
 }
 
+//PixelBounds describes a bounds in pixels.
+//	Extra Values are optional values that are defined as follows:
+//		extraVals[0] is the LeftBuffer (and acts as the value for other Buffer values if not defined)
+//		extraVals[1] is the BottomBuffer (and acts as the TopBuffer if the TopBuffer value is not defined)
+//		extraVals[2] is the RightBuffer
+//		extraVals[3] is the TopBuffer
+//		extraVals[4] is the ColOffset (and acts as the value for the RowOffset if it is not defined)
+//		extraVals[5] is the RowOffset
 func PixelBounds(x1, y1, x2, y2 float64, groundPixel float64, extraVals ...float64) PixelBox {
 	pbx := PixelBox{
 		Starting:     [2]float64{x1, y1},
@@ -503,6 +494,7 @@ func PixelBounds(x1, y1, x2, y2 float64, groundPixel float64, extraVals ...float
 	return pbx
 }
 
+//TransformLine transforms a line in meters to a line in pixels
 func (pbx PixelBox) TransformLine(l geom.Line) geom.Line {
 	return geom.Line{
 		{
@@ -515,6 +507,8 @@ func (pbx PixelBox) TransformLine(l geom.Line) geom.Line {
 	}
 
 }
+
+//TransformPoint transforms a point in meter to the a point in Pixels
 func (pbx PixelBox) TransformPoint(pt geom.Point) geom.Point {
 	return geom.Point{
 		pbx.Starting[0] + (pt[0] / pbx.GroundPixel),
@@ -626,15 +620,15 @@ func TplDrawBars(bottomLeft, topRight coord.LngLat, pxlBox PixelBox, grid trelli
 		// Calculate the number of steps
 		brEblE := structure.BottomRightUTM.Easting - structure.BottomLeftUTM.Easting
 		blEbrE := structure.BottomLeftUTM.Easting - structure.BottomRightUTM.Easting
-		log.Printf("BottomRight %g BottomLeft %g easting: %g : %g", structure.BottomRightUTM.Easting, structure.BottomLeftUTM.Easting, brEblE, blEbrE)
-		log.Printf("before Number of Easting steps (cols): %v", numberOfStepsEasting)
-		log.Printf("Number of Northing steps (rows): %v", numberOfStepsNorthing)
+		log.Infof("BottomRight %g BottomLeft %g easting: %g : %g", structure.BottomRightUTM.Easting, structure.BottomLeftUTM.Easting, brEblE, blEbrE)
+		log.Infof("before Number of Easting steps (cols): %v", numberOfStepsEasting)
+		log.Infof("Number of Northing steps (rows): %v", numberOfStepsNorthing)
 
 		part := LabelPart{
 			Grid: grid,
 			Unit: "m",
 		}
-		log.Printf("Number of Easting steps (cols): %v", numberOfStepsEasting)
+		log.Infof("Number of Easting steps (cols): %v", numberOfStepsEasting)
 		for col := -1; col < numberOfStepsEasting+2; col++ {
 			colMeter := float64(structure.LeftOffset) + float64(col*size)
 			tx, ty := structure.BottomVector.Travel(colMeter)
@@ -720,7 +714,7 @@ func TplDrawBars(bottomLeft, topRight coord.LngLat, pxlBox PixelBox, grid trelli
 			}
 		}
 
-		log.Printf("Number of Northing steps (rows): %v", numberOfStepsNorthing)
+		log.Infof("Number of Northing steps (rows): %v", numberOfStepsNorthing)
 		for row := -1; row < numberOfStepsNorthing+2; row++ {
 			rowMeter := float64(row * size)
 			tx, ty := structure.LeftVector.Travel(rowMeter)
@@ -820,4 +814,172 @@ func TplDrawBars(bottomLeft, topRight coord.LngLat, pxlBox PixelBox, grid trelli
 	output.WriteString("</g>\n")
 	output.WriteString("</g>\n")
 	return output.String(), nil
+}
+
+type simpleGrid struct {
+	grate grating.Grating
+}
+
+func (sg *simpleGrid) Path() string {
+	if sg == nil {
+		return ""
+	}
+	NumberOfCols := sg.grate.Cols
+	NumberOfRows := sg.grate.Rows
+	lines := make([]geom.Line, 0, NumberOfCols+NumberOfRows)
+	for col := uint(0); col <= NumberOfCols; col++ {
+		lines = append(lines, sg.grate.LineForCol(col))
+	}
+	for row := uint(0); row <= NumberOfRows; row++ {
+		lines = append(lines, sg.grate.LineForRow(row))
+	}
+
+	var path strings.Builder
+	// convert the lines into a path
+	for _, ln := range lines {
+		path.WriteString(fmt.Sprintf("M %v %v ", ln[0][0], ln[0][1]))
+		path.WriteString(fmt.Sprintf("L %v %v ", ln[1][0], ln[1][1]))
+	}
+	return path.String()
+}
+func (sg *simpleGrid) X() float64 {
+	if sg == nil {
+		return 0.0
+	}
+	return sg.grate.Extent[0]
+}
+func (sg *simpleGrid) MaxX() float64 {
+	if sg == nil {
+		return 0.0
+	}
+	return sg.grate.Extent[2]
+}
+func (sg *simpleGrid) Y() float64 {
+	if sg == nil {
+		return 0.0
+	}
+	return sg.grate.Extent[1]
+}
+func (sg *simpleGrid) MaxY() float64 {
+	if sg == nil {
+		return 0.0
+	}
+	return sg.grate.Extent[3]
+}
+func (sg *simpleGrid) Rows() []int {
+	if sg == nil {
+		return []int{}
+	}
+	rows := make([]int, sg.grate.Rows)
+	for i := range rows {
+		rows[i] = i
+	}
+	return rows
+}
+func (sg *simpleGrid) Cols() []int {
+	if sg == nil {
+		return []int{}
+	}
+	cols := make([]int, sg.grate.Cols)
+	for i := range cols {
+		cols[i] = i
+	}
+	return cols
+}
+func (sg *simpleGrid) YForRow(row int) float64 {
+	if sg == nil {
+		return 0.0
+	}
+	return sg.grate.YForRow(row)
+}
+func (sg *simpleGrid) YForRowCenterNext(row int) float64 {
+	if sg == nil {
+		return 0.0
+	}
+	y1, y2 := sg.grate.YForRow(row), sg.grate.YForRow(row+1)
+	return y1 + ((y2 - y1) / 2)
+}
+func (sg *simpleGrid) XForColCenterNext(col int) float64 {
+	if sg == nil {
+		return 0.0
+	}
+	x1, x2 := sg.grate.XForCol(col), sg.grate.XForCol(col+1)
+	return x1 + ((x2 - x1) / 2)
+}
+
+func (sg *simpleGrid) RowLabel(row int) string {
+	if sg == nil {
+		return ""
+	}
+	return sg.grate.LabelForRow(row)
+}
+func (sg *simpleGrid) ColLabel(col int) string {
+	if sg == nil {
+		return ""
+	}
+	return sg.grate.LabelForCol(col)
+}
+
+func simpleGridFromArgs(args tplArgs) (*simpleGrid, error) {
+	if vals := args.Required("X", "Y", "Width", "Height"); len(vals) != 0 {
+		return nil, fmt.Errorf("Missing required keys: (%v)", strings.Join(vals, ","))
+	}
+	var (
+		NumberOfCols = uint(10)
+		NumberOfRows = uint(10)
+		YFlip        bool
+		err          error
+	)
+	if args.Has("Number-Of-Rows") {
+		NumberOfRows, err = args.GetAsUint("Number-Of-Rows")
+		if err != nil {
+			return nil, err
+		}
+		NumberOfCols = NumberOfRows
+	}
+	if args.Has("Number-Of-Cols") {
+		NumberOfCols, err = args.GetAsUint("Number-Of-Cols")
+		if err != nil {
+			return nil, err
+		}
+	}
+	if args.Has("Flip-Y") {
+		YFlip, err = args.GetAsBool("Flip-Y")
+		if err != nil {
+			return nil, err
+		}
+	}
+	x, err := args.GetAsFloat64("X")
+	if err != nil {
+		return nil, err
+	}
+	y, err := args.GetAsFloat64("Y")
+	if err != nil {
+		return nil, err
+	}
+	width, err := args.GetAsFloat64("Width")
+	if err != nil {
+		return nil, err
+	}
+	height, err := args.GetAsFloat64("Height")
+	if err != nil {
+		return nil, err
+	}
+
+	grate, err := grating.NewGrating(
+		x,
+		y,
+		width,
+		height,
+		NumberOfRows,
+		NumberOfCols,
+		YFlip,
+	)
+	if err != nil {
+		return nil, err
+	}
+	return &simpleGrid{
+		grate: *grate,
+	}, nil
+
 }

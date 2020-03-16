@@ -15,6 +15,7 @@ import (
 	"github.com/go-spatial/geom"
 	"github.com/go-spatial/maptoolkit/atlante/server/coordinator/field"
 	"github.com/go-spatial/maptoolkit/atlante/server/coordinator/null"
+	"github.com/go-spatial/maptoolkit/atlante/template/grating"
 	"github.com/golang/protobuf/ptypes"
 
 	"github.com/go-spatial/maptoolkit/atlante/server/coordinator"
@@ -57,6 +58,9 @@ const (
 
 	// MaxJobs returns the max number of jobs to return
 	MaxJobs = 100
+
+	GratingNumRowsKey = "grating-number-of-rows"
+	GratingNumColsKey = "grating-number-of-columns"
 )
 
 // GenPath take a set of compontents and constructs a url
@@ -412,6 +416,8 @@ func (s *Server) QueueHandler(w http.ResponseWriter, request *http.Request, urlP
 			MdgID     *string      `json:"mdgid,omitempty"`
 			MdgIDPart uint32       `json:"sheet_number,omitempty"`
 			Bounds    *geom.Extent `json:"bounds,omitempty"`
+			NumRows   *uint        `json:"number_of_rows,omitempty"`
+			NumCols   *uint        `json:"number_of_cols,omitempty"`
 			Srid      uint         `json:"srid,omitempty"`
 		}
 		cell *grids.Cell
@@ -432,6 +438,17 @@ func (s *Server) QueueHandler(w http.ResponseWriter, request *http.Request, urlP
 	}
 	if ji.Bounds == nil && ji.MdgID == nil {
 		badRequest(w, "mdgid or bounds must be given")
+		return
+	}
+
+	if ji.NumRows != nil && (*ji.NumRows < grating.MinRowCol ||
+		*ji.NumRows > grating.MaxRowCol) {
+		badRequest(w, "number_of_rows need to be between %v and %v", grating.MinRowCol, grating.MaxRowCol)
+		return
+	}
+	if ji.NumCols != nil && (*ji.NumCols < grating.MinRowCol ||
+		*ji.NumCols > grating.MaxRowCol) {
+		badRequest(w, "number_of_cols need to be between %v and %v", grating.MinRowCol, grating.MaxRowCol)
 		return
 	}
 
@@ -509,6 +526,18 @@ func (s *Server) QueueHandler(w http.ResponseWriter, request *http.Request, urlP
 	// Fill out the Metadata with JobID
 	qjob.MetaData = map[string]string{
 		"job_id": jb.JobID,
+	}
+	if ji.NumRows != nil {
+		// Add row to Metadata
+		qjob.MetaData[GratingNumRowsKey] = fmt.Sprintf("%d", *ji.NumRows)
+		qjob.MetaData[GratingNumColsKey] = fmt.Sprintf("%d", *ji.NumRows)
+	}
+	if ji.NumCols != nil {
+		// Add col to Metadata
+		qjob.MetaData[GratingNumColsKey] = fmt.Sprintf("%d", *ji.NumCols)
+		if _, ok := qjob.MetaData[GratingNumRowsKey]; !ok {
+			qjob.MetaData[GratingNumRowsKey] = fmt.Sprintf("%d", *ji.NumCols)
+		}
 	}
 
 	qjobid, err := s.Queue.Enqueue(jb.JobID, &qjob)

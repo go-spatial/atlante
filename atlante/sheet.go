@@ -2,8 +2,11 @@ package atlante
 
 import (
 	"io"
+	"io/ioutil"
 	math "math"
 	"net/url"
+	"os"
+	"path/filepath"
 	"sort"
 	"strings"
 	"text/template"
@@ -62,6 +65,45 @@ type Sheet struct {
 	UseCached bool
 }
 
+func loadTemplateDir(t *template.Template, location *url.URL) (*template.Template, error) {
+	if urlutil.IsRemote(location) {
+		return t, nil
+	}
+
+	// For now we only support template directories
+	// if the svg file is local
+	filePath := location.EscapedPath()
+	baseDir := filepath.Dir(filePath)
+	templatesDir := filepath.Join(baseDir, "templates")
+	if _, err := os.Stat(templatesDir); os.IsNotExist(err) {
+		return t, nil
+	}
+	var subtemplates []string
+
+	fileInfos, err := ioutil.ReadDir(templatesDir)
+	if err != nil {
+		return t, err
+	}
+	for _, info := range fileInfos {
+		if info.Size() == 0 || info.IsDir() {
+			continue
+		}
+		fname := info.Name()
+		if filepath.Ext(fname) != ".tpl" {
+			continue
+		}
+		subtemplates = append(subtemplates,
+			filepath.Join(templatesDir, info.Name()),
+		)
+	}
+
+	if len(subtemplates) == 0 {
+		return t, nil
+	}
+	sort.Strings(subtemplates)
+	return t.ParseFiles(subtemplates...)
+}
+
 // NewSheet returns a new sheet
 func NewSheet(name string, provider grids.Provider, dpi uint, desc string, style string, svgTemplateFilename *url.URL, fs filestore.Provider) (*Sheet, error) {
 	var (
@@ -70,11 +112,6 @@ func NewSheet(name string, provider grids.Provider, dpi uint, desc string, style
 	)
 
 	name = strings.TrimSpace(strings.ToLower(name))
-
-	tpl, err := urlutil.ReadAll(svgTemplateFilename)
-	if err != nil {
-		return nil, err
-	}
 
 	scale := provider.CellSize()
 	sheet := &Sheet{
@@ -90,14 +127,32 @@ func NewSheet(name string, provider grids.Provider, dpi uint, desc string, style
 		Width:               DefaultWidthMM,
 	}
 
-	t, err = template.New(svgTemplateFilename.String()).
-		Funcs(sheet.AddTemplateFuncs(funcMap)).
-		Option("missingkey=error").
-		Parse(string(tpl))
+	log.Infof("Sheet %v processing template: %v", name, svgTemplateFilename)
+	tpl, err := urlutil.ReadAll(svgTemplateFilename)
 	if err != nil {
 		return nil, err
 	}
+
+	t = template.New(svgTemplateFilename.String()).
+		Funcs(sheet.AddTemplateFuncs(funcMap)).
+		Option("missingkey=error")
+	t, err = loadTemplateDir(t, svgTemplateFilename)
+	if err != nil {
+		return nil, err
+	}
+
+	t, err = t.Parse(string(tpl))
+	if err != nil {
+		return nil, err
+	}
+
 	sheet.svgTemplate = t
+	// let's read in our templates
+	log.Infof("Sheet %v has the following templates.\n", name)
+	tlps := sheet.svgTemplate.Templates()
+	for i := range tlps {
+		log.Infof("\tTemplate %v : %v", i, tlps[i].Name())
+	}
 
 	return sheet, nil
 }

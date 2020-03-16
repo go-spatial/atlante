@@ -1,3 +1,5 @@
+Atlante allow one to created printed maps based on templates
+
 # Environmental variables
 
 To turn on experimental cache support set the `ATLANTE_USED_CACHED_IMAGES` to a true value.
@@ -74,4 +76,14 @@ returns
 <text>{{$partial}}</text>
 ```
 
+## Support for sub-templates
+
+If the template file is local (e.g. on the filesystem), then the `templates` directory at the
+same level will be used to load base templates; files who's extension is '.tpl'.
+
+For example: 
+
+Say that the system is loading `templates/50k.svg`, and there is a `templates/templates` directory. Then every file in the `templates/templates` directory with an extension of `.tpl` (e.g. `templates/templates/*.tpl`) will be loading before `templates/50k.svg` is parsed.
+
+This allows one to define callable templates in those files, and override them as need in `templates/50k.svg`
 

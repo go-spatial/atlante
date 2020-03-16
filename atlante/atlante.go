@@ -32,6 +32,7 @@ type GridTemplateContext struct {
 	Grid   *grids.Cell
 	Width  float64
 	Height float64
+	Args   *tplArgs
 }
 
 func (grctx *GridTemplateContext) SetWidthHeight(w float64, h float64) string {
@@ -261,11 +262,13 @@ func GeneratePDF(ctx context.Context, sheet *Sheet, grid *grids.Cell, filenames 
 	}
 
 	widthpts, heightpts := float64(sheet.WidthInPoints(72)), float64(sheet.HeightInPoints(72))
+	log.Infof("Got cell metadata: %v", grid.MetaData)
 	gtc := &GridTemplateContext{
 		Image:  &img,
 		Grid:   grid,
 		Width:  widthpts,
 		Height: heightpts,
+		Args:   NewTplArgsFromMapStringString(grid.MetaData),
 	}
 	// Fill out template
 	err = sheet.Execute(file, gtc)
@@ -417,9 +420,12 @@ func (a *Atlante) GeneratePDFJob(ctx context.Context, job Job, filenameTemplate 
 		return nil, err
 	}
 	if cell.MetaData == nil {
-		cell.MetaData = make(map[string]string)
+		cell.MetaData = make(map[string]string, len(job.MetaData))
 	}
-	cell.MetaData["job_id"] = job.MetaData["job_id"]
+	log.Infof("Got cell metadata: %v", cell.MetaData)
+	for k, v := range job.MetaData {
+		cell.MetaData[k] = v
+	}
 	a.JobID = job.MetaData["job_id"]
 	return a.generatePDF(ctx, sheet, cell, filenameTemplate)
 }
