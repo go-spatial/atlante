@@ -2,6 +2,7 @@ package grating
 
 import (
 	"fmt"
+	"math"
 	"strings"
 
 	"github.com/go-spatial/geom"
@@ -33,6 +34,23 @@ type Grating struct {
 	Width, Height float64
 
 	FlipY bool
+}
+
+func Squarish(width, height float64, division uint) (widthDivision, heightDivision float64, rows, cols uint) {
+	height, width = math.Abs(height), math.Abs(width)
+	rows, cols = division, division
+	widthDivision = width / float64(cols)
+	heightDivision = height / float64(rows)
+
+	if widthDivision >= heightDivision {
+		rows = uint(height / widthDivision)
+		heightDivision = height / float64(rows)
+		return
+	}
+	cols = uint(width / heightDivision)
+	widthDivision = width / float64(cols)
+	return
+
 }
 
 func NewGrating(x, y, width, height float64, NumberOfRows, NumberOfCols uint, flipY bool) (*Grating, error) {

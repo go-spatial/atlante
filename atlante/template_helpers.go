@@ -23,13 +23,17 @@ import (
 )
 
 const (
-	ArgsKeyX            = "X"
-	ArgsKeyY            = "Y"
-	ArgsKeyWidth        = "Width"
-	ArgsKeyHeight       = "Height"
-	ArgsKeyNumberOfRows = "Number-Of-Rows"
-	ArgsKeyNumberOfCols = "Number-Of-Cols"
-	ArgsKeyFlipY        = "Flip-Y"
+	ArgsKeyX                   = "X"
+	ArgsKeyY                   = "Y"
+	ArgsKeyWidth               = "Width"
+	ArgsKeyHeight              = "Height"
+	ArgsKeyNumberOfRows        = "Number-Of-Rows"
+	ArgsKeyNumberOfCols        = "Number-Of-Cols"
+	ArgsKeyFlipY               = "Flip-Y"
+	ArgsKeyGratingNumberOfRows = "Grating-Number-Of-Rows"
+	ArgsKeyGratingNumberOfCols = "Grating-Number-Of-Columns"
+	ArgsKeyImageWidth          = "Image-Width"
+	ArgsKeyImageHeight         = "Image-Height"
 )
 
 var funcMap = template.FuncMap{
@@ -60,6 +64,7 @@ var funcMap = template.FuncMap{
 	"check_args":         checkArgs,
 	"indent":             Indent,
 	"log_info":           infoln,
+	"squarish":           squarish,
 }
 
 func infoln(template string, vals ...interface{}) string {
@@ -69,6 +74,33 @@ func infoln(template string, vals ...interface{}) string {
 	log.Infoln(str)
 
 	return fmt.Sprintf("<!-- %v -->\n", str)
+}
+
+func squarish(args *tplArgs) (*tplArgs, error) {
+
+	division := uint(10)
+	width, _ := args.GetAsFloat64(ArgsKeyImageWidth)
+	height, _ := args.GetAsFloat64(ArgsKeyImageHeight)
+	switch {
+	case args.Has(ArgsKeyGratingNumberOfRows):
+		division, _ = args.GetAsUint(ArgsKeyGratingNumberOfRows)
+	case args.Has(ArgsKeyNumberOfRows):
+		division, _ = args.GetAsUint(ArgsKeyNumberOfRows)
+	case args.Has(ArgsKeyGratingNumberOfCols):
+		division, _ = args.GetAsUint(ArgsKeyGratingNumberOfCols)
+	case args.Has(ArgsKeyNumberOfCols):
+		division, _ = args.GetAsUint(ArgsKeyNumberOfCols)
+
+	}
+
+	_, _, rows, cols := grating.Squarish(width, height, division)
+	return args.Set(
+		ArgsKeyGratingNumberOfRows, rows,
+		ArgsKeyGratingNumberOfCols, cols,
+		ArgsKeyNumberOfRows, rows,
+		ArgsKeyNumberOfCols, cols,
+	)
+
 }
 
 func Indent(spaces interface{}, content string) (string, error) {
