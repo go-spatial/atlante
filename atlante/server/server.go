@@ -59,8 +59,9 @@ const (
 	// MaxJobs returns the max number of jobs to return
 	MaxJobs = 100
 
-	GratingNumRowsKey = "grating-number-of-rows"
-	GratingNumColsKey = "grating-number-of-columns"
+	GratingNumRowsKey  = "grating-number-of-rows"
+	GratingNumColsKey  = "grating-number-of-columns"
+	GratingSquarishKey = "grating-not-squarish"
 )
 
 // GenPath take a set of compontents and constructs a url
@@ -418,10 +419,11 @@ func (s *Server) QueueHandler(w http.ResponseWriter, request *http.Request, urlP
 			Bounds    *geom.Extent `json:"bounds,omitempty"`
 			NumRows   *uint        `json:"number_of_rows,omitempty"`
 			NumCols   *uint        `json:"number_of_cols,omitempty"`
+			Rectangle bool         `json:"rectangle,omitempty"`
 			Srid      uint         `json:"srid,omitempty"`
 		}
-		cell *grids.Cell
 		err  error
+		jobs []*coordinator.Job
 	)
 
 	// Get json body
@@ -470,35 +472,34 @@ func (s *Server) QueueHandler(w http.ResponseWriter, request *http.Request, urlP
 		ji.Srid = 4326
 	}
 
+	qjob := atlante.Job{
+		SheetName: sheetName,
+	}
+
 	// We need to figure out what type of information we have to build
 	// the cell from.
 	if ji.Bounds != nil {
 		// Assume bounds first
-		cell, err = sheet.CellForBounds(*ji.Bounds, ji.Srid)
+		qjob.Cell, err = sheet.CellForBounds(*ji.Bounds, ji.Srid)
 		if err != nil {
 			badRequest(w, "error getting grid(%v):%v", *ji.Bounds, err)
 			return
 		}
+		// bounds based will always queue up a job
 
 	} else {
 		mdgid := grids.MDGID{
 			Id:   *ji.MdgID,
 			Part: ji.MdgIDPart,
 		}
-		cell, err = sheet.CellForMDGID(&mdgid)
+		qjob.Cell, err = sheet.CellForMDGID(&mdgid)
 		if err != nil {
 			badRequest(w, "error getting grid(%v):%v", mdgid.AsString(), err)
 			return
 		}
+		// Check the queue to see if there is already a job with these params:
+		jobs = s.Coordinator.FindByJob(&qjob)
 	}
-
-	qjob := atlante.Job{
-		Cell:      cell,
-		SheetName: sheetName,
-	}
-
-	// Check the queue to see if there is already a job with these params:
-	jobs := s.Coordinator.FindByJob(&qjob)
 
 	if len(jobs) > 0 {
 		// Let's just check the latest job.
@@ -525,7 +526,8 @@ func (s *Server) QueueHandler(w http.ResponseWriter, request *http.Request, urlP
 	}
 	// Fill out the Metadata with JobID
 	qjob.MetaData = map[string]string{
-		"job_id": jb.JobID,
+		"job_id":           jb.JobID,
+		GratingSquarishKey: strconv.FormatBool(ji.Rectangle),
 	}
 	if ji.NumRows != nil {
 		// Add row to Metadata
