@@ -65,6 +65,8 @@ var funcMap = template.FuncMap{
 	"indent":             Indent,
 	"log_info":           infoln,
 	"squarish":           squarish,
+	"int":                asInt64,
+	"as":                 ATplAs,
 }
 
 func infoln(template string, vals ...interface{}) string {
@@ -249,14 +251,19 @@ func tplMathAbs(av interface{}) (float64, error) {
 	return math.Abs(a), nil
 }
 
-func tplSeq(startArg float64, numArg uint, incArg float64) []float64 {
+func tplSeq(startArg interface{}, numArg interface{}, incArg interface{}) []float64 {
 	start, _ := as.Float64(startArg)
 	num, _ := as.Uint(numArg)
 	inc, _ := as.Float64(incArg)
 	if num == 0 {
 		return []float64{}
 	}
-	is := make([]float64, 0, int(num))
+	var is []float64
+	/*
+		if num >= 4 {
+			is = make([]float64, 0, int(num))
+		}
+	*/
 	last := start
 	for i := 0; i < int(num); i++ {
 		is = append(is, last)
@@ -283,8 +290,9 @@ func (t *tplToggle) Value() string {
 	return s
 }
 
-func (t *tplToggle) Reset() {
+func (t *tplToggle) Reset() string {
 	t.idx = 0
+	return ""
 }
 
 func (t *tplToggle) First() string {
@@ -446,6 +454,15 @@ func (lp LabelPart) DrawAt(w io.Writer, x, y float64, show ShowParts) {
 	fmt.Fprintln(&output, "</text>")
 	w.Write(output.Bytes())
 
+}
+
+func asInt64(v interface{}) (i64 int64, err error) {
+	var ok bool
+	i64, ok = as.Int64(v)
+	if !ok {
+		err = fmt.Errorf("unknown int value at '%v' ", v)
+	}
+	return i64, err
 }
 
 func IntSlice(vals ...interface{}) ([]int, error) {

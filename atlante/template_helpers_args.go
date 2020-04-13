@@ -72,24 +72,22 @@ func NewTplArgs(keyvals ...interface{}) (*tplArgs, error) {
 	return &args, nil
 }
 
-func (a *tplArgs) With(keys ...string) (*tplArgs, error) {
-	if a == nil {
-		return nil, nil
-	}
+func (a *tplArgs) With(keys ...string) *tplArgs {
 	na := &tplArgs{
 		data: make(map[string]interface{}, len(a.data)),
 	}
-	if a.data == nil {
-		return na, nil
+	if a == nil || a.data == nil || len(a.data) == 0 {
+		return na
 	}
 	for _, key := range keys {
+		key = normalizeKey(key)
 		val, ok := a.data[key]
 		if !ok {
 			continue
 		}
 		na.data[key] = val
 	}
-	return na, nil
+	return na
 }
 
 // Get get the normalized version of the key's data
@@ -217,9 +215,9 @@ func (a *tplArgs) GetAsInt64(key string) (int64, error) {
 	}
 	return num, nil
 }
-func (a *tplArgs) GetAsInt(key string) (uint, error) {
+func (a *tplArgs) GetAsInt(key string) (int, error) {
 	num, err := a.GetAsInt64(key)
-	return uint(num), err
+	return int(num), err
 }
 
 func (a *tplArgs) GetAsUint64(key string) (uint64, error) {

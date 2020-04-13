@@ -51,7 +51,7 @@ func (grctx GridTemplateContext) SetImageDimension(width, height float64) string
 
 func (grctx GridTemplateContext) GroundMeasure() float64 {
 	gm := grctx.Image.GroundMeasure()
-	log.Infof("ground measure is: %v", gm)
+	log.Infof("ground measure is: %v m/px", gm)
 	return gm
 }
 func (grctx GridTemplateContext) Zoom() float64 { return grctx.Image.Zoom() }
