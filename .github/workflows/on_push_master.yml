@@ -39,12 +39,13 @@ jobs:
 
     - name: Tag the Docker container
       run: |
-        docker tag ${{env.DOCKERHUB_REPO}}:latest ${{env.DOCKERHUB_REPO}}:${{env.BUILD_NUMBER}}
+        docker tag ${{env.DOCKERHUB_REPO}}:latest ${{env.DOCKERHUB_ORG}}/${{env.DOCKERHUB_REPO}}:master-${{env.BUILD_NUMBER}}
+        docker tag ${{env.DOCKERHUB_REPO}}:latest ${{env.DOCKERHUB_ORG}}/${{env.DOCKERHUB_REPO}}:latest
 
     - name: Login to Docker hub
       run: echo "${{secrets.DOCKER_PASSWORD}}" | docker login --username "${{secrets.DOCKER_USER}}" --password-stdin
 
     - name: Push Docker container to Docker Hub
       run: |
-        docker push ${{env.DOCKERHUB_REPO}} ${{env.DOCKERHUB_ORG}}/${{env.DOCKERHUB_REPO}}:latest
-        docker push ${{env.DOCKERHUB_REPO}} ${{env.DOCKERHUB_ORG}}/${{env.DOCKERHUB_REPO}}:${{env.BUILD_NUMBER}}
+        docker push ${{env.DOCKERHUB_ORG}}/${{env.DOCKERHUB_REPO}}:master-${{env.BUILD_NUMBER}}
+        docker push ${{env.DOCKERHUB_ORG}}/${{env.DOCKERHUB_REPO}}:latest
