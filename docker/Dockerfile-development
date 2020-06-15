@@ -31,7 +31,7 @@ COPY docker/files/templates /etc/templates
 
 RUN yum install -y centos-release-scl
 RUN yum install -y devtoolset-7-gcc* && /go/bin/bastet -o /etc/profile.d/devtoolset-7.sh /etc/templates/scl_profile.tpl "package=devtoolset-7"
-RUN yum install -y nodejs010-npm.noarch && /go/bin/bastet -o /etc/profile.d/nodejs010.sh /etc/templates/scl_profile.tpl "package=nodejs010"
+RUN yum install -y rh-nodejs10-npm.x86_64 && /go/bin/bastet -o /etc/profile.d/rh-nodejs10.sh /etc/templates/scl_profile.tpl "package=rh-nodejs10"
 
 # install cmake
 RUN cd /usr/local;    curl -SL https://github.com/Kitware/CMake/releases/download/v3.13.4/cmake-3.13.4-Linux-x86_64.tar.gz |  tar -xzC /usr/local && ln -s cmake-3.13.4-Linux-x86_64 cmake; echo 'PATH=$PATH:/usr/local/cmake/bin' > /etc/profile.d/cmake.sh
@@ -63,5 +63,5 @@ RUN go get github.com/golang/protobuf/protoc-gen-go
 # Install Fonts needed by the system
 COPY docker/files/fonts/* /usr/share/fonts/
 RUN fc-cache
-WORKDIR /go/src/github.com/go-spatial/maptoolkit
+WORKDIR /go/src/github.com/go-spatial/atlante
 

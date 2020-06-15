@@ -23,11 +23,9 @@ RUN curl -s https://packagecloud.io/install/repositories/github/git-lfs/script.r
 
 COPY docker/files/templates /etc/templates
 
-RUN curl -s https://packagecloud.io/install/repositories/github/git-lfs/script.rpm.sh | bash && yum install -y git-lfs vim
-
 RUN yum install -y centos-release-scl
 RUN yum install -y devtoolset-7-gcc* && /go/bin/bastet -o /etc/profile.d/devtoolset-7.sh /etc/templates/scl_profile.tpl "package=devtoolset-7"
-RUN yum install -y nodejs010-npm.noarch && /go/bin/bastet -o /etc/profile.d/nodejs010.sh /etc/templates/scl_profile.tpl "package=nodejs010"
+RUN yum install -y rh-nodejs10-npm.x86_64 && /go/bin/bastet -o /etc/profile.d/rh-nodejs10.sh /etc/templates/scl_profile.tpl "package=rh-nodejs10"
 
 # install cmake
 RUN cd /usr/local;    curl -SL https://github.com/Kitware/CMake/releases/download/v3.13.4/cmake-3.13.4-Linux-x86_64.tar.gz |  tar -xzC /usr/local && ln -s cmake-3.13.4-Linux-x86_64 cmake; echo 'PATH=$PATH:/usr/local/cmake/bin' > /etc/profile.d/cmake.sh
@@ -49,10 +47,10 @@ RUN yum install -y sqlite-devel.x86_64 \
 	libcurl-devel.x86_64
 
 # copy source code to container
-COPY . $GOPATH/src/github.com/go-spatial/maptoolkit/
+COPY . $GOPATH/src/github.com/go-spatial/atlante/
 
 # build binary
-WORKDIR $GOPATH/src/github.com/go-spatial/maptoolkit/cmd/atlante/
+WORKDIR $GOPATH/src/github.com/go-spatial/atlante/cmd/atlante/
 RUN source ~/.bash_profile && go install
 
 # build final container without build dependencies
