@@ -1,0 +1,50 @@
+name: On push
+on: 
+  push:
+    branches: 
+      - master
+
+env: 
+  DOCKERHUB_ORG: gospatial
+  DOCKERHUB_REPO: atlante
+
+jobs:
+  test:
+    name: Test on Ubuntu, build and deploy Docker
+    runs-on: ubuntu-latest
+    strategy:
+      matrix: 
+        go: ['1.14']
+
+    steps:
+    - name: Set up Go ${{ matrix.go }}
+      uses: actions/setup-go@v2
+      with:
+        go-version: ${{ matrix.go }}
+
+    - name: Check out code
+      uses: actions/checkout@v2
+
+    - name: Pull git large file store (lfs)
+      run: git lfs pull
+
+    #- name: Run Go tests
+    #  run: go test -v -race ./...
+
+    - name: Set build number
+      run: echo "::set-env name=BUILD_NUMBER::$(echo ${GITHUB_SHA} | cut -c1-7)"
+
+    - name: Build Docker container
+      run: docker build -f docker/Dockerfile -t ${{env.DOCKERHUB_REPO}} .
+
+    - name: Tag the Docker container
+      run: |
+        docker tag ${{env.DOCKERHUB_REPO}}:latest ${{env.DOCKERHUB_REPO}}:${{env.BUILD_NUMBER}}
+
+    - name: Login to Docker hub
+      run: echo "${{secrets.DOCKER_PASSWORD}}" | docker login --username "${{secrets.DOCKER_USER}}" --password-stdin
+
+    - name: Push Docker container to Docker Hub
+      run: |
+        docker push ${{env.DOCKERHUB_REPO}} ${{env.DOCKERHUB_ORG}}/${{env.DOCKERHUB_REPO}}:latest
+        docker push ${{env.DOCKERHUB_REPO}} ${{env.DOCKERHUB_ORG}}/${{env.DOCKERHUB_REPO}}:${{env.BUILD_NUMBER}}
