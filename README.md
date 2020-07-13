@@ -1,4 +1,4 @@
-# Maptoolkit
+# Atlante
 
 A set of go modules and api's to use mvt vector tiles to create printable maps
 
