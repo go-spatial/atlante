@@ -11,3 +11,4 @@ temp
 atlante/.vscode/settings.json
 .idea/workspace.xml
 startup_back.sh
+cmd/insetmap/server/insetmap
