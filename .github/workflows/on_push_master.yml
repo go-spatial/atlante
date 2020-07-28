@@ -6,7 +6,8 @@ on:
 
 env: 
   DOCKERHUB_ORG: gospatial
-  DOCKERHUB_REPO: atlante
+  ATLANTE_DOCKERHUB_REPO: atlante
+  ATLANTE_INSET_MAPS_DOCKERHUB_REPO: atlante-inset-maps
 
 jobs:
   test:
@@ -34,18 +35,31 @@ jobs:
     - name: Set build number
       run: echo "::set-env name=BUILD_NUMBER::$(echo ${GITHUB_SHA} | cut -c1-7)"
 
-    - name: Build Docker container
-      run: docker build -f docker/Dockerfile -t ${{env.DOCKERHUB_REPO}} .
+    - name: [atlante] Build Docker container
+      run: docker build -f docker/Dockerfile-atlante -t ${{env.ATLANTE_DOCKERHUB_REPO}} .
 
-    - name: Tag the Docker container
+    - name: [atlante] Tag the Docker container
       run: |
-        docker tag ${{env.DOCKERHUB_REPO}}:latest ${{env.DOCKERHUB_ORG}}/${{env.DOCKERHUB_REPO}}:master-${{env.BUILD_NUMBER}}
-        docker tag ${{env.DOCKERHUB_REPO}}:latest ${{env.DOCKERHUB_ORG}}/${{env.DOCKERHUB_REPO}}:latest
+        docker tag ${{env.ATLANTE_DOCKERHUB_REPO}}:latest ${{env.DOCKERHUB_ORG}}/${{env.ATLANTE_DOCKERHUB_REPO}}:master-${{env.BUILD_NUMBER}}
+        docker tag ${{env.ATLANTE_DOCKERHUB_REPO}}:latest ${{env.DOCKERHUB_ORG}}/${{env.ATLANTE_DOCKERHUB_REPO}}:latest
 
     - name: Login to Docker hub
       run: echo "${{secrets.DOCKER_PASSWORD}}" | docker login --username "${{secrets.DOCKER_USER}}" --password-stdin
 
-    - name: Push Docker container to Docker Hub
+    - name: [atlante] Push Docker container to Docker Hub
       run: |
-        docker push ${{env.DOCKERHUB_ORG}}/${{env.DOCKERHUB_REPO}}:master-${{env.BUILD_NUMBER}}
-        docker push ${{env.DOCKERHUB_ORG}}/${{env.DOCKERHUB_REPO}}:latest
+        docker push ${{env.DOCKERHUB_ORG}}/${{env.ATLANTE_DOCKERHUB_REPO}}:master-${{env.BUILD_NUMBER}}
+        docker push ${{env.DOCKERHUB_ORG}}/${{env.ATLANTE_DOCKERHUB_REPO}}:latest
+
+    - name: [atlante-inset-maps] Build Docker container
+      run: docker build -f docker/Dockerfile-atlante-inset-maps -t ${{env.ATLANTE_INSET_MAPS_DOCKERHUB_REPO}} .
+
+    - name: [atlante-inset-maps] Tag the Docker container
+      run: |
+        docker tag ${{env.ATLANTE_INSET_MAPS_DOCKERHUB_REPO}}:latest ${{env.DOCKERHUB_ORG}}/${{env.ATLANTE_INSET_MAPS_DOCKERHUB_REPO}}:master-${{env.BUILD_NUMBER}}
+        docker tag ${{env.ATLANTE_INSET_MAPS_DOCKERHUB_REPO}}:latest ${{env.DOCKERHUB_ORG}}/${{env.ATLANTE_INSET_MAPS_DOCKERHUB_REPO}}:latest
+
+    - name: [atlante-inset-maps] Push Docker container to Docker Hub
+      run: |
+        docker push ${{env.DOCKERHUB_ORG}}/${{env.ATLANTE_INSET_MAPS_DOCKERHUB_REPO}}:master-${{env.BUILD_NUMBER}}
+        docker push ${{env.DOCKERHUB_ORG}}/${{env.ATLANTE_INSET_MAPS_DOCKERHUB_REPO}}:latest

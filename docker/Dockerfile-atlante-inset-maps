@@ -1,0 +1,35 @@
+FROM centos@sha256:8d487d68857f5bc9595793279b33d082b03713341ddec91054382641d14db861 AS build
+
+USER root
+
+RUN yum -y update
+
+# Install Go
+RUN curl -SL https://dl.google.com/go/go1.14.6.linux-amd64.tar.gz | tar -xzC /usr/local && mkdir -p /go/bin
+
+ENV GO111MODULE=on
+ENV GOROOT=/usr/local/go
+ENV GOPATH=/go
+ENV GOBIN=$GOPATH/bin
+ENV PATH="/go/bin:/usr/local/go/bin:${PATH}"
+
+
+
+# copy source code to container
+COPY . $GOPATH/src/github.com/go-spatial/atlante/
+
+# build binary
+WORKDIR $GOPATH/src/github.com/go-spatial/atlante/cmd/insetmap/server
+RUN source ~/.bash_profile && go build -mod vendor -o /go/bin/insetmap
+
+# build final container without build dependencies
+FROM centos@sha256:8d487d68857f5bc9595793279b33d082b03713341ddec91054382641d14db861
+
+USER root
+
+# copy binary from build image
+COPY --from=build /go/bin/insetmap /usr/bin/insetmap
+
+WORKDIR /mnt
+
+ENTRYPOINT ["/usr/bin/insetmap"]
