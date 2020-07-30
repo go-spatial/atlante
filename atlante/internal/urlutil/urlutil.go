@@ -8,11 +8,31 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/prometheus/common/log"
 )
+
+var remoteTimeout int64 = 90
+
+func init() {
+	httpTimeout := strings.TrimSpace(os.Getenv("REMOTE_TIMEOUT"))
+
+	if httpTimeout != "" {
+		t, err := strconv.ParseInt(httpTimeout, 10, 64)
+		if err != nil {
+			log.Printf("WARNING: unabled to parse REMOTE_TIMEOUT env: %v", err)
+			return
+		}
+		if t < 0 {
+			log.Printf("WARNING: negative REMOTE_TIMEOUT provided assuming 0.")
+			t = 0
+		}
+		remoteTimeout = t
+	}
+}
 
 // ErrRemoteFile is an error that was caused when trying to access a remote file.
 // the remote location is provided
@@ -94,7 +114,7 @@ func NewReader(location *url.URL) (io.ReadCloser, error) {
 	case "http", "https":
 
 		var httpClient = &http.Client{
-			Timeout: 10 * time.Second,
+			Timeout: remoteTimeout * time.Second,
 		}
 
 		res, err := httpClient.Get(location.String())

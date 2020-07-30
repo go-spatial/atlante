@@ -7,7 +7,6 @@ import (
 	"log"
 	"net/url"
 	"path/filepath"
-	"strings"
 	"time"
 
 	"github.com/go-spatial/atlante/atlante/filestore"
@@ -36,7 +35,6 @@ func Remote(location string, fswriter filestore.FileWriter, useCached bool) (str
 	if err != nil {
 		return "", err
 	}
-	loc.Host = strings.ToLower(loc.Hostname())
 	shaBytes := sha1.Sum([]byte(loc.String()))
 	shaFilename := fmt.Sprintf("%x", shaBytes)
 	svgBytes, err := urlutil.ReadAll(loc)
