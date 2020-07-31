@@ -23,11 +23,11 @@ func init() {
 	if httpTimeout != "" {
 		t, err := strconv.ParseInt(httpTimeout, 10, 64)
 		if err != nil {
-			log.Printf("WARNING: unabled to parse REMOTE_TIMEOUT env: %v", err)
+			log.Warnf("unabled to parse REMOTE_TIMEOUT env: %v", err)
 			return
 		}
 		if t < 0 {
-			log.Printf("WARNING: negative REMOTE_TIMEOUT provided assuming 0.")
+			log.Warnf("negative REMOTE_TIMEOUT provided assuming 0.")
 			t = 0
 		}
 		remoteTimeout = t
@@ -114,7 +114,7 @@ func NewReader(location *url.URL) (io.ReadCloser, error) {
 	case "http", "https":
 
 		var httpClient = &http.Client{
-			Timeout: remoteTimeout * time.Second,
+			Timeout: time.Duration(remoteTimeout) * time.Second,
 		}
 
 		res, err := httpClient.Get(location.String())
