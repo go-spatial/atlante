@@ -1,2 +1,6 @@
 .git
+.github
+.vscode
+.DS_Store
 _configs
+*code-workspace
