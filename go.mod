@@ -1,6 +1,6 @@
-module github.com/go-spatial/maptoolkit
+module github.com/go-spatial/atlante
 
-go 1.12
+go 1.13
 
 require (
 	github.com/BurntSushi/toml v0.3.1
@@ -12,18 +12,18 @@ require (
 	github.com/gdey/cmd v0.0.0-20180214202002-8f086d11c1e6 // indirect
 	github.com/gdey/errors v0.0.0-20190426172550-8ebd5bc891fb
 	github.com/gdey/tbltest v0.0.0-20180914212833-1865222d591f // indirect
-	github.com/go-chi/chi v4.0.3+incompatible // indirect
-	github.com/go-spatial/geom v0.0.0-20191004223540-7f2d6843ed9f
+	github.com/go-chi/chi v4.0.3+incompatible
+	github.com/go-spatial/geom v0.0.0-20200715161102-ca3b2fd9dd14
 	github.com/go-spatial/tegola v0.9.0
 	github.com/gocarina/gocsv v0.0.0-20200302151839-87c60d755c58 // indirect
 	github.com/gogo/protobuf v1.2.1
-	github.com/golang/protobuf v1.3.1
+	github.com/golang/protobuf v1.3.2
 	github.com/hairyhenderson/gomplate/v3 v3.6.0 // indirect
 	github.com/jackc/fake v0.0.0-20150926172116-812a484cc733 // indirect
 	github.com/jackc/pgx v3.4.0+incompatible
+	github.com/jackc/pgx/v4 v4.7.2
 	github.com/pkg/errors v0.8.1
 	github.com/prometheus/common v0.4.1
 	github.com/satori/go.uuid v1.2.0 // indirect
-	github.com/shopspring/decimal v0.0.0-20180709203117-cd690d0c9e24 // indirect
 	github.com/spf13/cobra v0.0.5
 )

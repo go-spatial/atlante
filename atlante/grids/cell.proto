@@ -1,6 +1,6 @@
 syntax = "proto3";
 package atlante.grids;
-option go_package = "github.com/go-spatial/maptoolkit/atlante/grids";
+option go_package = "github.com/go-spatial/atlante/atlante/grids";
 
 import "google/protobuf/timestamp.proto";
 

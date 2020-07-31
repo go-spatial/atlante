@@ -2,11 +2,11 @@ package main
 
 import (
 	// Import various filestores
-	"github.com/go-spatial/maptoolkit/atlante/filestore"
-	_ "github.com/go-spatial/maptoolkit/atlante/filestore/file"
-	_ "github.com/go-spatial/maptoolkit/atlante/filestore/multi"
-	_ "github.com/go-spatial/maptoolkit/atlante/filestore/null"
-	_ "github.com/go-spatial/maptoolkit/atlante/filestore/s3"
+	"github.com/go-spatial/atlante/atlante/filestore"
+	_ "github.com/go-spatial/atlante/atlante/filestore/file"
+	_ "github.com/go-spatial/atlante/atlante/filestore/multi"
+	_ "github.com/go-spatial/atlante/atlante/filestore/null"
+	_ "github.com/go-spatial/atlante/atlante/filestore/s3"
 )
 
 func init() {

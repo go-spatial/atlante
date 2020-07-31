@@ -20,8 +20,8 @@ import (
 	"github.com/go-spatial/geom/slippy"
 	"github.com/go-spatial/geom/spherical"
 
-	"github.com/go-spatial/maptoolkit/mbgl"
-	"github.com/go-spatial/maptoolkit/mbgl/bounds"
+	"github.com/go-spatial/atlante/mbgl"
+	"github.com/go-spatial/atlante/mbgl/bounds"
 
 	"github.com/spf13/cobra"
 )

@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/go-spatial/maptoolkit/cmd/atlante/cmd"
+	"github.com/go-spatial/atlante/cmd/atlante/cmd"
 )
 
 // cleanupFns are functions that should be run before exiting.

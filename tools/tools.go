@@ -9,5 +9,5 @@ import (
 	_ "github.com/golang/protobuf/protoc-gen-go"
 
 	// used for Docker files and template file generation
-	_ "github.com/gdey/bastet/tree/master/cmd/bastet"
+	_ "github.com/gdey/bastet/cmd/bastet"
 )

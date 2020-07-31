@@ -1,7 +1,7 @@
 package queuer
 
 import (
-	"github.com/go-spatial/maptoolkit/atlante"
+	"github.com/go-spatial/atlante/atlante"
 )
 
 // Status is the status of the job

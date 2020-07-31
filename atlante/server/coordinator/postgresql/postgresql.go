@@ -11,11 +11,11 @@ import (
 	"text/template"
 	"time"
 
+	"github.com/go-spatial/atlante/atlante"
+	"github.com/go-spatial/atlante/atlante/server/coordinator"
+	"github.com/go-spatial/atlante/atlante/server/coordinator/field"
 	"github.com/go-spatial/geom"
 	"github.com/go-spatial/geom/encoding/wkt"
-	"github.com/go-spatial/maptoolkit/atlante"
-	"github.com/go-spatial/maptoolkit/atlante/server/coordinator"
-	"github.com/go-spatial/maptoolkit/atlante/server/coordinator/field"
 	"github.com/prometheus/common/log"
 
 	"github.com/go-spatial/tegola"

@@ -5,7 +5,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/go-spatial/maptoolkit/atlante/internal/env"
+	"github.com/go-spatial/atlante/atlante/internal/env"
 )
 
 func TestDict(t *testing.T) {

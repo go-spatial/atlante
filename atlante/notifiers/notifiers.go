@@ -1,6 +1,6 @@
 package notifiers
 
-import "github.com/go-spatial/maptoolkit/atlante/server/coordinator/field"
+import "github.com/go-spatial/atlante/atlante/server/coordinator/field"
 
 // Emitter emits the status of the job to the notifier
 type Emitter interface {

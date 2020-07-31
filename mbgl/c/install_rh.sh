@@ -50,7 +50,7 @@ if [[ ! $GOPATH ]]; then
     exit
 fi
 
-PKG_ROOT=$GOPATH/src/github.com/go-spatial/maptoolkit/mbgl/c
+PKG_ROOT=$GOPATH/src/github.com/go-spatial/atlante/mbgl/c
 osdir="linux-x86_64"
 
 

@@ -6,10 +6,10 @@ import (
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/batch"
-	"github.com/go-spatial/maptoolkit/atlante"
-	cfgaws "github.com/go-spatial/maptoolkit/atlante/config/aws"
-	"github.com/go-spatial/maptoolkit/atlante/internal/env"
-	"github.com/go-spatial/maptoolkit/atlante/queuer"
+	"github.com/go-spatial/atlante/atlante"
+	cfgaws "github.com/go-spatial/atlante/atlante/config/aws"
+	"github.com/go-spatial/atlante/atlante/internal/env"
+	"github.com/go-spatial/atlante/atlante/queuer"
 	"github.com/prometheus/common/log"
 )
 

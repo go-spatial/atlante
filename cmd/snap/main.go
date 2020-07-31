@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/go-spatial/maptoolkit/cmd/snap/cmd"
+	"github.com/go-spatial/atlante/cmd/snap/cmd"
 )
 
 func main() {

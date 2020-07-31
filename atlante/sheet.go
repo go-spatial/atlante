@@ -11,11 +11,11 @@ import (
 	"strings"
 	"text/template"
 
-	"github.com/go-spatial/maptoolkit/atlante/filestore"
-	"github.com/go-spatial/maptoolkit/atlante/grids"
-	"github.com/go-spatial/maptoolkit/atlante/internal/urlutil"
-	"github.com/go-spatial/maptoolkit/atlante/notifiers"
-	"github.com/go-spatial/maptoolkit/atlante/server/coordinator/field"
+	"github.com/go-spatial/atlante/atlante/filestore"
+	"github.com/go-spatial/atlante/atlante/grids"
+	"github.com/go-spatial/atlante/atlante/internal/urlutil"
+	"github.com/go-spatial/atlante/atlante/notifiers"
+	"github.com/go-spatial/atlante/atlante/server/coordinator/field"
 	"github.com/prometheus/common/log"
 )
 

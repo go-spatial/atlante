@@ -5,7 +5,7 @@ package atlante
 import (
 	"encoding/base64"
 
-	"github.com/go-spatial/maptoolkit/atlante/grids"
+	"github.com/go-spatial/atlante/atlante/grids"
 	"github.com/gogo/protobuf/proto"
 	"github.com/pkg/errors"
 )

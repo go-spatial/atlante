@@ -8,13 +8,13 @@ import (
 	"path/filepath"
 	"time"
 
-	cfgaws "github.com/go-spatial/maptoolkit/atlante/config/aws"
+	cfgaws "github.com/go-spatial/atlante/atlante/config/aws"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/aws/aws-sdk-go/service/s3/s3manager"
 
-	"github.com/go-spatial/maptoolkit/atlante/filestore"
+	"github.com/go-spatial/atlante/atlante/filestore"
 )
 
 const (

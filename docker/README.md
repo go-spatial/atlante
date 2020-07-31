@@ -29,7 +29,7 @@ docker run --rm -v "$(pwd)":/mnt -it gospatial/atlante \
 ``` toml
 [[providers]]
   name     = "providerName"
-  type     = "postgresql"            # Types are defined at maptoolkit⁩/⁨atlante/⁨grids
+  type     = "postgresql"            # Types are defined at atlante⁩/⁨atlante/⁨grids
   host     = "host.docker.internal"  # Required for macOS, https://docs.docker.com/docker-for-mac/networking
   # host   = "192.168.1.100"         # You can use IP address or domain (postgis1.example.com)
   port     = 5432                    # postgresql database port
@@ -67,5 +67,5 @@ Use this container in interactive mode with a volume mount so `atlante` can be b
 
 
 ```console
-$ docker run --rm -v $(pwd):/go/src/github.com/go-spatial/maptoolkit -it atlante-dev /bin/bash
+$ docker run --rm -v $(pwd):/go/src/github.com/go-spatial/atlante -it atlante-dev /bin/bash
 ```

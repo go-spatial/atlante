@@ -7,8 +7,8 @@ import (
 	"github.com/prometheus/common/log"
 
 	"github.com/gdey/errors"
+	"github.com/go-spatial/atlante/atlante/grids"
 	"github.com/go-spatial/geom"
-	"github.com/go-spatial/maptoolkit/atlante/grids"
 )
 
 // Type of the grid this provider is providing

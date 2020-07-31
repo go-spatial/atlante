@@ -11,11 +11,11 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/go-spatial/atlante/mbgl"
+	"github.com/go-spatial/atlante/mbgl/bounds"
+	"github.com/go-spatial/atlante/mbgl/image"
 	"github.com/go-spatial/geom"
 	"github.com/go-spatial/geom/spherical"
-	"github.com/go-spatial/maptoolkit/mbgl"
-	"github.com/go-spatial/maptoolkit/mbgl/bounds"
-	"github.com/go-spatial/maptoolkit/mbgl/image"
 	"github.com/spf13/cobra"
 )
 

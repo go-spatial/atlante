@@ -11,11 +11,11 @@ import (
 
 	"github.com/golang/protobuf/ptypes"
 
+	"github.com/go-spatial/atlante/atlante/internal/resolution"
+	"github.com/go-spatial/atlante/mbgl/bounds"
 	"github.com/go-spatial/geom"
 	"github.com/go-spatial/geom/planar/coord"
 	"github.com/go-spatial/geom/spherical"
-	"github.com/go-spatial/maptoolkit/atlante/internal/resolution"
-	"github.com/go-spatial/maptoolkit/mbgl/bounds"
 )
 
 // CellSize is the size of the cell in meters

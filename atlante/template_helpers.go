@@ -14,12 +14,12 @@ import (
 	"github.com/gdey/as"
 	"github.com/prometheus/common/log"
 
+	"github.com/go-spatial/atlante/atlante/server/coordinator/field"
+	"github.com/go-spatial/atlante/atlante/template/grating"
+	"github.com/go-spatial/atlante/atlante/template/remote"
+	"github.com/go-spatial/atlante/atlante/template/trellis"
 	"github.com/go-spatial/geom"
 	"github.com/go-spatial/geom/planar/coord"
-	"github.com/go-spatial/maptoolkit/atlante/server/coordinator/field"
-	"github.com/go-spatial/maptoolkit/atlante/template/grating"
-	"github.com/go-spatial/maptoolkit/atlante/template/remote"
-	"github.com/go-spatial/maptoolkit/atlante/template/trellis"
 )
 
 const (

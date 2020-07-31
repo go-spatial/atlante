@@ -4,9 +4,9 @@ import (
 	"fmt"
 
 	"github.com/gdey/errors"
-	"github.com/go-spatial/maptoolkit/atlante"
-	"github.com/go-spatial/maptoolkit/atlante/server/coordinator"
-	"github.com/go-spatial/maptoolkit/atlante/server/coordinator/field"
+	"github.com/go-spatial/atlante/atlante"
+	"github.com/go-spatial/atlante/atlante/server/coordinator"
+	"github.com/go-spatial/atlante/atlante/server/coordinator/field"
 	"github.com/go-spatial/tegola/dict"
 	"github.com/prometheus/common/log"
 )

@@ -7,7 +7,7 @@ import (
 	fmt "fmt"
 	math "math"
 
-	grids "github.com/go-spatial/maptoolkit/atlante/grids"
+	grids "github.com/go-spatial/atlante/atlante/grids"
 	proto "github.com/golang/protobuf/proto"
 )
 

@@ -4,9 +4,9 @@ import (
 	"time"
 
 	"github.com/gdey/errors"
-	"github.com/go-spatial/maptoolkit/atlante"
-	"github.com/go-spatial/maptoolkit/atlante/grids"
-	"github.com/go-spatial/maptoolkit/atlante/server/coordinator/field"
+	"github.com/go-spatial/atlante/atlante"
+	"github.com/go-spatial/atlante/atlante/grids"
+	"github.com/go-spatial/atlante/atlante/server/coordinator/field"
 )
 
 const (

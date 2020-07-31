@@ -6,8 +6,8 @@ import (
 	"net/url"
 
 	"github.com/BurntSushi/toml"
-	"github.com/go-spatial/maptoolkit/atlante/internal/env"
-	"github.com/go-spatial/maptoolkit/atlante/internal/urlutil"
+	"github.com/go-spatial/atlante/atlante/internal/env"
+	"github.com/go-spatial/atlante/atlante/internal/urlutil"
 )
 
 // Config models the config file that can be passed into the application

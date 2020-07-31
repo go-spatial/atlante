@@ -11,7 +11,7 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/go-spatial/maptoolkit/svg2pdf"
+	"github.com/go-spatial/atlante/svg2pdf"
 )
 
 var mediabox = regexp.MustCompile(`/MediaBox\s+\[(.+)\]`)

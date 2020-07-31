@@ -10,8 +10,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/go-spatial/maptoolkit/atlante/filestore"
-	"github.com/go-spatial/maptoolkit/atlante/internal/urlutil"
+	"github.com/go-spatial/atlante/atlante/filestore"
+	"github.com/go-spatial/atlante/atlante/internal/urlutil"
 )
 
 var RemoteDir = "remoteasset"

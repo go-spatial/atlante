@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/go-spatial/maptoolkit/svg2pdf"
+	"github.com/go-spatial/atlante/svg2pdf"
 )
 
 var height, width float64

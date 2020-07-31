@@ -11,11 +11,11 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/go-spatial/atlante/atlante"
+	"github.com/go-spatial/atlante/atlante/grids"
+	"github.com/go-spatial/atlante/cmd/atlante/config"
+	"github.com/go-spatial/atlante/mbgl"
 	"github.com/go-spatial/geom"
-	"github.com/go-spatial/maptoolkit/atlante"
-	"github.com/go-spatial/maptoolkit/atlante/grids"
-	"github.com/go-spatial/maptoolkit/cmd/atlante/config"
-	"github.com/go-spatial/maptoolkit/mbgl"
 	"github.com/gogo/protobuf/proto"
 	"github.com/spf13/cobra"
 )
@@ -84,7 +84,7 @@ var Root = &cobra.Command{
 	Short: "Atlante is a flexable server to build static print maps",
 	Long: `A flexable server for building static print maps from tegola servers
 built with love and c8h10n4o2. Complete documentation is available at
-http://github.com/go-spatial/maptoolkit`,
+http://github.com/go-spatial/atlante`,
 	RunE: rootCmdRun,
 }
 

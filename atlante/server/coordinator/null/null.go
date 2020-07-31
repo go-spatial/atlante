@@ -3,9 +3,9 @@ package null
 import (
 	"fmt"
 
-	"github.com/go-spatial/maptoolkit/atlante"
-	"github.com/go-spatial/maptoolkit/atlante/server/coordinator"
-	"github.com/go-spatial/maptoolkit/atlante/server/coordinator/field"
+	"github.com/go-spatial/atlante/atlante"
+	"github.com/go-spatial/atlante/atlante/server/coordinator"
+	"github.com/go-spatial/atlante/atlante/server/coordinator/field"
 )
 
 const (

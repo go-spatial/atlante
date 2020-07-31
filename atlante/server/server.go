@@ -12,20 +12,20 @@ import (
 	"strings"
 	"time"
 
+	"github.com/go-spatial/atlante/atlante/server/coordinator/field"
+	"github.com/go-spatial/atlante/atlante/server/coordinator/null"
+	"github.com/go-spatial/atlante/atlante/template/grating"
 	"github.com/go-spatial/geom"
-	"github.com/go-spatial/maptoolkit/atlante/server/coordinator/field"
-	"github.com/go-spatial/maptoolkit/atlante/server/coordinator/null"
-	"github.com/go-spatial/maptoolkit/atlante/template/grating"
 	"github.com/golang/protobuf/ptypes"
 
-	"github.com/go-spatial/maptoolkit/atlante/server/coordinator"
+	"github.com/go-spatial/atlante/atlante/server/coordinator"
 
-	"github.com/go-spatial/maptoolkit/atlante/filestore"
-	"github.com/go-spatial/maptoolkit/atlante/queuer"
+	"github.com/go-spatial/atlante/atlante/filestore"
+	"github.com/go-spatial/atlante/atlante/queuer"
 
 	"github.com/dimfeld/httptreemux"
-	"github.com/go-spatial/maptoolkit/atlante"
-	"github.com/go-spatial/maptoolkit/atlante/grids"
+	"github.com/go-spatial/atlante/atlante"
+	"github.com/go-spatial/atlante/atlante/grids"
 	"github.com/prometheus/common/log"
 )
 

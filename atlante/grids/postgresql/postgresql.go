@@ -12,8 +12,8 @@ import (
 
 	"github.com/go-spatial/geom/encoding/wkb"
 
+	"github.com/go-spatial/atlante/atlante/grids"
 	"github.com/go-spatial/geom"
-	"github.com/go-spatial/maptoolkit/atlante/grids"
 	"github.com/go-spatial/tegola"
 	"github.com/jackc/pgx"
 )

@@ -4,7 +4,7 @@ import (
 	"io"
 	"log"
 
-	"github.com/go-spatial/maptoolkit/atlante/filestore"
+	"github.com/go-spatial/atlante/atlante/filestore"
 )
 
 const (

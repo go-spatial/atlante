@@ -1,8 +1,8 @@
 package main
 
 import (
-	"github.com/go-spatial/maptoolkit/atlante/queuer"
-	_ "github.com/go-spatial/maptoolkit/atlante/queuer/awsbatch"
+	"github.com/go-spatial/atlante/atlante/queuer"
+	_ "github.com/go-spatial/atlante/atlante/queuer/awsbatch"
 )
 
 func init() {

@@ -6,12 +6,12 @@ import (
 	"strings"
 
 	"github.com/gdey/errors"
-	"github.com/go-spatial/maptoolkit/atlante"
-	"github.com/go-spatial/maptoolkit/atlante/config"
-	"github.com/go-spatial/maptoolkit/atlante/filestore"
-	fsmulti "github.com/go-spatial/maptoolkit/atlante/filestore/multi"
-	"github.com/go-spatial/maptoolkit/atlante/grids"
-	"github.com/go-spatial/maptoolkit/atlante/notifiers"
+	"github.com/go-spatial/atlante/atlante"
+	"github.com/go-spatial/atlante/atlante/config"
+	"github.com/go-spatial/atlante/atlante/filestore"
+	fsmulti "github.com/go-spatial/atlante/atlante/filestore/multi"
+	"github.com/go-spatial/atlante/atlante/grids"
+	"github.com/go-spatial/atlante/atlante/notifiers"
 	"github.com/go-spatial/tegola/dict"
 	"github.com/prometheus/common/log"
 )

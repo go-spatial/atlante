@@ -5,8 +5,8 @@ package screen
 
 import (
 	"github.com/gdey/errors"
-	"github.com/go-spatial/maptoolkit/atlante/notifiers"
-	"github.com/go-spatial/maptoolkit/atlante/server/coordinator/field"
+	"github.com/go-spatial/atlante/atlante/notifiers"
+	"github.com/go-spatial/atlante/atlante/server/coordinator/field"
 	"github.com/prometheus/common/log"
 )
 

@@ -5,17 +5,17 @@ import (
 	"net/http"
 	"net/url"
 
-	"github.com/go-spatial/maptoolkit/atlante/server/coordinator"
-	crdnull "github.com/go-spatial/maptoolkit/atlante/server/coordinator/null"
+	"github.com/go-spatial/atlante/atlante/server/coordinator"
+	crdnull "github.com/go-spatial/atlante/atlante/server/coordinator/null"
 
-	"github.com/go-spatial/maptoolkit/atlante/queuer"
+	"github.com/go-spatial/atlante/atlante/queuer"
 	"github.com/prometheus/common/log"
 
 	"github.com/dimfeld/httptreemux"
 
-	"github.com/go-spatial/maptoolkit/atlante/config"
-	"github.com/go-spatial/maptoolkit/atlante/server"
-	cmdconfig "github.com/go-spatial/maptoolkit/cmd/atlante/config"
+	"github.com/go-spatial/atlante/atlante/config"
+	"github.com/go-spatial/atlante/atlante/server"
+	cmdconfig "github.com/go-spatial/atlante/cmd/atlante/config"
 	"github.com/spf13/cobra"
 )
 

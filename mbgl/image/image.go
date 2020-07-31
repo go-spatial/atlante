@@ -11,9 +11,9 @@ import (
 	"os"
 	"sync"
 
+	"github.com/go-spatial/atlante/mbgl"
+	"github.com/go-spatial/atlante/mbgl/bounds"
 	"github.com/go-spatial/geom"
-	"github.com/go-spatial/maptoolkit/mbgl"
-	"github.com/go-spatial/maptoolkit/mbgl/bounds"
 	"github.com/prometheus/common/log"
 )
 

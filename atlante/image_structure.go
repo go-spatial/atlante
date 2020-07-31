@@ -5,12 +5,12 @@ import (
 	"image/png"
 	"sync"
 
-	"github.com/go-spatial/maptoolkit/atlante/filestore"
-	"github.com/go-spatial/maptoolkit/atlante/grids"
-	"github.com/go-spatial/maptoolkit/atlante/internal/resolution"
-	"github.com/go-spatial/maptoolkit/mbgl/bounds"
-	"github.com/go-spatial/maptoolkit/mbgl/image"
-	mbgl "github.com/go-spatial/maptoolkit/mbgl/image"
+	"github.com/go-spatial/atlante/atlante/filestore"
+	"github.com/go-spatial/atlante/atlante/grids"
+	"github.com/go-spatial/atlante/atlante/internal/resolution"
+	"github.com/go-spatial/atlante/mbgl/bounds"
+	"github.com/go-spatial/atlante/mbgl/image"
+	mbgl "github.com/go-spatial/atlante/mbgl/image"
 	"github.com/prometheus/common/log"
 )
 
@@ -134,7 +134,7 @@ func (img *Img) initImage(ctx context.Context) (*mbgl.Image, error) {
 		img.zoom,
 		// TODO(gdey): Need to remove this hack and figure out how to used the
 		// ppi value as well as set the correct scale on the svg/pdf document
-		// that is produced later on. (https://github.com/go-spatial/maptoolkit/issues/13)
+		// that is produced later on. (https://github.com/go-spatial/atlante/issues/13)
 		1.0, // ppiRatio, (we adjust the zoom)
 		0.0, // Bearing
 		0.0, // Pitch
