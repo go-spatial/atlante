@@ -72,11 +72,16 @@ func (b *Boundary) For(ctx context.Context, mdgid string, cssKey string) (*Bound
 		for i, bdry := range b.SQLS {
 			sql := replaceTokens(bdry.Main, imap.totalExtent)
 			rows, err := b.Query(ctx, sql)
+			if debug {
+				log.Printf("[DEBUG] run sql for boundary[%v:%v]:\n%v", i, mdgid, sql)
+			}
 			if err != nil {
 				return nil, fmt.Errorf("SQL:\n%v\nerr: %w", sql, err)
 			}
 			defer rows.Close()
+			count := 0
 			for rows.Next() {
+				count++
 				err = rows.Scan(&name, &order, &parent, &id, &class, &geobytes)
 
 				g, err := wkb.DecodeBytes(geobytes)
@@ -87,6 +92,13 @@ func (b *Boundary) For(ctx context.Context, mdgid string, cssKey string) (*Bound
 					}
 					log.Printf("[entry %v] Name [%v], order [%v], class [%v], id [%v], parent [%v]:\nSQL:%v", i, name, order, class, id, parent, sql)
 					return nil, fmt.Errorf("DecodeBytes: %w", err)
+				}
+				if geom.IsEmpty(g) {
+					// skip empty entries
+					if debug {
+						log.Printf("[DEBUG] skipping empty geom for [%v:%v] %v", i, mdgid, name)
+					}
+					continue
 				}
 				var mp geom.MultiPolygon
 				// Need to make sure the g is of MultiPolygon
@@ -107,14 +119,22 @@ func (b *Boundary) For(ctx context.Context, mdgid string, cssKey string) (*Bound
 					geo:    mp,
 				})
 			}
+			if debug {
+				log.Printf("[DEBUG] sql for boundary[%v:%v] return %v rows:\n%v", i, mdgid, count, sql)
+			}
 
 			sql = replaceTokens(bdry.Boundary, imap.totalExtent)
 			rows, err = b.Query(ctx, sql)
+			if debug {
+				log.Printf("[DEBUG] run sql for boundary line[%v:%v]:\n%v", i, mdgid, sql)
+			}
 			if err != nil {
 				return nil, fmt.Errorf("SQL:\n%v\nerr: %w", sql, err)
 			}
 			defer rows.Close()
+			count = 0
 			for rows.Next() {
+				count++
 				err = rows.Scan(&namel, &namer, &order, &parent, &class, &geobytes)
 
 				g, err := wkb.DecodeBytes(geobytes)
@@ -124,6 +144,13 @@ func (b *Boundary) For(ctx context.Context, mdgid string, cssKey string) (*Bound
 						panic(fmt.Sprintf("boundary lines Unknown geo %v: %v", name, unknownGeo))
 					}
 					return nil, fmt.Errorf("DecodeBytes: %w", err)
+				}
+				if geom.IsEmpty(g) {
+					// skip empty entries
+					if debug {
+						log.Printf("[DEBUG] skipping empty line geom for [%v:%v] %v", i, mdgid, name)
+					}
+					continue
 				}
 				var ml geom.MultiLineString
 				// Need to make sure the g is of MultiPolygon
@@ -143,6 +170,9 @@ func (b *Boundary) For(ctx context.Context, mdgid string, cssKey string) (*Bound
 					class:    class,
 					boundary: ml,
 				})
+			}
+			if debug {
+				log.Printf("[DEBUG] sql for boundary-line[%v:%v] return %v rows:\n%v", i, mdgid, count, sql)
 			}
 
 		}
