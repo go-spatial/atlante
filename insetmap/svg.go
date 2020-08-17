@@ -3,6 +3,7 @@ package insetmap
 import (
 	"fmt"
 	"log"
+	"sort"
 	"strings"
 
 	"github.com/go-spatial/geom"
@@ -12,6 +13,73 @@ import (
 var order = winding.Order{YPositiveDown: false}
 
 const SVGMime = "image/svg+xml"
+
+func Attr(attrs map[string]string, extra string) string {
+	// make sure attrs are always written in sorted order
+	var pairs = make([]string, len(attrs))
+	for k, v := range attrs {
+		pairs = append(pairs, fmt.Sprintf(`%v="%v"`, strings.ToLower(k), v))
+	}
+	sort.Strings(pairs)
+	extra = strings.TrimSpace(extra)
+	if extra != "" {
+		pairs = append(pairs, extra)
+	}
+	return strings.Join(pairs, " ")
+}
+
+func SVGTag(tag string, attrs string, body string) string {
+	var svg strings.Builder
+	svgTagBuilder(&svg, tag, attrs, body)
+	return svg.String()
+}
+func svgTagBuilder(svg *strings.Builder, tag string, attrs string, body string) {
+	svg.WriteRune('<')
+	svg.WriteString(tag)
+	svg.WriteRune(' ')
+	svg.WriteString(attrs)
+	svg.WriteString(">\n")
+
+	svg.WriteString(body)
+
+	svg.WriteString("\n</")
+	svg.WriteString(tag)
+	svg.WriteString(">\n")
+}
+
+func SVGTagFn(tag string, attrs string, body func() (string, error)) (string, error) {
+	var svg strings.Builder
+	bodyStr, err := body()
+	if err != nil {
+		return "", err
+	}
+	svgTagBuilder(&svg, tag, attrs, bodyStr)
+	return svg.String(), nil
+}
+
+type SVGStringBuilder struct {
+	strings.Builder
+}
+
+func (s *SVGStringBuilder) WriteTag(tag string, attr string, fn func(*SVGStringBuilder) error) error {
+
+	s.WriteRune('<')
+	s.WriteString(tag)
+
+	s.WriteRune(' ')
+	s.WriteString(attr)
+
+	s.WriteString(">\n")
+
+	err := fn(s)
+
+	// We always close out the tag
+	s.WriteString("\n</")
+	s.WriteString(tag)
+	s.WriteString(">\n")
+
+	return err
+}
 
 type SvgPath struct {
 	fn    func(...float64) ([]float64, error)
@@ -66,9 +134,8 @@ func (svg *SvgPath) Point(x, y float64) (float64, float64) {
 	return xy[0], xy[1]
 }
 
-func (svg SvgPath) Path(g geom.Geometry) (string, error) {
+func (svg SvgPath) encodePath(g geom.Geometry) (string, error) {
 	var path strings.Builder
-	g, _ = geom.ApplyToPoints(g, svg.fn)
 	switch geo := g.(type) {
 	case geom.Polygon:
 		//gpts := [][][2]float64(geo)
@@ -85,7 +152,7 @@ func (svg SvgPath) Path(g geom.Geometry) (string, error) {
 		return path.String(), nil
 	case geom.MultiPolygon:
 		for _, p := range geo {
-			str, err := svg.Path(geom.Polygon(p))
+			str, err := svg.encodePath(geom.Polygon(p))
 			if err != nil {
 				return "", err
 			}
@@ -102,7 +169,7 @@ func (svg SvgPath) Path(g geom.Geometry) (string, error) {
 		return path.String(), nil
 	case geom.MultiLineString:
 		for _, l := range geo {
-			str, err := svg.Path(geom.LineString(l))
+			str, err := svg.encodePath(geom.LineString(l))
 			if err != nil {
 				return "", err
 			}
@@ -116,4 +183,8 @@ func (svg SvgPath) Path(g geom.Geometry) (string, error) {
 		}
 	}
 	return "", nil
+}
+func (svg SvgPath) Path(g geom.Geometry) (string, error) {
+	g, _ = geom.ApplyToPoints(g, svg.fn)
+	return svg.encodePath(g)
 }

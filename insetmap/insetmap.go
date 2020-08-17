@@ -90,6 +90,81 @@ func New(db *pgxpool.Pool, config Config, gCSSDir string, gCSSMap CSSMap, gCSSDe
 
 }
 
+func (inset *Inset) initLayers(ctx context.Context, imap *Map, ext *geom.Extent) error {
+	for _, lyr := range inset.Layers {
+		var (
+			geobytes []byte
+			class    string
+		)
+
+		sql := replaceTokens(lyr.SQL, ext)
+		var mlayer mapLayer
+		if debug {
+			log.Println("[DEBUG] running sql: ", sql)
+		}
+		rows, err := inset.Query(ctx, sql)
+		if err != nil {
+			return err
+		}
+		defer rows.Close()
+		for rows.Next() {
+			err = rows.Scan(&class, &geobytes)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "[ERR] geom failed %v: %v\n", lyr.Name, err)
+				return err
+			}
+			g, err := wkb.DecodeBytes(geobytes)
+			if err != nil {
+				var unknownGeo wkb.ErrUnknownGeometryType
+				if errors.As(err, &unknownGeo) {
+					panic(fmt.Sprintf("Unknown geo %v: %v", lyr.Name, unknownGeo))
+				}
+				return err
+			}
+			mlayer.Geometries = append(mlayer.Geometries, g)
+		}
+		mlayer.Class = class
+		mlayer.Name = lyr.Name
+		imap.layers = append(imap.layers, mlayer)
+	}
+	return nil
+}
+
+func (inset *Inset) initBaseVars(ctx context.Context, imap *Map, mdgid string, cssKey string) error {
+	var (
+		err error
+	)
+	if debug {
+		log.Printf("[DEBUG-inset] using buff to: %v", inset.Buff)
+	}
+	imap.scale = inset.Scale
+	imap.buff = inset.Buff
+
+	if cssKey == "" {
+		cssKey = inset.CSSDefault
+	}
+	if cssKey != "" {
+		cssFile := inset.CSSMap[cssKey].Path
+		if cssFile != "" {
+			// don't care about the error
+			contents, _ := ioutil.ReadFile(cssFile)
+			imap.css = string(contents)
+		}
+	}
+
+	// Get main sheet
+	if debug {
+		log.Printf("[DEBUG] working on mdgid: %#v", mdgid)
+	}
+	row := inset.QueryRow(ctx, inset.Main, mdgid)
+	imap.main, err = sheetForRow(row)
+	if err != nil {
+		return err
+	}
+	imap.totalExtent = imap.main.Extent.Clone()
+	return nil
+}
+
 // For retrieves the data for the given mdgid to generate a Map, that can
 // be rendered as an SVG
 func (inset *Inset) For(ctx context.Context, mdgid string, cssKey string) (*Map, error) {
@@ -101,40 +176,14 @@ func (inset *Inset) For(ctx context.Context, mdgid string, cssKey string) (*Map,
 		return nil, nil
 	}
 
-	if debug {
-		log.Printf("[DEBUG-inset] using buff to: %v", inset.Buff)
-	}
-	insetmap.scale = inset.Scale
-	insetmap.buff = inset.Buff
-
-	if cssKey == "" {
-		cssKey = inset.CSSDefault
-	}
-	if cssKey != "" {
-		cssFile := inset.CSSMap[cssKey].Path
-		if cssFile != "" {
-			// don't care about the error
-			contents, _ := ioutil.ReadFile(cssFile)
-			insetmap.css = string(contents)
-		}
+	if err = inset.initBaseVars(ctx, &insetmap, mdgid, cssKey); err != nil {
+		return nil, err
 	}
 
-	{
-		// Get main sheet
-		if debug {
-			log.Printf("[DEBUG] working on mdgid: %#v", mdgid)
-		}
-		row := inset.QueryRow(ctx, inset.Main, mdgid)
-		insetmap.main, err = sheetForRow(row)
-		if err != nil {
-			return nil, err
-		}
-	}
 	{
 		deltax := (insetmap.main.Extent.MaxX() - insetmap.main.Extent.MinX()) / 2
 		deltay := (insetmap.main.Extent.MaxY() - insetmap.main.Extent.MinY()) / 2
 		// Make sure our total bounds is at minimum 9x9
-		insetmap.totalExtent = insetmap.main.Extent.Clone()
 		insetmap.totalExtent[0] -= deltax
 		insetmap.totalExtent[1] -= deltay
 		insetmap.totalExtent[2] += deltax
@@ -156,42 +205,8 @@ func (inset *Inset) For(ctx context.Context, mdgid string, cssKey string) (*Map,
 			insetmap.totalExtent.Add(sheet.Extent)
 		}
 	}
-	{
-		for _, lyr := range inset.Layers {
-			var (
-				geobytes []byte
-				class    string
-			)
-
-			sql := replaceTokens(lyr.SQL, insetmap.totalExtent)
-			var mlayer mapLayer
-			if debug {
-				log.Println("[DEBUG] running sql: ", sql)
-			}
-			rows, err := inset.Query(ctx, sql)
-			if err != nil {
-				return nil, err
-			}
-			defer rows.Close()
-			for rows.Next() {
-				err = rows.Scan(&class, &geobytes)
-				if err != nil {
-					fmt.Fprintf(os.Stderr, "[ERR] geom failed %v: %v\n", lyr.Name, err)
-				}
-				g, err := wkb.DecodeBytes(geobytes)
-				if err != nil {
-					var unknownGeo wkb.ErrUnknownGeometryType
-					if errors.As(err, &unknownGeo) {
-						panic(fmt.Sprintf("Unknown geo %v: %v", lyr.Name, unknownGeo))
-					}
-					return nil, err
-				}
-				mlayer.Geometries = append(mlayer.Geometries, g)
-			}
-			mlayer.Class = class
-			mlayer.Name = lyr.Name
-			insetmap.layers = append(insetmap.layers, mlayer)
-		}
+	if err = inset.initLayers(ctx, &insetmap, insetmap.totalExtent); err != nil {
+		return nil, err
 	}
 	return &insetmap, nil
 
@@ -229,63 +244,104 @@ type Map struct {
 	css         string // css to embed into the svg
 }
 
-// AsSVG will render the map as an SVG image.
+func (m *Map) CSSTag() string {
+	if m.css == "" {
+		return ""
+	}
+	return fmt.Sprintf("<style>\n%s\n</style>", m.css)
+}
+
+func (m *Map) newSVGPath() *SvgPath {
+	if debug {
+		log.Printf("[DEBUG-map] using buff to: %v", m.buff)
+	}
+	return NewSVGPath(m.totalExtent, m.scale, m.buff)
+}
+
+func (m *Map) buildLayers(svgpath *SvgPath, svg *SVGStringBuilder) error {
+	for i := range m.layers {
+		str, err := m.layers[i].AsSVG(svgpath)
+		if err != nil {
+			return err
+		}
+		svg.WriteString(str)
+	}
+	return nil
+}
+
+func (m *Map) writeCutLine(svgpath *SvgPath, svg *SVGStringBuilder) error {
+	str, err := mapSheet{Extent: m.totalExtent, Class: "cutline"}.AsSVG("cutline-border", svgpath)
+	if err != nil {
+		return err
+	}
+	svg.WriteString(str)
+	return nil
+}
+
+// AsSVG will render the map as an SVG image
 // the layers are rendered first,
 // then the adjoining sheets' boxes and texts
 // then the main sheet's box and text
 // then the cutline surrounding the image
 func (m *Map) AsSVG(partial bool, attr string) (string, error) {
-	var svg strings.Builder
+	var svg = new(SVGStringBuilder)
 
-	if debug {
-		log.Printf("[DEBUG-map] using buff to: %v", m.buff)
-	}
-	svgpath := NewSVGPath(m.totalExtent, m.scale, m.buff)
-	if !partial {
-		svg.WriteString(fmt.Sprintf(`<svg preserveAspectRatio="xMidyMid meet" viewBox="%s" %s version="1.2" baseProfile="tiny" xmlns="http://www.w3.org/2000/svg">`, svgpath.ViewBox(), attr))
-		svg.WriteString("\n")
-	}
+	svgpath := m.newSVGPath()
 
 	if m.css != "" {
-		svg.WriteString(fmt.Sprintf("<defs><style>\n%s\n</style></defs>", m.css))
+
+		svg.WriteTag("defs", "", func(s *SVGStringBuilder) error {
+			s.WriteString(m.CSSTag())
+			return nil
+		})
 	}
 
-	svg.WriteString(`<g id="diagram">` + "\n")
+	err := svg.WriteTag(
+		"g", Attr(map[string]string{"id": "diagram"}, ""),
+		func(svg *SVGStringBuilder) error {
+			if err := m.buildLayers(svgpath, svg); err != nil {
+				return err
+			}
 
-	for i := range m.layers {
-		str, err := m.layers[i].AsSVG(svgpath)
-		if err != nil {
-			return "", err
-		}
-		svg.WriteString(str)
-	}
+			for i := range m.adjoining {
+				str, err := m.adjoining[i].AsSVG(fmt.Sprintf("adjoining_%d", i), svgpath)
+				if err != nil {
+					return err
+				}
+				svg.WriteString(str)
+			}
 
-	for i := range m.adjoining {
-		str, err := m.adjoining[i].AsSVG(fmt.Sprintf("adjoining_%d", i), svgpath)
-		if err != nil {
-			return "", err
-		}
-		svg.WriteString(str)
-	}
+			str, err := m.main.AsSVG("main", svgpath)
+			if err != nil {
+				return err
+			}
+			svg.WriteString(str)
 
-	str, err := m.main.AsSVG("main", svgpath)
+			if err = m.writeCutLine(svgpath, svg); err != nil {
+				return err
+			}
+
+			return nil
+		},
+	)
 	if err != nil {
 		return "", err
 	}
-	svg.WriteString(str)
 
-	svg.WriteString("\n")
-	str, err = mapSheet{Extent: m.totalExtent, Class: "cutline"}.AsSVG("cutline-border", svgpath)
-	if err != nil {
-		return "", err
+	if partial {
+		return svg.String(), nil
 	}
-	svg.WriteString(str)
 
-	if !partial {
-		svg.WriteString("\n")
-		svg.WriteString("</g></svg>")
-	}
-	return svg.String(), nil
+	return SVGTag(
+		"svg", Attr(map[string]string{
+			"viewBox":     svgpath.ViewBox(),
+			"xMidyMid":    "meet",
+			"version":     "1.2",
+			"baseProfile": "tiny",
+			"xmlns":       "http://www.w3.org/2000/svg",
+		}, attr),
+		svg.String(),
+	), nil
 
 }
 
@@ -367,7 +423,7 @@ func envelope(ext *geom.Extent) string {
 }
 
 // sheetForRow will extrat the sheet form the given row object.
-// expectes the following columns in order sheet, class, wkb bytes
+// expects the following columns in order sheet, class, wkb bytes
 func sheetForRow(scanner interface{ Scan(...interface{}) error }) (sheet mapSheet, err error) {
 	var (
 		geobytes []byte
