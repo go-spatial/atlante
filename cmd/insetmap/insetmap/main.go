@@ -17,7 +17,8 @@ var (
 	entryFlag  = flag.String("entry", "", "which entry to use from the config file. If not set, will be the default entry, or the first entry.")
 	mdgid      = flag.String("mdgid", "V795G25492", "mdgid to generate svg for.")
 	configFile = flag.String("config", "config.toml", "config file")
-	InsetMaps  map[string]*insetmap.Inset
+	boundary   = flag.Bool("boundary", false, "generate a boundary map instead of an adjoining sheets map")
+	Maps       map[string]*insetmap.Boundary
 	DefaultMap string
 	css        = flag.String("css", "", "the css file to embed without the ext")
 )
@@ -48,7 +49,7 @@ func main() {
 		return
 	}
 	DefaultMap = string(config.DefaultEntry)
-	InsetMaps = make(map[string]*insetmap.Inset)
+	Maps = make(map[string]*insetmap.Boundary)
 
 	for name, entry := range config.Entries {
 		if DefaultMap == "" {
@@ -63,11 +64,11 @@ func main() {
 		}
 
 		defer conn.Close()
-		imap, err := insetmap.New(conn, entry.Config, "", nil, "")
+		imap, err := insetmap.NewBoundary(conn, entry.Config, "", nil, "")
 		if err != nil {
 			panic(err)
 		}
-		InsetMaps[name] = imap
+		Maps[name] = imap
 
 	}
 
@@ -78,13 +79,26 @@ func main() {
 
 	log.Println("Using entry:", entry)
 
-	inset, err := InsetMaps[entry].For(ctx, *mdgid, *css)
-	if err != nil {
-		panic(err)
-	}
-	svg, err := inset.AsSVG(false)
-	if err != nil {
-		panic(err)
+	var svg string
+	if !*boundary {
+		inset, err := Maps[entry].Inset.For(ctx, *mdgid, *css)
+		if err != nil {
+			panic(err)
+		}
+		svg, err = inset.AsSVG(false, "")
+		if err != nil {
+			panic(err)
+		}
+	} else {
+		bmap, err := Maps[entry].For(ctx, *mdgid, *css)
+		if err != nil {
+			panic(err)
+		}
+		svg, err = bmap.AsSVG("")
+		if err != nil {
+			panic(err)
+		}
+
 	}
 	fmt.Println(svg)
 

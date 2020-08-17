@@ -29,6 +29,7 @@ Currently available Entries are:
 {{ $mdgid := .Mdgid }}
 {{range .Items}}
 <dt><a href="/{{.Name}}/mdgid/{{$mdgid}}">{{if .IsDefault}}<b>{{end}}{{.Name}}{{if .IsDefault}}</b>{{end}}</a></dt>
+<dd><a href="/{{.Name}}/boundary/mdgid/{{$mdgid}}">boundary</a></dd>
 <dd>
 <p>{{.Description}}</p>
 {{ if .CSSMap }} 
@@ -58,7 +59,7 @@ var (
 
 type InsetEntry struct {
 	Description string
-	*insetmap.Inset
+	*insetmap.Boundary
 }
 type ConfigEntry struct {
 	DBConnStr env.String `toml:"database"`
@@ -147,14 +148,14 @@ func main() {
 		}
 
 		defer conn.Close()
-		imap, err := insetmap.New(conn, entry.Config, gCSSDir, gCSSMap, gCSSDefault)
+		imap, err := insetmap.NewBoundary(conn, entry.Config, gCSSDir, gCSSMap, gCSSDefault)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "[%v] Unable to parse entry: %v", name, err)
 			os.Exit(1)
 		}
 		InsetMaps[name] = InsetEntry{
 			Description: string(entry.Desc),
-			Inset:       imap,
+			Boundary:    imap,
 		}
 		lsData.Items = append(lsData.Items, ListingDataItem{
 			Name:        name,
@@ -192,7 +193,7 @@ func main() {
 		}
 		cssKey := strings.TrimSpace(r.URL.Query().Get("css"))
 
-		inset, err := entry.For(r.Context(), mdgid, cssKey)
+		inset, err := entry.Inset.For(r.Context(), mdgid, cssKey)
 		if err != nil {
 			log.Printf("for mdgid(%v) got error: %v", mdgid, err)
 			http.Error(w, http.StatusText(http.StatusNotFound), http.StatusNotFound)
@@ -223,6 +224,51 @@ func main() {
 		}
 
 		svg, err := inset.AsSVG(partial, attr.String())
+		if err != nil {
+			log.Printf("while generating svg for  mdgid(%v) got error: %v", mdgid, err)
+			http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Type", insetmap.SVGMime)
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(svg))
+	})
+	r.Get("/{entry}/boundary/mdgid/{mdgid}", func(w http.ResponseWriter, r *http.Request) {
+		entryName := chi.URLParam(r, "entry")
+		entry, ok := InsetMaps[entryName]
+		if !ok {
+			http.Error(w, http.StatusText(http.StatusNotFound), http.StatusNotFound)
+			return
+		}
+		mdgid := chi.URLParam(r, "mdgid")
+		if mdgid == "" {
+			http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
+			return
+		}
+		cssKey := strings.TrimSpace(r.URL.Query().Get("css"))
+
+		boundary, err := entry.For(r.Context(), mdgid, cssKey)
+		if err != nil {
+			log.Printf("for mdgid(%v) got error: %v", mdgid, err)
+			http.Error(w, http.StatusText(http.StatusNotFound), http.StatusNotFound)
+			return
+		}
+
+		var attr strings.Builder
+		{
+			str := strings.TrimSpace(r.URL.Query().Get("w"))
+
+			if str != "" {
+				fmt.Fprintf(&attr, " width=\"%v\"", str)
+			}
+			str = strings.TrimSpace(r.URL.Query().Get("h"))
+
+			if str != "" {
+				fmt.Fprintf(&attr, " height=\"%v\"", str)
+			}
+		}
+
+		svg, err := boundary.AsSVG(attr.String())
 		if err != nil {
 			log.Printf("while generating svg for  mdgid(%v) got error: %v", mdgid, err)
 			http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)

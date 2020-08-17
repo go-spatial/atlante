@@ -11,19 +11,25 @@ import (
 	"github.com/gorilla/css/scanner"
 )
 
+type ConfigBoundarySql struct {
+	Main     env.String `toml:"sql"`
+	Boundary env.String `toml:"boundary_sql"`
+}
+
 type ConfigLayer struct {
 	Name env.String `toml:"name"`
 	SQL  env.String `toml:"sql"`
 }
 
 type Config struct {
-	Scale      env.Uint      `toml:"scale"`
-	ViewBuffer env.Uint      `toml:"view_buffer"`
-	Sheet      env.String    `toml:"main_sql"`
-	Adjoining  env.String    `toml:"adjoining_sql"`
-	Layers     []ConfigLayer `toml:"layers"`
-	CSSDir     env.String    `toml:"css_dir"`
-	CSSDefault env.String    `toml:"css_default"`
+	Scale      env.Uint            `toml:"scale"`
+	ViewBuffer env.Uint            `toml:"view_buffer"`
+	Sheet      env.String          `toml:"main_sql"`
+	Adjoining  env.String          `toml:"adjoining_sql"`
+	Layers     []ConfigLayer       `toml:"layers"`
+	Boundaries []ConfigBoundarySql `toml:"boundaries"`
+	CSSDir     env.String          `toml:"css_dir"`
+	CSSDefault env.String          `toml:"css_default"`
 }
 
 type CSSInfo struct {
