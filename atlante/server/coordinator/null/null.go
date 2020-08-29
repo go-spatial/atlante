@@ -29,15 +29,15 @@ func (Provider) NewJob(job *atlante.Job) (jb *coordinator.Job, err error) {
 	return coordinator.NewJob(jbID, job), nil
 }
 
-func (Provider) UpdateField(job *coordinator.Job, fields ...field.Value) error {
+func (Provider) UpdateField(*coordinator.Job, ...field.Value) error {
 	return nil
 }
 
-func (Provider) FindByJob(job *atlante.Job) (jobs []*coordinator.Job) {
+func (Provider) FindByJob(*atlante.Job, string) (jobs []*coordinator.Job) {
 	return nil
 }
 
-func (Provider) FindByJobID(jobid string) (jb *coordinator.Job, found bool) {
+func (Provider) FindByJobID(string) (jb *coordinator.Job, found bool) {
 	return nil, false
 }
 func (Provider) Jobs(uint) ([]*coordinator.Job, error) {

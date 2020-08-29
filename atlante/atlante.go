@@ -171,6 +171,10 @@ func (ft filenameTemplate) Filename(sheetName string, grid *grids.Cell, wd strin
 
 // GeneratePDF will generate the PDF based on the sheet, and grid
 func GeneratePDF(ctx context.Context, sheet *Sheet, grid *grids.Cell, filenames *GeneratedFiles) error {
+
+	var (
+		style string
+	)
 	if grid == nil {
 		return ErrNilGrid
 	}
@@ -182,6 +186,17 @@ func GeneratePDF(ctx context.Context, sheet *Sheet, grid *grids.Cell, filenames 
 	}
 
 	sheet.Emit(field.Started{})
+
+	if grid.MetaData != nil {
+		style = grid.MetaData["styleLocation"]
+		if style == "" {
+			s, _ := sheet.Styles.For(grid.MetaData["styleName"])
+			style = s.Location
+		}
+	} else {
+		s, _ := sheet.Styles.For("")
+		style = s.Location
+	}
 
 	// TODO(gdey): use MdgID once we move to partial templates system
 	// grp := grid.MdgID.String(), an empty group is current directory
@@ -240,7 +255,7 @@ func GeneratePDF(ctx context.Context, sheet *Sheet, grid *grids.Cell, filenames 
 		Grid:       grid,
 		Projection: bounds.ESPG3857,
 		Scale:      sheet.Scale,
-		Style:      sheet.Style,
+		Style:      style,
 	}
 
 	defer func() {
@@ -382,7 +397,7 @@ func (a *Atlante) generatePDF(ctx context.Context, sheet *Sheet, grid *grids.Cel
 	return filenames, err
 }
 
-func (a *Atlante) GeneratePDFLatLng(ctx context.Context, sheetName string, lat, lng float64, srid uint64, filenameTemplate string) (*GeneratedFiles, error) {
+func (a *Atlante) GeneratePDFLatLng(ctx context.Context, sheetName string, styleName string, lat, lng float64, srid uint64, filenameTemplate string) (*GeneratedFiles, error) {
 	if a == nil {
 		return nil, ErrNilAtlanteObject
 	}
@@ -408,6 +423,11 @@ func (a *Atlante) GeneratePDFLatLng(ctx context.Context, sheetName string, lat, 
 	if err != nil {
 		return nil, err
 	}
+
+	style, _ := provider.Styles.For(styleName)
+	cell.MetaData["styleName"] = style.Name
+	cell.MetaData["styleLocation"] = style.Location
+
 	err = GeneratePDF(ctx, provider, cell, filenames)
 	return filenames, err
 
@@ -430,7 +450,7 @@ func (a *Atlante) GeneratePDFJob(ctx context.Context, job Job, filenameTemplate 
 	return a.generatePDF(ctx, sheet, cell, filenameTemplate)
 }
 
-func (a *Atlante) GeneratePDFMDGID(ctx context.Context, sheetName string, mdgID *grids.MDGID, filenameTemplate string) (*GeneratedFiles, error) {
+func (a *Atlante) GeneratePDFMDGID(ctx context.Context, sheetName string, styleName string, mdgID *grids.MDGID, filenameTemplate string) (*GeneratedFiles, error) {
 
 	sheet, err := a.SheetFor(sheetName)
 	if err != nil {
@@ -441,10 +461,15 @@ func (a *Atlante) GeneratePDFMDGID(ctx context.Context, sheetName string, mdgID 
 	if err != nil {
 		return nil, err
 	}
+
+	style, _ := sheet.Styles.For(styleName)
+	cell.MetaData["styleName"] = style.Name
+	cell.MetaData["styleLocation"] = style.Location
+
 	return a.generatePDF(ctx, sheet, cell, filenameTemplate)
 }
 
-func (a *Atlante) GeneratePDFBounds(ctx context.Context, sheetName string, bounds geom.Extent, srid uint, filenameTemplate string) (*GeneratedFiles, error) {
+func (a *Atlante) GeneratePDFBounds(ctx context.Context, sheetName string, styleName string, bounds geom.Extent, srid uint, filenameTemplate string) (*GeneratedFiles, error) {
 	sheet, err := a.SheetFor(sheetName)
 	if err != nil {
 		return nil, err
@@ -454,6 +479,10 @@ func (a *Atlante) GeneratePDFBounds(ctx context.Context, sheetName string, bound
 	if err != nil {
 		return nil, err
 	}
+
+	style, _ := sheet.Styles.For(styleName)
+	cell.MetaData["styleName"] = style.Name
+	cell.MetaData["styleLocation"] = style.Location
 
 	return a.generatePDF(ctx, sheet, cell, filenameTemplate)
 }

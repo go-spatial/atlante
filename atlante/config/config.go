@@ -32,9 +32,19 @@ type Config struct {
 	// that the user wants
 	FileStores []env.Dict `toml:"file_stores"`
 
+	// Styles are the styles that can be used
+	Styles []Style `toml:"styles" `
 	// metadata holds the metadata from parsing the toml
 	// file
 	metadata toml.MetaData `toml:"-"`
+}
+
+// Style describes information about the various styles that will be
+// available to the system
+type Style struct {
+	Name env.String `toml:"name"`
+	Loc  env.String `toml:"location"`
+	Desc env.String `toml:"description"`
 }
 
 // Webserver represents the config values for the webserver potion
@@ -51,15 +61,16 @@ type Webserver struct {
 
 // Sheet models a sheet in the config file
 type Sheet struct {
-	Name         env.String   `toml:"name"`
-	ProviderGrid env.String   `toml:"provider_grid"`
-	Filestores   []env.String `toml:"file_stores"`
-	DPI          env.Int      `toml:"dpi"`
-	Template     env.String   `toml:"template"`
-	Style        env.String   `toml:"style"`
-	Description  env.String   `toml:"description"`
-	Width        env.Float    `toml:"width"`
-	Height       env.Float    `toml:"height"`
+	Name         env.String     `toml:"name"`
+	ProviderGrid env.String     `toml:"provider_grid"`
+	Filestores   []env.String   `toml:"file_stores"`
+	DPI          env.Int        `toml:"dpi"`
+	Template     env.String     `toml:"template"`
+	Style        env.String     `toml:"style"`
+	Styles       env.StringList `toml:"styles"`
+	Description  env.String     `toml:"description"`
+	Width        env.Float      `toml:"width"`
+	Height       env.Float      `toml:"height"`
 }
 
 // Validate will validate the config and make sure the is valid

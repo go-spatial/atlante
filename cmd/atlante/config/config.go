@@ -5,6 +5,8 @@ import (
 	"net/url"
 	"strings"
 
+	"github.com/go-spatial/atlante/atlante/style"
+
 	"github.com/gdey/errors"
 	"github.com/go-spatial/atlante/atlante"
 	"github.com/go-spatial/atlante/atlante/config"
@@ -56,7 +58,7 @@ func (fscfg Filestore) FileStoreFor(name string) (filestore.Provider, error) {
 	return p, nil
 }
 
-// LoadConfig will load
+// LoadConfig will create a new Atlante object based on the config provided
 func LoadConfig(conf config.Config, dpi int, overrideDPI bool) (*atlante.Atlante, error) {
 
 	var ok bool
@@ -71,16 +73,27 @@ func LoadConfig(conf config.Config, dpi int, overrideDPI bool) (*atlante.Atlante
 		a.Notifier = note
 	}
 
+	// Loop through and load up any global styles
+	styles := make([]style.Style, len(conf.Styles))
+	for i, s := range conf.Styles {
+		styles[i].Name = string(s.Name)
+		styles[i].Description = string(s.Desc)
+		styles[i].Location = string(s.Loc)
+	}
+	if err := style.Append(styles...); err != nil {
+		return nil, fmt.Errorf("error global styles %w", err)
+	}
+
 	// Loop through providers creating a provider type mapping.
 	for i, p := range conf.Providers {
 		// type is required
 		typ, err := p.String("type", nil)
 		if err != nil {
-			return nil, fmt.Errorf("error provider (%v) missing type : %v", i, err)
+			return nil, fmt.Errorf("error provider (%v) missing type : %w", i, err)
 		}
 		name, err := p.String("name", nil)
 		if err != nil {
-			return nil, fmt.Errorf("error provider( %v) missing name : %v", i, err)
+			return nil, fmt.Errorf("error provider( %v) missing name : %w", i, err)
 		}
 		name = strings.ToLower(name)
 		if _, ok := Providers[name]; ok {
@@ -88,7 +101,7 @@ func LoadConfig(conf config.Config, dpi int, overrideDPI bool) (*atlante.Atlante
 		}
 		prv, err := grids.For(typ, Provider{p})
 		if err != nil {
-			return nil, fmt.Errorf("error registering provider (%v -- %v)(#%v): %v", typ, name, i, err)
+			return nil, fmt.Errorf("error registering provider (%v -- %v)(#%v): %w", typ, name, i, err)
 		}
 
 		Providers[name] = prv
@@ -169,13 +182,46 @@ func LoadConfig(conf config.Config, dpi int, overrideDPI bool) (*atlante.Atlante
 		if overrideDPI || odpi == 0 {
 			odpi = uint(dpi)
 		}
+		var stylelist = style.Provider((*style.List)(nil))
+
+		{
+			// Here we need to check to see if
+			// we have multiple styles or the old
+			// style entry or both.
+
+			styleEntry := string(sheet.Style)
+			stylesEntry := ([]string)(sheet.Styles)
+			switch {
+
+			case len(stylesEntry) > 0:
+				// we have a styles entry. Always use that
+				stylelist = style.SubList(stylesEntry...)
+
+			case styleEntry != "":
+				// Old style config. We need to build a new style
+				// name and entry and issue a warning.
+				styleName := fmt.Sprintf("%s_style", name)
+				style.Append(style.Style{
+					Name:        styleName,
+					Description: fmt.Sprintf("Style for sheet %v:\n%v", name, sheet.Description),
+					Location:    styleEntry,
+				})
+				stylelist = style.SubList(styleName)
+				log.Warnf("For sheet %v, style is deprecated, please use styles instead", name)
+
+			default:
+				// values
+				// No style list is defined just use the global
+			}
+
+		}
 
 		sht, err := atlante.NewSheet(
 			name,
 			prv,
 			uint(odpi),
 			string(sheet.Description),
-			string(sheet.Style),
+			stylelist,
 			templateURL,
 			fsprv,
 		)

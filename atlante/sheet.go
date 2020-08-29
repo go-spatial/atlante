@@ -16,6 +16,7 @@ import (
 	"github.com/go-spatial/atlante/atlante/internal/urlutil"
 	"github.com/go-spatial/atlante/atlante/notifiers"
 	"github.com/go-spatial/atlante/atlante/server/coordinator/field"
+	"github.com/go-spatial/atlante/atlante/style"
 	"github.com/prometheus/common/log"
 )
 
@@ -38,8 +39,10 @@ type Sheet struct {
 	DPI uint
 	// Scale value (50000, 5000, etc...)
 	Scale uint
-	// URL to the style file
-	Style string
+
+	// Styles is the name of the style to use from the global style set.
+	Styles style.Provider
+
 	// Template file to use
 	SvgTemplateFilename string
 
@@ -108,7 +111,7 @@ func loadTemplateDir(t *template.Template, location *url.URL) (*template.Templat
 }
 
 // NewSheet returns a new sheet
-func NewSheet(name string, provider grids.Provider, dpi uint, desc string, style string, svgTemplateFilename *url.URL, fs filestore.Provider) (*Sheet, error) {
+func NewSheet(name string, provider grids.Provider, dpi uint, desc string, stylelist style.Provider, svgTemplateFilename *url.URL, fs filestore.Provider) (*Sheet, error) {
 	var (
 		err error
 		t   *template.Template
@@ -122,7 +125,7 @@ func NewSheet(name string, provider grids.Provider, dpi uint, desc string, style
 		Provider:            provider,
 		DPI:                 dpi,
 		Scale:               uint(scale),
-		Style:               style,
+		Styles:              stylelist,
 		SvgTemplateFilename: svgTemplateFilename.String(),
 		Filestore:           fs,
 		Desc:                desc,

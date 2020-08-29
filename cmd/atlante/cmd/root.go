@@ -52,12 +52,14 @@ var (
 	job        string
 	jobid      string
 	showJob    bool
+	listStyles bool
 	workDir    string
 	timeout    uint8
 	srid       int
 	boundsStr  string
 	bounds     [4]float64
 	haveBounds bool
+	styleName  string
 )
 
 func init() {
@@ -73,6 +75,8 @@ func init() {
 	Root.Flags().Uint8Var(&timeout, "timeout", 0, "timeout in minutes, 0 means no timeout.")
 	Root.Flags().IntVar(&srid, "srid", 4326, "the srid for the bounds")
 	Root.Flags().StringVar(&boundsStr, "bounds", "", "the bounds to use to generate the map")
+	Root.Flags().StringVar(&styleName, "style", "", "The name of the style to use; will use the default for sheet if not given")
+	Root.Flags().BoolVar(&listStyles, "list-styles", false, "list out the styles, if sheet is defined, then just list the styles for that sheet.")
 
 	// Add server command
 	Root.AddCommand(Server)
@@ -99,6 +103,35 @@ func generatePDFForJob(ctx context.Context, a *atlante.Atlante, jobstr string) (
 func rootCmdParseArgs(ctx context.Context, a *atlante.Atlante) (*atlante.GeneratedFiles, error) {
 	a.JobID = jobid
 	switch {
+
+	case listStyles:
+		sheets := a.Sheets()
+		for _, sheet := range sheets {
+			if sheetName != "" && sheet.Name != sheetName {
+				continue
+			}
+			styleNames := sheet.Styles.Styles()
+			styleword := "styles"
+			if len(styleNames) == 0 {
+				fmt.Fprintf(os.Stdout, "sheet '%v' has no styles; please fix.", sheet.Name)
+				continue
+			}
+			if len(styleNames) == 1 {
+				styleword = "style"
+			}
+			fmt.Fprintf(os.Stdout, "sheet '%v' has %v %s:\n", sheet.Name, len(styleNames), styleword)
+			for i, name := range styleNames {
+				style, _ := sheet.Styles.For(name)
+				name = style.Name
+				format := "  % 5d: %s -- %20s\n%s\n"
+				if i == 0 {
+					name = fmt.Sprintf("[default] %s", name)
+				}
+				fmt.Fprintf(os.Stdout, format, i+1, name, style.Location, style.Description)
+			}
+			fmt.Fprintln(os.Stdout, "\n")
+		}
+		return nil, nil
 
 	case showJob:
 		switch {
@@ -143,10 +176,10 @@ func rootCmdParseArgs(ctx context.Context, a *atlante.Atlante) (*atlante.Generat
 		// We have bounds to deal with.
 		sname := a.NormalizeSheetName(sheetName, true)
 		ext := geom.Extent{float64(bounds[0]), float64(bounds[1]), float64(bounds[2]), float64(bounds[3])}
-		return a.GeneratePDFBounds(ctx, sname, ext, uint(srid), "")
+		return a.GeneratePDFBounds(ctx, sname, styleName, ext, uint(srid), "")
 	default:
 		sname := a.NormalizeSheetName(sheetName, true)
-		return a.GeneratePDFMDGID(ctx, sname, grids.NewMDGID(mdgid), "")
+		return a.GeneratePDFMDGID(ctx, sname, styleName, grids.NewMDGID(mdgid), "")
 	}
 }
 

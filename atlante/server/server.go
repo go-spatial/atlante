@@ -49,6 +49,8 @@ const (
 	// ParamsKeyJobID is the key used for the jobid
 	ParamsKeyJobID = URLPlaceholder("job_id")
 
+	ParamsKeyStyleName = URLPlaceholder("style")
+
 	// HTTPErrorHeader is the name of the X-header where details of the error
 	// is provided.
 	HTTPErrorHeader = "X-HTTP-Error-Description"
@@ -185,7 +187,10 @@ func encodeCellAsJSON(w io.Writer, cell *grids.Cell, pdf filestore.URLInfo, lat,
 	if jobs == nil {
 		jobs = []*coordinator.Job{}
 	}
-
+	styleName := ""
+	if cell.MetaData != nil {
+		styleName = cell.MetaData["styleName"]
+	}
 	jsonCell := struct {
 		MDGID      string             `json:"mdgid"`
 		Part       *uint32            `json:"sheet_number"`
@@ -198,6 +203,7 @@ func encodeCellAsJSON(w io.Writer, cell *grids.Cell, pdf filestore.URLInfo, lat,
 		Lat        *float64           `json:"lat"`
 		Lng        *float64           `json:"lng"`
 		SheetName  string             `json:"sheet_name"`
+		Style      string             `json:"style_name"`
 		GeoJSON    json.RawMessage    `json:"geo_json"`
 	}{
 		MDGID:     mdgid.Id,
@@ -208,6 +214,7 @@ func encodeCellAsJSON(w io.Writer, cell *grids.Cell, pdf filestore.URLInfo, lat,
 		LastGen:   pdf.TimeString(),
 		Series:    cell.GetSeries(),
 		SheetName: cell.GetSheet(),
+		Style:     styleName,
 	}
 
 	if cell.Edited != nil {
@@ -388,8 +395,10 @@ func (s *Server) GridInfoHandler(w http.ResponseWriter, request *http.Request, u
 		pdfURL, _ = sheet.GetURL(mdgid.AsString(), gf.PDF, false)
 	}
 
+	defaultStyle, _ := sheet.Styles.For("")
+
 	// Ask the coordinator for the status:
-	jobs := s.Coordinator.FindByJob(&atlante.Job{SheetName: sheetName, Cell: cell})
+	jobs := s.Coordinator.FindByJob(&atlante.Job{SheetName: sheetName, Cell: cell}, defaultStyle.Location)
 
 	setHeaders(map[string]string{
 		"Content-Type":  "application/json",
@@ -421,6 +430,7 @@ func (s *Server) QueueHandler(w http.ResponseWriter, request *http.Request, urlP
 			NumCols   *uint        `json:"number_of_cols,omitempty"`
 			Rectangle bool         `json:"rectangle,omitempty"`
 			Srid      uint         `json:"srid,omitempty"`
+			StyleName string       `json:"style_name,omitempty"`
 		}
 		err  error
 		jobs []*coordinator.Job
@@ -472,8 +482,19 @@ func (s *Server) QueueHandler(w http.ResponseWriter, request *http.Request, urlP
 		ji.Srid = 4326
 	}
 
+	defaultStyle, _ := sheet.Styles.For("")
+	requestedStyle, found := sheet.Styles.For(ji.StyleName)
+	if !found {
+		badRequest(w, "style %v is unknown", ji.StyleName)
+		return
+	}
+
 	qjob := atlante.Job{
 		SheetName: sheetName,
+		MetaData: map[string]string{
+			"styleLocation": requestedStyle.Location,
+			"styleName":     requestedStyle.Name,
+		},
 	}
 
 	// We need to figure out what type of information we have to build
@@ -498,7 +519,7 @@ func (s *Server) QueueHandler(w http.ResponseWriter, request *http.Request, urlP
 			return
 		}
 		// Check the queue to see if there is already a job with these params:
-		jobs = s.Coordinator.FindByJob(&qjob)
+		jobs = s.Coordinator.FindByJob(&qjob, defaultStyle.Location)
 	}
 
 	if len(jobs) > 0 {
@@ -525,10 +546,9 @@ func (s *Server) QueueHandler(w http.ResponseWriter, request *http.Request, urlP
 		return
 	}
 	// Fill out the Metadata with JobID
-	qjob.MetaData = map[string]string{
-		"job_id":           jb.JobID,
-		GratingSquarishKey: strconv.FormatBool(ji.Rectangle),
-	}
+	qjob.MetaData["job_id"] = jb.JobID
+	qjob.MetaData[GratingSquarishKey] = strconv.FormatBool(ji.Rectangle)
+
 	if ji.NumRows != nil {
 		// Add row to Metadata
 		qjob.MetaData[GratingNumRowsKey] = fmt.Sprintf("%d", *ji.NumRows)
@@ -545,10 +565,12 @@ func (s *Server) QueueHandler(w http.ResponseWriter, request *http.Request, urlP
 	qjobid, err := s.Queue.Enqueue(jb.JobID, &qjob)
 	if err != nil {
 		s.Coordinator.UpdateField(jb,
-			field.Status{field.Failed{
-				Description: "Failed to enqueue job",
-				Error:       err,
-			}},
+			field.Status{
+				Status: field.Failed{
+					Description: "Failed to enqueue job",
+					Error:       err,
+				},
+			},
 		)
 		badRequest(w, "failed to queue job: %v", err)
 		return
@@ -557,7 +579,7 @@ func (s *Server) QueueHandler(w http.ResponseWriter, request *http.Request, urlP
 	s.Coordinator.UpdateField(jb,
 		field.QJobID(qjobid),
 		field.JobData(jbData),
-		field.Status{field.Requested{}},
+		field.Status{Status: field.Requested{}},
 	)
 
 	setHeaders(nil, w)
@@ -570,10 +592,15 @@ func (s *Server) QueueHandler(w http.ResponseWriter, request *http.Request, urlP
 // SheetInfoHandler takes a job from a post and enqueue it on the configured queue
 // if the job has not be submitted before
 func (s *Server) SheetInfoHandler(w http.ResponseWriter, request *http.Request, urlParams map[string]string) {
+	type styleInfo struct {
+		Name        string `json:"name"`
+		Description string `json:Description"`
+	}
 	type sheetInfo struct {
-		Name  string `json:"name"`
-		Desc  string `json:"desc"`
-		Scale uint   `json:"scale"`
+		Name   string      `json:"name"`
+		Desc   string      `json:"desc"`
+		Scale  uint        `json:"scale"`
+		Styles []styleInfo `json:"styles"`
 	}
 	type sheetsDef struct {
 		Sheets []sheetInfo `json:"sheets"`
@@ -582,10 +609,20 @@ func (s *Server) SheetInfoHandler(w http.ResponseWriter, request *http.Request, 
 	sheets := s.Atlante.Sheets()
 	newSheets.Sheets = make([]sheetInfo, 0, len(sheets))
 	for _, sh := range sheets {
+		var styles []styleInfo
+		for _, name := range sh.Styles.Styles() {
+			sty, _ := sh.Styles.For(name)
+			styles = append(styles, styleInfo{
+				Name:        sty.Name,
+				Description: sty.Description,
+			})
+
+		}
 		newSheets.Sheets = append(newSheets.Sheets, sheetInfo{
-			Name:  sh.Name,
-			Desc:  sh.Desc,
-			Scale: sh.Scale,
+			Name:   sh.Name,
+			Desc:   sh.Desc,
+			Scale:  sh.Scale,
+			Styles: styles,
 		})
 	}
 
