@@ -31,11 +31,21 @@ The webserver has the following properties
 [[filestores]]
 ...
 
+[[styles]]
+   name = "name"
+   location = "url://of/the/style/file"
+   description = "description of the style."
+
+[[styles]]
+   name = "name2"
+   location = "url://of/the/style/file/2"
+   description = "description of the style"
+
 [[sheets]]
 
    name = "50k"
    provider_grid = "postgistDB50k"
-   style = "files://...."
+   styles = ["name","name2"]
    template = "templates/...."
    file_stores = [ "file", "s3" ]
 
@@ -45,7 +55,7 @@ The webserver has the following properties
 * `file_stores`   (string) : [required] the names of file stores to use
 * `name`          (string) : [required] the name of the sheet
 * `provider_grid` (string) : [required] the name of the grid provider
-* `style`         (string) : [required] the style to use for this sheet
+* `styles`         (array of strings) : [optional] the style to use for this sheet, defaults to the first style in global styles
 * `template`      (string) : [required] the template to use 
 * `description`   (string) : [optional] ("") the description for this sheet
 * `dpi`           (int)    : [optional] (144) the DPI to use

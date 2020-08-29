@@ -14,7 +14,6 @@ import (
 	"github.com/go-spatial/atlante/atlante"
 	"github.com/go-spatial/atlante/atlante/server/coordinator"
 	"github.com/go-spatial/atlante/atlante/server/coordinator/field"
-	"github.com/go-spatial/geom"
 	"github.com/go-spatial/geom/encoding/wkt"
 	"github.com/prometheus/common/log"
 
@@ -302,9 +301,11 @@ INSERT INTO jobs(
 	mdgid,
 	sheet_number,
 	sheet_name,
+	style_name,
+	style_location,
 	bounds
 )
-VALUES($1,$2,$3,ST_GeometryFromText($4,$5))
+VALUES($1,$2,$3,$6,$7,ST_GeometryFromText($4,$5))
 RETURNING id;
 `
 
@@ -312,13 +313,18 @@ RETURNING id;
 	if p.QueryNewJob != "" {
 		query = p.QueryNewJob
 	}
-	var id int
+	var (
+		id            int
+		styleName     string
+		styleLocation string
+	)
 
-	// TODO(gdey):Bug in wkt.Encode it should close the ring
-	//	bounds, _ := wkt.Encode(job.Cell.Hull().AsPolygon())
-	h := job.Cell.Hull().Vertices()
-	h = append(h, h[0])
-	bounds, _ := wkt.EncodeString(geom.Polygon{h})
+	bounds, _ := wkt.EncodeString(job.Cell.Hull().AsPolygon())
+
+	if job.MetaData != nil {
+		styleName = job.MetaData["styleName"]
+		styleLocation = job.MetaData["styleLocation"]
+	}
 
 	row := p.pool.QueryRow(
 		query,
@@ -327,6 +333,8 @@ RETURNING id;
 		job.SheetName,
 		bounds,
 		4326,
+		styleName,
+		styleLocation,
 	)
 	if err := row.Scan(&id); err != nil {
 		return nil, err
@@ -428,17 +436,19 @@ func scanRow(row rowScanner) (*coordinator.Job, error) {
 		emptyString string
 		zeroTime    time.Time
 
-		jobid       int
-		mdgid       string
-		jobdata     string
-		sheetNumber int
-		sheetName   string
-		queueIDp    *string
-		enqueued    time.Time
-		status      *string
-		desc        *string
-		updated     *time.Time
-		ajob        *atlante.Job
+		jobid         int
+		mdgid         string
+		jobdata       string
+		sheetNumber   int
+		sheetName     string
+		styleName     string
+		styleLocation string
+		queueIDp      *string
+		enqueued      time.Time
+		status        *string
+		desc          *string
+		updated       *time.Time
+		ajob          *atlante.Job
 	)
 
 	if err := row.Scan(
@@ -446,6 +456,8 @@ func scanRow(row rowScanner) (*coordinator.Job, error) {
 		&mdgid,
 		&sheetNumber,
 		&sheetName,
+		&styleName,
+		&styleLocation,
 		&queueIDp,
 		&jobdata,
 		&enqueued,
@@ -484,21 +496,24 @@ func scanRow(row rowScanner) (*coordinator.Job, error) {
 	}
 
 	return &coordinator.Job{
-		JobID:      fmt.Sprintf("%v", jobid),
-		QJobID:     *queueIDp,
-		MdgID:      mdgid,
-		MdgIDPart:  uint32(sheetNumber),
-		SheetName:  sheetName,
-		Status:     field.Status{s},
-		EnqueuedAt: enqueued,
-		UpdatedAt:  *updated,
-		AJob:       ajob,
+		JobID:         fmt.Sprintf("%v", jobid),
+		QJobID:        *queueIDp,
+		MdgID:         mdgid,
+		MdgIDPart:     uint32(sheetNumber),
+		SheetName:     sheetName,
+		StyleLocation: styleLocation,
+		Status:        field.Status{s},
+		EnqueuedAt:    enqueued,
+		UpdatedAt:     *updated,
+		AJob:          ajob,
 	}, nil
 
 }
 
 // FindByJob will find the lastest 2 jobs as described by the atlante job descriptions
-func (p *Provider) FindByJob(job *atlante.Job) (jobs []*coordinator.Job) {
+// TODO(gdey): remove defaultStyleLocation once this version of atlante as supplented older versions without
+// styleLists support.
+func (p *Provider) FindByJob(job *atlante.Job, defaultStyleLocation string) (jobs []*coordinator.Job) {
 
 	const selectQuery = `
 SELECT 
@@ -506,6 +521,8 @@ SELECT
 	job.mdgid,
 	job.sheet_number,
 	job.sheet_name,
+	job.style_name,
+	job.style_location,
 	job.queue_id,
 	job.job_data,
     job.created as enqueued,
@@ -524,7 +541,7 @@ LEFT JOIN
 ) AS jobstatus ON jobstatus.job_id = job.id
 WHERE job.mdgid = $1 AND job.sheet_number = $2 AND job.sheet_name = $3
 ORDER BY jobstatus.id desc 
-LIMIT 2;
+;
 	`
 	query := selectQuery
 	if p.QuerySelectMDGIDSheetName != "" {
@@ -536,6 +553,8 @@ LIMIT 2;
 	mdgid := job.Cell.Mdgid.Id
 	sheetNumber := job.Cell.Mdgid.Part
 	sheetName := job.SheetName
+	styleLocation := job.MetaData["styleLocation"]
+	lookingForDefault := styleLocation == defaultStyleLocation
 
 	rows, err := p.pool.Query(query, mdgid, sheetNumber, sheetName)
 	if err != nil {
@@ -544,15 +563,33 @@ LIMIT 2;
 		return nil
 	}
 	defer rows.Close()
+
 	for rows.Next() {
 		jb, err := scanRow(rows)
 		if err != nil {
 			logScanError(err, query)
 			continue
 		}
+		loc := jb.StyleLocation
+		if loc == "" {
+			if !lookingForDefault {
+				continue
+			}
+			loc = defaultStyleLocation
+		}
+
+		if styleLocation != loc {
+			continue
+		}
+		// let's looks at styleLocation and filter out by location
+		// if location is empty, then we need to assume it's the default.
 		jobs = append(jobs, jb)
 	}
-	return jobs
+	// limit jobs to two
+	if len(jobs) <= 2 {
+		return jobs
+	}
+	return jobs[:2]
 }
 
 // FindByJobID will attempt to locate the job for the given job id
@@ -563,7 +600,9 @@ SELECT
 	job.id,
     job.mdgid,
     job.sheet_number,
-    job.sheet_name,
+	job.sheet_name,
+	job.style_name,
+	job.style_location,
 	job.queue_id,
 	job.job_data,
     job.created as enqueued,
@@ -591,7 +630,6 @@ ORDER BY jobstatus.id desc limit 1;
 		return nil, false
 	}
 	return jb, true
-
 }
 
 // genAllSQL retuns the all sql (primarySQL if it's not empty otherwise defaultSQL) that results from running the provided
@@ -634,7 +672,9 @@ SELECT
 	job.id,
     job.mdgid,
     job.sheet_number,
-    job.sheet_name,
+	job.sheet_name,
+	job.style_name,
+	job.style_location,
     job.queue_id,
 	job.job_data,
     job.created as enqueued,

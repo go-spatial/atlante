@@ -95,14 +95,14 @@ func (p *Provider) UpdateField(job *coordinator.Job, fields ...field.Value) erro
 	return nil
 }
 
-func (p *Provider) FindByJob(job *atlante.Job) (jobs []*coordinator.Job) {
+func (p *Provider) FindByJob(job *atlante.Job, defaultStyleLocation string) (jobs []*coordinator.Job) {
 	if job == nil {
 		log.Infof("job is nil")
 		return nil
 	}
 	log.Infof("looking for job via sheet: %v mdgid: %v ", job.SheetName, job.Cell.Mdgid.AsString())
 	if p == nil || p.Provider != nil {
-		return p.Provider.FindByJob(job)
+		return p.Provider.FindByJob(job, defaultStyleLocation)
 	}
 	return nil
 }

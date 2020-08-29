@@ -91,6 +91,49 @@ func (t *String) UnmarshalTOML(v interface{}) error {
 	return nil
 }
 
+type StringList []string
+
+func StringListPtr(v StringList) *StringList {
+	return &v
+}
+
+// UnmarshalTOML fullfils the the TOMAL interface for unmarshaling the value
+// there are a few types for a string list.
+// if v is a string/inteface{}, then we parse the string and then split the
+// value inside on comma's.
+// if v is a []string, or []interface, we will treat each value as
+// an env.String
+func (t *StringList) UnmarshalTOML(v interface{}) error {
+
+	switch tt := v.(type) {
+	default:
+		var s String
+		if err := s.UnmarshalTOML(v); err != nil {
+			return fmt.Errorf("StringList err: %w", err)
+		}
+		(*t) = append((*t), strings.Split(string(s), ",")...)
+		return nil
+	case []string:
+		for i := range tt {
+			var s String
+			if err := s.UnmarshalTOML(tt[i]); err != nil {
+				return fmt.Errorf("StringList err: %w", err)
+			}
+			(*t) = append((*t), string(s))
+		}
+		return nil
+	case []interface{}:
+		for i := range tt {
+			var s String
+			if err := s.UnmarshalTOML(tt[i]); err != nil {
+				return fmt.Errorf("StringList err: %w", err)
+			}
+			(*t) = append((*t), string(s))
+		}
+		return nil
+	}
+}
+
 type Int int
 
 func IntPtr(v Int) *Int {
