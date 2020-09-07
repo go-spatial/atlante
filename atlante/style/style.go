@@ -183,5 +183,18 @@ func Styles() []string {
 	return global.Styles()
 }
 
-// For returns the style for the given name and if it was found in the global registary
+// For returns the style for the given name and if it was found in the global registrar
 func For(name string) (Style, bool) { return global.For(name) }
+
+// Location2Style will return a map of style locations to style name for a provider
+func Location2Style(p Provider) map[string]string {
+	names := p.Styles()
+	locIdx := make(map[string]string, len(names))
+	for _, name := range names {
+		s, _ := p.For(name)
+		locIdx[s.Location] = name
+	}
+	defaultStyle, _ := p.For("")
+	locIdx[""] = defaultStyle.Name
+	return locIdx
+}

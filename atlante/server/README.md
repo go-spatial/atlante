@@ -124,8 +124,133 @@ Returns:
 }
 ```
 
+5. `POST /sheets/${sheet_name}/bounds/grid` will return a GEOJSON describing the grid
 
-5. `GET /jobs` will return the latest 100 jobs
+Expected:
+
+```js
+{
+    "type": "FeatureCollection",
+    "features": [{
+        "type": "Feature",
+        "geometry": {
+            "type": "Point",
+            "coordinates": [-117.164125, 32.73213]
+        },
+        "properties": {
+            "name": "1"
+        },
+    }, {
+        "type": "Feature",
+        "geometry": {
+            "type": "Point",
+            "coordinates": [-117.164125, 32.683308]
+        },
+        "properties": {
+            "name": "1"
+        },
+    }, {
+        "type": "Feature",
+        "geometry": {
+            "type": "Point",
+            "coordinates": [-117.133741, 32.73213]
+        },
+        "properties": {
+            "name": "2"
+        },
+    }, {
+        "type": "Feature",
+        "geometry": {
+            "type": "Point",
+            "coordinates": [-117.133741, 32.683308]
+        },
+        "properties": {
+            "name": "2"
+        },
+    }, {
+        "type": "Feature",
+        "geometry": {
+            "type": "Point",
+            "coordinates": [-117.179317, 32.7199245]
+        },
+        "properties": {
+            "name": "B"
+        },
+    }, {
+        "type": "Feature",
+        "geometry": {
+            "type": "Point",
+            "coordinates": [-117.118549, 32.7199245]
+        },
+        "properties": {
+            "name": "B"
+        },
+    }, {
+        "type": "Feature",
+        "geometry": {
+            "type": "Point",
+            "coordinates": [-117.179317, 32.6955135]
+        },
+        "properties": {
+            "name": "A"
+        },
+    }, {
+        "type": "Feature",
+        "geometry": {
+            "type": "Point",
+            "coordinates": [-117.118549, 32.6955135]
+        },
+        "properties": {
+            "name": "A"
+        },
+    }, {
+        "type": "Feature",
+        "geometry": {
+            "type": "MultiLineString",
+            "coordinates": [
+                [
+                    [-117.179317, 32.73213],
+                    [-117.179317, 32.683308]
+                ],
+                [
+                    [-117.148933, 32.73213],
+                    [-117.148933, 32.683308]
+                ],
+                [
+                    [-117.118549, 32.73213],
+                    [-117.118549, 32.683308]
+                ],
+                [
+                    [-117.179317, 32.73213],
+                    [-117.118549, 32.73213]
+                ],
+                [
+                    [-117.179317, 32.707719],
+                    [-117.118549, 32.707719]
+                ],
+                [
+                    [-117.179317, 32.683308],
+                    [-117.118549, 32.683308]
+                ]
+            ]
+        },
+        "properties": {},
+    }]
+}
+```
+
+Returns:
+```js
+{
+   "mdgid" : string,
+   "sheet_number" : null | number,
+   "job_id" : number,
+   "status" : "requested" | "started" | "processing" | "completed",
+}
+```
+
+
+6. `GET /jobs` will return the latest 100 jobs
 
 Returns:
 
@@ -146,12 +271,15 @@ Returns:
         "pdf_url":  null | url, // if null or empty string, pdf has not be generated
         "last_generated" :  null | date, // last time the pdf was generated 
      },
+     "style_location" : string, // the location of the style sheet
+     "style_name" :  string, // the name configured for that style sheet
   }
   //...
   ]
 
 ```
-6. `GET /jobs/%{job_id}/status` will return the status of the job
+
+7. `GET /jobs/%{job_id}/status` will return the status of the job
 
 Returns:
 
@@ -172,11 +300,13 @@ Returns:
         "pdf_url":  null | url, // if null or empty string, pdf has not be generated
         "last_generated" :  null | date, // last time the pdf was generated 
      },
+     "style_location" : string, // the location of the style sheet
+     "style_name" :  string, // the name configured for that style sheet
   },
 
 ```
 
-7. `POST /jobs/%{job_id}/status` post status updates for jobs
+8. `POST /jobs/%{job_id}/status` post status updates for jobs
 
 Expected:
 
@@ -191,4 +321,4 @@ Expected:
 }
 ```
 
-No content is retuned unless there is an error.
+No content is returned unless there is an error.

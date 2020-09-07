@@ -39,7 +39,7 @@ The provider supports the following properties
 ## SQL Properties
 
 These properties allow one to redefine the sql used to retrieve the grid
-There are two, one for mdgid, the other for lng/lat values
+There are three, for mdgid, for lng/lat and bounds values
 * `query_mdgid` (string) : [optional] the sql used to retrieve the grid values for an mdgid
 
 Example SQL for a 50k grid
@@ -119,6 +119,41 @@ LIMIT 1;
 
 ** `$3` is the srid
 
+* `query_bounds` (string) : [optional] the sql used to retrieve the grid values for an mdgid
+
+Example SQL for a 50k grid
+
+```sql
+		SELECT
+		  mdg_id,
+		  sheet,
+		  series,
+		  nrn,
+      swlat,
+      swlon AS swlng,
+      nelat,
+      nelon AS nelng,
+		  country,
+		  last_edite AS edited_by,
+		  last_edi_1 AS edited_at
+		FROM
+		  grids.grid50K
+		WHERE
+		  ST_Intersects(
+		    wkb_geometry,
+		    ST_Transform(
+		      ST_SetSRID(
+		        ST_MakeEnvelope($1,$2,$3,$4),
+		        $5
+		      ),
+		      4326
+		    )
+		  )
+		LIMIT 1;
+```
+
+** `$1`,`$2`,`$3`, and `$4` are the bounds values
+** `$5` is the srid
 
 # Expected Table Layout:
 
