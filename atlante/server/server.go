@@ -14,8 +14,10 @@ import (
 
 	"github.com/go-spatial/atlante/atlante/server/coordinator/field"
 	"github.com/go-spatial/atlante/atlante/server/coordinator/null"
+	"github.com/go-spatial/atlante/atlante/style"
 	"github.com/go-spatial/atlante/atlante/template/grating"
 	"github.com/go-spatial/geom"
+	"github.com/go-spatial/geom/encoding/geojson"
 	"github.com/golang/protobuf/ptypes"
 
 	"github.com/go-spatial/atlante/atlante/server/coordinator"
@@ -180,31 +182,34 @@ func serverError(w http.ResponseWriter, reasonFmt string, data ...interface{}) {
 	w.WriteHeader(http.StatusInternalServerError)
 }
 
-func encodeCellAsJSON(w io.Writer, cell *grids.Cell, pdf filestore.URLInfo, lat, lng *float64, jobs []*coordinator.Job) {
+func encodeCellAsJSON(w io.Writer, cell *grids.Cell, defaultStyle string, pdf filestore.URLInfo, lat, lng *float64, jobs []InfoJob) {
 	// Build out the geojson
 	const geoJSONFmt = `{"type":"FeatureCollection","features":[{"type":"Feature","properties":{"objectid":"%v"},"geometry":{"type":"Polygon","coordinates":[[[%v,%v],[%v, %v],[%v, %v],[%v, %v],[%v, %v]]]}}]}`
 	mdgid := cell.GetMdgid()
 	if jobs == nil {
-		jobs = []*coordinator.Job{}
+		jobs = []InfoJob{}
 	}
-	styleName := ""
+	var styleName string
 	if cell.MetaData != nil {
 		styleName = cell.MetaData["styleName"]
 	}
+	if styleName == "" {
+		styleName = defaultStyle
+	}
 	jsonCell := struct {
-		MDGID      string             `json:"mdgid"`
-		Part       *uint32            `json:"sheet_number"`
-		Jobs       []*coordinator.Job `json:"jobs"`
-		PDF        string             `json:"pdf_url"`
-		LastGen    string             `json:"last_generated"` // RFC 3339 format
-		LastEdited string             `json:"last_edited"`    // RFC 3339 format
-		EditedBy   string             `json:"edited_by"`
-		Series     string             `json:"series"`
-		Lat        *float64           `json:"lat"`
-		Lng        *float64           `json:"lng"`
-		SheetName  string             `json:"sheet_name"`
-		Style      string             `json:"style_name"`
-		GeoJSON    json.RawMessage    `json:"geo_json"`
+		MDGID      string          `json:"mdgid"`
+		Part       *uint32         `json:"sheet_number"`
+		Jobs       []InfoJob       `json:"jobs"`
+		PDF        string          `json:"pdf_url"`
+		LastGen    string          `json:"last_generated"` // RFC 3339 format
+		LastEdited string          `json:"last_edited"`    // RFC 3339 format
+		EditedBy   string          `json:"edited_by"`
+		Series     string          `json:"series"`
+		Lat        *float64        `json:"lat"`
+		Lng        *float64        `json:"lng"`
+		SheetName  string          `json:"sheet_name"`
+		Style      string          `json:"style_name"`
+		GeoJSON    json.RawMessage `json:"geo_json"`
 	}{
 		MDGID:     mdgid.Id,
 		Jobs:      jobs,
@@ -301,8 +306,8 @@ func (s *Server) URLRoot(r *http.Request) string {
 
 // GridInfoHandler will write to the writer information about the requested grid. The params should contain a `sheet_name` and either an `mgdid` entry
 // or a `lat` and `lng` entries.
-// if an non-empty `mgdid` string is there it will be used to attempt to retrieve grid information based on that value.
-// if a `lat` and `lng` entries is given the mgdid grid containing that point will be used instead.
+// if an non-empty `mdgid` string is there it will be used to attempt to retrieve grid information based on that value.
+// if a `lat` and `lng` entries is given the mdgid grid containing that point will be used instead.
 // if both are provided, then the mdgid will be used, and the lat/lng keys will be ignored.
 // if neither are provided or if the value is bad then a 400 status code will be returned.
 // Requires
@@ -399,6 +404,25 @@ func (s *Server) GridInfoHandler(w http.ResponseWriter, request *http.Request, u
 
 	// Ask the coordinator for the status:
 	jobs := s.Coordinator.FindByJob(&atlante.Job{SheetName: sheetName, Cell: cell}, defaultStyle.Location)
+	iJobs := make([]InfoJob, 0, len(jobs))
+	styleIdx := style.Location2Style(sheet.Styles)
+	for i := range jobs {
+		if jobs[i] == nil || jobs[i].AJob == nil {
+			continue
+		}
+		if jobs[i].StyleLocation == "" {
+			jobs[i].StyleLocation = defaultStyle.Location
+			iJobs = append(iJobs, InfoJob{
+				Job:       jobs[i],
+				StyleName: defaultStyle.Name,
+			})
+			continue
+		}
+		iJobs = append(iJobs, InfoJob{
+			Job:       jobs[i],
+			StyleName: styleIdx[jobs[i].StyleLocation],
+		})
+	}
 
 	setHeaders(map[string]string{
 		"Content-Type":  "application/json",
@@ -408,7 +432,250 @@ func (s *Server) GridInfoHandler(w http.ResponseWriter, request *http.Request, u
 	},
 		w)
 
-	encodeCellAsJSON(w, cell, pdfURL, latp, lngp, jobs)
+	encodeCellAsJSON(w, cell, defaultStyle.Name, pdfURL, latp, lngp, iJobs)
+}
+
+func (s *Server) BoundsGeojsonHandler(w http.ResponseWriter, request *http.Request, urlParams map[string]string) {
+	var (
+		err      error
+		features geojson.FeatureCollection
+	)
+	ji, sheet, didErr := s.retriveSheetAndJob(w, request, urlParams)
+	if didErr {
+		return
+	}
+	var bds geom.Extent
+	if ji.Bounds == nil {
+		cell, _, err := cellForQueueJob(ji, sheet)
+		if err != nil {
+			badRequest(w, "%v", err)
+			return
+		}
+		bds = cell.Hull().Extent()
+	} else {
+		bds = *ji.Bounds
+	}
+
+	rows := uint(grating.MinRowCol)
+	cols := uint(grating.MinRowCol)
+	switch {
+	case ji.NumRows == nil && ji.NumCols == nil:
+		badRequest(w, "number_of_rows or number_of_cols need to be specified.")
+		return
+	case ji.NumRows == nil && ji.NumCols != nil:
+		rows = uint(*ji.NumCols)
+		cols = uint(*ji.NumCols)
+	case ji.NumRows != nil && ji.NumCols == nil:
+		rows = uint(*ji.NumRows)
+		cols = uint(*ji.NumRows)
+	default:
+		rows = uint(*ji.NumRows)
+		cols = uint(*ji.NumCols)
+	}
+
+	width := bds.XSpan()
+	deltax := width / float64(cols)
+	height := bds.YSpan()
+	deltay := height / float64(rows)
+
+	if !ji.Rectangle {
+		// we need to make it squarish
+		max := cols
+		if max < rows {
+			max = rows
+		}
+
+		isPos := deltay >= 0
+		odeltax, odeltay, orows, ocols := grating.Squarish(width, height, max)
+		if deltay >= 0 != isPos {
+			odeltay *= -1
+		}
+		if orows >= grating.MinRowCol && ocols >= grating.MaxRowCol {
+			// values are valid to use
+			rows, cols = orows, ocols
+			deltax, deltay = odeltax, odeltax
+		}
+	}
+
+	grate, err := grating.NewGrating(bds.MinX(), bds.MinY(), width, height, rows, cols, false)
+	if err != nil {
+		serverError(w, "failed to build grating %v", err)
+		return
+	}
+
+	lines := make(geom.MultiLineString, 0, rows+cols+2)
+
+	// Draw all the column lines
+	nextx := bds.MinX()
+	for i := 0; i <= int(cols); i++ {
+		minx := nextx
+		lines = append(lines, geom.LineString{{minx, bds.MinY()}, {minx, bds.MaxY()}})
+		if i == int(cols) {
+			continue
+		}
+		nextx = bds.MinX() + (deltax * float64(i+1))
+		// Add the label points for each column.
+		lbl := grate.LabelForCol(i)
+		features.Features = append(features.Features,
+			geojson.Feature{
+				Geometry: geojson.Geometry{geom.Point{
+					minx + ((nextx - minx) / 2),
+					bds.MinY(),
+				}},
+				Properties: map[string]interface{}{
+					"name": lbl,
+				},
+			},
+			geojson.Feature{
+				Geometry: geojson.Geometry{geom.Point{
+					minx + ((nextx - minx) / 2),
+					bds.MaxY(),
+				}},
+				Properties: map[string]interface{}{
+					"name": lbl,
+				},
+			},
+		)
+
+	}
+	nexty := bds.MinY()
+	for i := 0; i <= int(rows); i++ {
+		miny := nexty
+		lines = append(lines, geom.LineString{
+			{bds.MinX(), miny},
+			{bds.MaxX(), miny},
+		})
+		if i == int(rows) {
+			continue
+		}
+		nexty = bds.MinY() + (deltay * float64(i+1))
+		lbl := grate.LabelForRow(int(rows-1) - i)
+		features.Features = append(features.Features,
+			geojson.Feature{
+				Geometry: geojson.Geometry{Geometry: geom.Point{
+					bds.MinX(),
+					miny + ((nexty - miny) / 2),
+				}},
+				Properties: map[string]interface{}{
+					"name": lbl,
+				},
+			},
+			geojson.Feature{
+				Geometry: geojson.Geometry{Geometry: geom.Point{
+					bds.MaxX(),
+					miny + ((nexty - miny) / 2),
+				}},
+				Properties: map[string]interface{}{
+					"name": lbl,
+				},
+			},
+		)
+	}
+	features.Features = append(features.Features, geojson.Feature{Geometry: geojson.Geometry{Geometry: lines}})
+
+	setHeaders(map[string]string{
+		"Content-Type":  "application/geo+json",
+		"Cache-Control": "no-cache, no-store, must-revalidate",
+		"Pragma":        "no-cache",
+		"Expires":       "0",
+	},
+		w)
+
+	val, err := json.Marshal(features)
+	if err != nil {
+		serverError(w, "failed to encode as geo-json: %v", err)
+		return
+	}
+	if _, err = w.Write(val); err != nil {
+		log.Errorf("Failed to write to connection: %v", err)
+	}
+	return
+}
+
+type QueueJob struct {
+	MdgID     *string      `json:"mdgid,omitempty"`
+	MdgIDPart uint32       `json:"sheet_number,omitempty"`
+	Bounds    *geom.Extent `json:"bounds,omitempty"`
+	NumRows   *uint        `json:"number_of_rows,omitempty"`
+	NumCols   *uint        `json:"number_of_cols,omitempty"`
+	Rectangle bool         `json:"rectangle,omitempty"`
+	Srid      uint         `json:"srid,omitempty"`
+	StyleName string       `json:"style_name,omitempty"`
+}
+
+func (s *Server) retriveSheetAndJob(w http.ResponseWriter, request *http.Request, urlParams map[string]string) (ji QueueJob, sheet *atlante.Sheet, didErr bool) {
+	var err error
+
+	// Get json body
+	bdy, err := ioutil.ReadAll(request.Body)
+	request.Body.Close()
+	if err != nil {
+		badRequest(w, "error reading body")
+		return ji, nil, true
+	}
+	err = json.Unmarshal(bdy, &ji)
+	if err != nil {
+		badRequest(w, "unable to unmarshal json: %v", err)
+		return ji, nil, true
+	}
+	if ji.Bounds == nil && ji.MdgID == nil {
+		badRequest(w, "mdgid or bounds must be given")
+		return ji, nil, true
+	}
+
+	if ji.NumRows != nil && (*ji.NumRows < grating.MinRowCol ||
+		*ji.NumRows > grating.MaxRowCol) {
+		badRequest(w, "number_of_rows need to be between %v and %v", grating.MinRowCol, grating.MaxRowCol)
+		return ji, nil, true
+	}
+	if ji.NumCols != nil && (*ji.NumCols < grating.MinRowCol ||
+		*ji.NumCols > grating.MaxRowCol) {
+		badRequest(w, "number_of_cols need to be between %v and %v", grating.MinRowCol, grating.MaxRowCol)
+		return ji, nil, true
+	}
+
+	sheetName, ok := urlParams[string(ParamsKeySheetname)]
+	if !ok {
+		// We need a sheetnumber.
+		badRequest(w, "missing sheet name)")
+		return ji, nil, true
+	}
+
+	sheetName = s.Atlante.NormalizeSheetName(sheetName, false)
+
+	sheet, err = s.Atlante.SheetFor(sheetName)
+	if err != nil {
+		badRequest(w, "error getting sheet(%v):%v", sheetName, err)
+		return ji, nil, true
+	}
+	if ji.Srid == 0 {
+		ji.Srid = 4326
+	}
+	return ji, sheet, false
+}
+
+func cellForQueueJob(ji QueueJob, sheet *atlante.Sheet) (*grids.Cell, bool, error) {
+	// We need to figure out what type of information we have to build
+	// the cell from.
+	if ji.Bounds != nil {
+		// Assume bounds first
+		cell, err := sheet.CellForBounds(*ji.Bounds, ji.Srid)
+		if err != nil {
+			return nil, true, fmt.Errorf("error getting grid(%v):%w", *ji.Bounds, err)
+		}
+		return cell, true, nil
+	}
+
+	mdgid := grids.MDGID{
+		Id:   *ji.MdgID,
+		Part: ji.MdgIDPart,
+	}
+
+	cell, err := sheet.CellForMDGID(&mdgid)
+	if err != nil {
+		return nil, false, fmt.Errorf("error getting grid(%v):%w", mdgid.AsString(), err)
+	}
+	return cell, false, nil
 }
 
 // QueueHandler takes a job from a post and queues it on the configured queue
@@ -422,64 +689,13 @@ func (s *Server) QueueHandler(w http.ResponseWriter, request *http.Request, urlP
 	}
 
 	var (
-		ji struct {
-			MdgID     *string      `json:"mdgid,omitempty"`
-			MdgIDPart uint32       `json:"sheet_number,omitempty"`
-			Bounds    *geom.Extent `json:"bounds,omitempty"`
-			NumRows   *uint        `json:"number_of_rows,omitempty"`
-			NumCols   *uint        `json:"number_of_cols,omitempty"`
-			Rectangle bool         `json:"rectangle,omitempty"`
-			Srid      uint         `json:"srid,omitempty"`
-			StyleName string       `json:"style_name,omitempty"`
-		}
 		err  error
 		jobs []*coordinator.Job
 	)
 
-	// Get json body
-	bdy, err := ioutil.ReadAll(request.Body)
-	request.Body.Close()
-	if err != nil {
-		badRequest(w, "error reading body")
+	ji, sheet, didErr := s.retriveSheetAndJob(w, request, urlParams)
+	if didErr {
 		return
-	}
-	err = json.Unmarshal(bdy, &ji)
-	if err != nil {
-		badRequest(w, "unable to unmarshal json: %v", err)
-		return
-	}
-	if ji.Bounds == nil && ji.MdgID == nil {
-		badRequest(w, "mdgid or bounds must be given")
-		return
-	}
-
-	if ji.NumRows != nil && (*ji.NumRows < grating.MinRowCol ||
-		*ji.NumRows > grating.MaxRowCol) {
-		badRequest(w, "number_of_rows need to be between %v and %v", grating.MinRowCol, grating.MaxRowCol)
-		return
-	}
-	if ji.NumCols != nil && (*ji.NumCols < grating.MinRowCol ||
-		*ji.NumCols > grating.MaxRowCol) {
-		badRequest(w, "number_of_cols need to be between %v and %v", grating.MinRowCol, grating.MaxRowCol)
-		return
-	}
-
-	sheetName, ok := urlParams[string(ParamsKeySheetname)]
-	if !ok {
-		// We need a sheetnumber.
-		badRequest(w, "missing sheet name)")
-		return
-	}
-
-	sheetName = s.Atlante.NormalizeSheetName(sheetName, false)
-
-	sheet, err := s.Atlante.SheetFor(sheetName)
-	if err != nil {
-		badRequest(w, "error getting sheet(%v):%v", sheetName, err)
-		return
-	}
-	if ji.Srid == 0 {
-		ji.Srid = 4326
 	}
 
 	defaultStyle, _ := sheet.Styles.For("")
@@ -490,34 +706,21 @@ func (s *Server) QueueHandler(w http.ResponseWriter, request *http.Request, urlP
 	}
 
 	qjob := atlante.Job{
-		SheetName: sheetName,
+		SheetName: sheet.Name,
 		MetaData: map[string]string{
 			"styleLocation": requestedStyle.Location,
 			"styleName":     requestedStyle.Name,
 		},
 	}
 
-	// We need to figure out what type of information we have to build
-	// the cell from.
-	if ji.Bounds != nil {
-		// Assume bounds first
-		qjob.Cell, err = sheet.CellForBounds(*ji.Bounds, ji.Srid)
-		if err != nil {
-			badRequest(w, "error getting grid(%v):%v", *ji.Bounds, err)
-			return
-		}
-		// bounds based will always queue up a job
-
-	} else {
-		mdgid := grids.MDGID{
-			Id:   *ji.MdgID,
-			Part: ji.MdgIDPart,
-		}
-		qjob.Cell, err = sheet.CellForMDGID(&mdgid)
-		if err != nil {
-			badRequest(w, "error getting grid(%v):%v", mdgid.AsString(), err)
-			return
-		}
+	var isBoundsBased bool
+	qjob.Cell, isBoundsBased, err = cellForQueueJob(ji, sheet)
+	if err != nil {
+		badRequest(w, "%v", err)
+		return
+	}
+	if !isBoundsBased {
+		// for MDGID
 		// Check the queue to see if there is already a job with these params:
 		jobs = s.Coordinator.FindByJob(&qjob, defaultStyle.Location)
 	}
@@ -634,6 +837,12 @@ func (s *Server) SheetInfoHandler(w http.ResponseWriter, request *http.Request, 
 	}
 }
 
+// InfoJob is the struct for the json return by info end point
+type InfoJob struct {
+	*coordinator.Job
+	StyleName string `json:"style_name"`
+}
+
 // JobInfoHandler is a http handler for information about a job.
 func (s *Server) JobInfoHandler(w http.ResponseWriter, request *http.Request, urlParams map[string]string) {
 
@@ -648,6 +857,7 @@ func (s *Server) JobInfoHandler(w http.ResponseWriter, request *http.Request, ur
 		w.WriteHeader(http.StatusNotFound)
 		return
 	}
+	var styleIdx map[string]string
 	if job.AJob != nil {
 		sheetName := job.SheetName
 		sheetName = s.Atlante.NormalizeSheetName(sheetName, false)
@@ -661,10 +871,20 @@ func (s *Server) JobInfoHandler(w http.ResponseWriter, request *http.Request, ur
 				job.LastGen = pdfURL.TimeString()
 			}
 		}
+		// Make sure the styleLocation is always set.
+		if job.StyleLocation == "" {
+			s, _ := sheet.Styles.For("") // get the location of the default style
+			job.StyleLocation = s.Location
+		}
+		styleIdx = style.Location2Style(sheet.Styles)
 	}
+	iJob := InfoJob{
+		Job: job,
+	}
+	iJob.StyleName = styleIdx[job.StyleLocation]
 
 	setHeaders(nil, w)
-	if err := json.NewEncoder(w).Encode(job); err != nil {
+	if err := json.NewEncoder(w).Encode(iJob); err != nil {
 		serverError(w, "failed to marshal json: %v", err)
 	}
 
@@ -682,6 +902,7 @@ func (s *Server) JobsHandler(w http.ResponseWriter, request *http.Request, urlPa
 	if jobs == nil {
 		jobs = []*coordinator.Job{}
 	}
+	iJobs := make([]InfoJob, 0, len(jobs))
 
 	for i := range jobs {
 		if jobs[i] == nil || jobs[i].AJob == nil {
@@ -700,9 +921,25 @@ func (s *Server) JobsHandler(w http.ResponseWriter, request *http.Request, urlPa
 			jobs[i].PDF = pdfURL.String()
 			jobs[i].LastGen = pdfURL.TimeString()
 		}
+		styleLocation := jobs[i].StyleLocation
+		styleName := ""
+		if styleLocation == "" {
+			s, _ := sheet.Styles.For("")
+			styleLocation = s.Location
+			styleName = s.Name
+
+		} else {
+			LocationIdx := style.Location2Style(sheet.Styles)
+			styleName = LocationIdx[styleLocation]
+		}
+		iJobs = append(iJobs, InfoJob{
+			Job:       jobs[i],
+			StyleName: styleName,
+		})
+
 	}
 	setHeaders(nil, w)
-	err = json.NewEncoder(w).Encode(jobs)
+	err = json.NewEncoder(w).Encode(iJobs)
 	if err != nil {
 		serverError(w, "failed to marshal json: %v", err)
 	}
@@ -783,6 +1020,9 @@ func (s *Server) RegisterRoutes(r *httptreemux.TreeMux) {
 		log.Infof("registering: POST /sheets/:sheetname/bounds")
 		group.POST("/bounds", s.QueueHandler)
 	}
+
+	log.Infof("registering: POST /sheets/:sheetname/bounds/grid")
+	group.POST("/bounds/grid", s.BoundsGeojsonHandler)
 
 	log.Infof("registering: GET  /jobs")
 	r.GET("/jobs", s.JobsHandler)

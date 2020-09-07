@@ -254,7 +254,7 @@ func (a *Atlante) NormalizeSheetName(sheetName string, getDefault bool) string {
 }
 
 // SheetFor returns the sheet for the given name, if the sheet does not exists
-// sheet.ErrUnkownSheetName is returned.
+// sheet.ErrUnknownSheetName is returned.
 func (a *Atlante) SheetFor(sheetName string) (*Sheet, error) {
 	if a == nil {
 		return nil, ErrNilAtlanteObject
