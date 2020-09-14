@@ -2,7 +2,7 @@
 
 The system as the following server end-points.
 
-1. `GET /sheets/` used to get the currently configured sheets.
+1. <a id="get_sheets">`GET /sheets/`</a> used to get the currently configured sheets.</a>
 
 Returns
 ```js
@@ -15,7 +15,7 @@ Returns
 }
 ```
 
-2. `GET /sheets/${sheet_name}/info/${lng}/${lat}` used to get the grid information for the lat and long values.
+2. <a id="get_sheets_info_lng_lat"`GET /sheets/${sheet_name}/info/${lng}/${lat}` used to get the grid information for the lat and long values.</a>
 
 Returns
 ```js
@@ -48,7 +48,7 @@ Returns
 }
 ```
 
-3. `GET /sheets/${sheet_name}/info/mdgid/${mdgid-sheet_number}` used to get the grid information for the mdgid
+3. <a id="get_sheets_info_mdgid">`GET /sheets/${sheet_name}/info/mdgid/${mdgid-sheet_number}` used to get the grid information for the mdgid</a>
 
 Returns
 ```js
@@ -81,7 +81,7 @@ Returns
 }
 ```
 
-4. `POST /sheets/${sheet_name}/mdgid` will cause the pdf generation the job to start.
+4. <a id="post_sheets_mdgid">`POST /sheets/${sheet_name}/mdgid` will cause the pdf generation the job to start.</a>
 
 Expected:
 
@@ -102,7 +102,7 @@ Returns:
 }
 ```
 
-4. `POST /sheets/${sheet_name}/bounds` will cause the pdf generation the job to start.
+4. <a id="post_sheets_bounds">`POST /sheets/${sheet_name}/bounds` will cause the pdf generation the job to start.</a>
 
 Expected:
 
@@ -124,7 +124,7 @@ Returns:
 }
 ```
 
-5. `POST /sheets/${sheet_name}/bounds/grid` will return a GEOJSON describing the grid
+5. <a id="post_sheets_bounds_grid">`POST /sheets/${sheet_name}/bounds/grid` will return a GEOJSON describing the grid</a>
 
 Expected:
 
@@ -250,7 +250,7 @@ Returns:
 ```
 
 
-6. `GET /jobs` will return the latest 100 jobs
+6. <a id="get_jobs">`GET /jobs` will return the latest 100 jobs</a>
 
 Returns:
 
@@ -279,7 +279,7 @@ Returns:
 
 ```
 
-7. `GET /jobs/%{job_id}/status` will return the status of the job
+7. <a id="get_jobs_status">`GET /jobs/%{job_id}/status` will return the status of the job</a>
 
 Returns:
 
@@ -306,7 +306,7 @@ Returns:
 
 ```
 
-8. `POST /jobs/%{job_id}/status` post status updates for jobs
+8. <a id="post_jobs_status">`POST /jobs/%{job_id}/status` post status updates for jobs</a>
 
 Expected:
 
