@@ -108,8 +108,11 @@ Expected:
 
 ```js
 {
-   "bounds" : []number, // this should be four number min_lng, min_lat, max_lng,max_lat
-   "srid"   : number    // this the srid defaults to 4326 
+   "bounds"         : []number, // this should be four number min_lng, min_lat, max_lng,max_lat
+   "srid"           : number    // this the srid defaults to 4326
+   "number_of_rows" : number    // the number of rows for a grid
+   "number_of_cols" : number    // the number of cols for a grid
+   "style_name"     : string    // the name of the style to use
    
 }
 ```
@@ -128,6 +131,19 @@ Returns:
 
 Expected:
 
+```js
+{
+   "bounds"         : []number,      // this should be four number min_lng, min_lat, max_lng, max_lat
+   "mdgid"          : string,        // MDGID to use to get the bounds (bounds takes precedent)
+   "sheet_number"   : null | number, // used with MDGID
+   "srid"           : number         // ignored (will always be in 4326)
+   "number_of_rows" : number         // the number of rows for a grid
+   "number_of_cols" : number         // the number of cols for a grid
+   "style_name"     : string         // ignored
+}
+```
+
+Returns:
 ```js
 {
     "type": "FeatureCollection",
@@ -236,16 +252,6 @@ Expected:
         },
         "properties": {},
     }]
-}
-```
-
-Returns:
-```js
-{
-   "mdgid" : string,
-   "sheet_number" : null | number,
-   "job_id" : number,
-   "status" : "requested" | "started" | "processing" | "completed",
 }
 ```
 
