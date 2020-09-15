@@ -7,11 +7,38 @@ The system as the following server end-points.
 Returns
 ```js
 {
-   "sheets" : []{
-        "name": string,
-        "scale" : number, // the scale in meters -- 5k => 5000; 50k => 50000
-        "description":string,
+  "sheets": [
+    {
+      "name": "50k",
+      "desc": "Gautam's 50k sheet",
+      "scale": 50000,
+      "styles": [
+        {
+          "name": "topo",
+          "Description": "\tA style for topo maps\n\t"
+        },
+        {
+          "name": "tegola_grids",
+          "Description": "A simple style for gridded maps\n"
+        }
+      ]
+    },
+    {
+      "name": "grg",
+      "desc": "grg sheet",
+      "scale": 50000,
+      "styles": [
+        {
+          "name": "tegola_grids",
+          "Description": "A simple style for gridded maps\n"
+        },
+        {
+          "name": "topo",
+          "Description": "\tA style for topo maps\n\t"
+        }
+      ]
     }
+  ]
 }
 ```
 
@@ -45,6 +72,16 @@ Returns
   "lat" :  float // the queried lat
   "lng" : float // the queried lng
   "sheet_name": string
+  "styles": [
+        {
+          "name": "tegola_grids",
+          "Description": "A simple style for gridded maps\n"
+        },
+        {
+          "name": "topo",
+          "Description": "\tA style for topo maps\n\t"
+        }
+      ]
 }
 ```
 
@@ -78,6 +115,16 @@ Returns
   "lat" :  float // the queried lat
   "lng" : float // the queried lng
   "sheet_name": string
+  "styles": [
+        {
+          "name": "tegola_grids",
+          "Description": "A simple style for gridded maps\n"
+        },
+        {
+          "name": "topo",
+          "Description": "\tA style for topo maps\n\t"
+        }
+      ]
 }
 ```
 
