@@ -1,0 +1,41 @@
+# Intermediary container for build out the standard database
+
+FROM postgres:12
+
+RUN apt-get update && apt install -y postgis postgresql-12-postgis-3
+
+
+# Create the need temp file for first postgresSQL execution
+RUN mkdir -p /database
+RUN mkdir -p /tmp/db/coordinator
+
+RUN chown -R postgres /database
+RUN chmod 777 /database
+
+# copy over files needed for db
+COPY docker/files/db /tmp/db
+COPY atlante/server/coordinator/postgresql/docs /tmp/db/coordinator
+RUN cat /tmp/db/9??_graticule.sql > /tmp/db/graticule.sql
+RUN cat /tmp/db/0??_initdb.sql > /tmp/db/initdb.sql
+RUN ls -lh /tmp/db
+
+RUN chmod +x /tmp/db/run_sql.sh
+RUN chown -R postgres /tmp/db
+
+USER postgres
+
+# initialize database
+RUN pg_ctl init  -D /database
+RUN echo "hostnossl\tall\tall\t0.0.0.0/0\ttrust" >> /database/pg_hba.conf
+
+# setup postgis
+RUN /tmp/db/run_sql.sh /tmp/db/initdb.sql 
+RUN DB_FLAG="-d grids"  /tmp/db/run_sql.sh /tmp/db/graticule.sql
+RUN DB_FLAG="-d coord" /tmp/db/run_sql.sh /tmp/db/coordinator/jobs_00.sql
+RUN rm -rf /tmp/db
+
+ENV PGDATA /database
+
+EXPOSE 5432
+ENTRYPOINT ["postgres"]
+

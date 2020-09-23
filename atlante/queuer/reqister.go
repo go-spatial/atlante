@@ -6,6 +6,7 @@ import (
 	"sync"
 
 	"github.com/gdey/errors"
+	"github.com/go-spatial/atlante/atlante"
 	"github.com/go-spatial/tegola/dict"
 	"github.com/prometheus/common/log"
 )
@@ -34,10 +35,10 @@ type Config interface {
 	dict.Dicter
 }
 
-// InitFunc initilizes a queue provider given a config
+// InitFunc initializes a queue provider given a config
 // The InitFunc should validate the config and report any errors.
 // Called by the For function
-type InitFunc func(Config) (Provider, error)
+type InitFunc func(Config, *atlante.Atlante) (Provider, error)
 
 // CleanupFunc is called when the system is shuting down;
 // Allows queue provider a way to do cleanup
@@ -98,8 +99,8 @@ func Registered() []string {
 	return p
 }
 
-// For function returns a configured provider given the trype and config
-func For(providerType string, config Config) (Provider, error) {
+// For function returns a configured provider given the type and config
+func For(providerType string, config Config, a *atlante.Atlante) (Provider, error) {
 	providerLock.RLock()
 	defer providerLock.RUnlock()
 
@@ -111,10 +112,10 @@ func For(providerType string, config Config) (Provider, error) {
 	if !ok {
 		return nil, ErrUnknownProvider(providerType)
 	}
-	return p.init(config)
+	return p.init(config, a)
 }
 
-// Cleanup should be called when the system is shutting down. This gives weach provider
+// Cleanup should be called when the system is shutting down. This gives each provider
 // a chance to do any needed cleanup. this will unreigster all providers
 func Cleanup() {
 	providerLock.Lock()

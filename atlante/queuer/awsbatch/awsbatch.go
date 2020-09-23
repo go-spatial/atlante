@@ -53,7 +53,7 @@ type Provider struct {
 	Client     *batch.Batch
 }
 
-func initFunc(cfg queuer.Config) (queuer.Provider, error) {
+func initFunc(cfg queuer.Config, _ *atlante.Atlante) (queuer.Provider, error) {
 
 	var emptyStr = ""
 	var queue Provider

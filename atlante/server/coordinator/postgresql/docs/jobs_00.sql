@@ -36,22 +36,24 @@ CREATE TABLE job_statuses (
 CREATE INDEX ON job_statuses (job_id);
 
 -- Find job by job id
-SELECT
-    job.mdgid,
-    job.sheet_number,
-    job.sheet_name,
-    job.style_location,
-    job.queue_id,
-    job.created AS enqueued,
-    jobstatus.status,
-    jobstatus.description,
-    jobstatus.created AS updated
-FROM
-    jobs AS job
-    JOIN job_statuses AS jobstatus ON job.id = jobstatus.job_id
-WHERE
-    job.id = $1
-ORDER BY
-    jobstatus.id DESC
-LIMIT 1;
+--
+-- SELECT
+--     job.mdgid,
+--     job.sheet_number,
+--     job.sheet_name,
+--     job.style_location,
+--     job.queue_id,
+--     job.created AS enqueued,
+--     jobstatus.status,
+--     jobstatus.description,
+--     jobstatus.created AS updated
+-- FROM
+--     jobs AS job
+--     JOIN job_statuses AS jobstatus ON job.id = jobstatus.job_id
+-- WHERE
+--     job.id = $1
+-- ORDER BY
+--     jobstatus.id DESC
+-- LIMIT 1;
+-- 
 

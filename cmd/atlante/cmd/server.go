@@ -98,7 +98,7 @@ func serverCmdRunE(cmd *cobra.Command, args []string) error {
 		qType, _ := conf.Webserver.Queue.String(queuer.ConfigKeyType, nil)
 		if qType != "none" && qType != "" {
 			// Configure the queue
-			srv.Queue, err = queuer.For(qType, conf.Webserver.Queue)
+			srv.Queue, err = queuer.For(qType, conf.Webserver.Queue, a)
 			if err != nil {
 				if _, ok := err.(queuer.ErrUnknownProvider); ok {
 					log.Infoln("known queue providers:")
