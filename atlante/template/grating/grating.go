@@ -18,7 +18,7 @@ var LabelLetters = [...]string{
 	// Skip I and L (looks like 1 i l), O and Q (looks like 0, 6, o , q), S (looks like 5, s)
 	// 0 1 2 3 4 5 6 7 8 9
 	"A", "B", "C", "D", "E", "F", "G", "H", "J", "K",
-	"M", "N", "P", "R", "T", "U", "V", "W", "Y", "Z",
+	"M", "N", "P", "R", "T", "U", "V", "W", "X", "Y", "Z",
 }
 
 type Grating struct {
@@ -33,7 +33,8 @@ type Grating struct {
 	// have to modify the value by to get the row or col line
 	Width, Height float64
 
-	FlipY bool
+	FlipY      bool
+	FlipYLabel bool
 }
 
 func Squarish(width, height float64, division uint) (widthDivision, heightDivision float64, rows, cols uint) {
@@ -89,31 +90,21 @@ func (grate *Grating) labelForRow(row int) string {
 		buff   strings.Builder
 		lblLen = len(LabelLetters)
 	)
+
 	if row < lblLen {
 		return LabelLetters[row]
 	}
-	prelbl := grate.labelForRow(row / lblLen)
+	prelbl := grate.labelForRow((row / lblLen) - 1)
 	buff.WriteString(prelbl)
 	buff.WriteString(LabelLetters[row%lblLen])
 	return buff.String()
 }
 func (grate *Grating) LabelForRow(row int) string {
-	if row < 0 || row > int(grate.Rows) {
+	if grate == nil || row < 0 || row > int(grate.Rows) {
 		return ""
 	}
-	var (
-		buff   strings.Builder
-		lblLen = len(LabelLetters)
-	)
-	if row < lblLen {
-		if int(grate.Rows) >= lblLen {
-			// Need to add the first letter
-			for i := 1; i < int(grate.Rows)/lblLen; i++ {
-				buff.WriteString(LabelLetters[0])
-			}
-		}
-		buff.WriteString(LabelLetters[row])
-		return buff.String()
+	if !grate.FlipYLabel {
+		row = int(grate.Rows) - row
 	}
 	return grate.labelForRow(row)
 }
