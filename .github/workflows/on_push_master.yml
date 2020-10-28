@@ -33,7 +33,7 @@ jobs:
     #  run: go test -v -race ./...
 
     - name: Set build number
-      run: echo "::set-env name=BUILD_NUMBER::$(echo ${GITHUB_SHA} | cut -c1-7)"
+      run: echo "BUILD_NUMBER=$(echo ${GITHUB_SHA} | cut -c1-7)" >> $GITHUB_ENV
 
     - name: "[atlante] Build Docker container"
       run: docker build -f docker/Dockerfile-atlante -t ${{env.ATLANTE_DOCKERHUB_REPO}} .
