@@ -46,25 +46,46 @@ func TestLabelForRow(t *testing.T) {
 
 	tests := map[string]tcase{
 		"Rows: 10 row: 1": {
-			Grating: &Grating{Rows: 10},
+			Grating: &Grating{Rows: 11},
 			Rows:    seq(0, 10),
 			Labels:  strings.Split("M K J H G F E D C B A", " "),
 		},
 		"Rows: 22 row: 1": {
 			Grating: &Grating{Rows: 23},
-			Rows:    seq(0, 5),
-			Labels:  strings.Split("AC AB AA Z Y X", " "),
+			Rows:    seq(0, 22),
+			Labels:  strings.Split("AB AA Z Y X W V U T R P N M K J H G F E D C B A", " "),
 		},
 		"Rows: 10 row: 1 FlipLabel": {
 			Grating: &Grating{Rows: 10, FlipYLabel: true},
 			Rows:    seq(0, 10),
-			Labels:  strings.Split("A B C D E F G H J K M", " "),
+			Labels:  []string{"A", "B", "C", "D", "E", "F", "G", "H", "J", "K", ""},
+		},
+		"Rows: 10 row: 1 FlipLabel:no ": {
+			Grating: &Grating{Rows: 10},
+			Rows:    seq(0, 9),
+			Labels:  strings.Split("K J H G F E D C B A", " "),
 		},
 		"Rows: 10 row: 11": {
 			Grating: &Grating{Rows: 10},
-			Rows:    []int{11},
-			Labels:  []string{""},
+			Rows:    []int{10, 11},
+			Labels:  []string{"", ""},
 		},
+		"issue #219 nome": func() tcase {
+			grate, err := NewGrating(
+				0, 0,
+				1024*10, 768*10,
+				10, 10,
+				true,
+			)
+			if err != nil {
+				panic(err)
+			}
+			return tcase{
+				Grating: grate,
+				Rows:    seq(0, 9),
+				Labels:  strings.Split("K J H G F E D C B A", " "),
+			}
+		}(),
 	}
 
 	for name, tc := range tests {

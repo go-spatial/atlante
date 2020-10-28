@@ -100,17 +100,17 @@ func (grate *Grating) labelForRow(row int) string {
 	return buff.String()
 }
 func (grate *Grating) LabelForRow(row int) string {
-	if grate == nil || row < 0 || row > int(grate.Rows) {
+	if grate == nil || row < 0 || row >= int(grate.Rows) {
 		return ""
 	}
 	if !grate.FlipYLabel {
-		row = int(grate.Rows) - row
+		row = int(grate.Rows) - row - 1
 	}
 	return grate.labelForRow(row)
 }
 
 func (grate *Grating) LabelForCol(col int) string {
-	if col < 0 || col > int(grate.Cols) {
+	if col < 0 || col >= int(grate.Cols) {
 		return ""
 	}
 	return fmt.Sprintf("%d", col+1)
