@@ -510,67 +510,38 @@ func (s *Server) BoundsGeojsonHandler(w http.ResponseWriter, request *http.Reque
 	for i := 0; i <= int(cols); i++ {
 		minx := nextx
 		lines = append(lines, geom.LineString{{minx, bds.MinY()}, {minx, bds.MaxY()}})
-		if i == int(cols) {
-			continue
-		}
-		nextx = bds.MinX() + (deltax * float64(i+1))
-		// Add the label points for each column.
-		lbl := grate.LabelForCol(i)
-		features.Features = append(features.Features,
-			geojson.Feature{
-				Geometry: geojson.Geometry{geom.Point{
-					minx + ((nextx - minx) / 2),
-					bds.MinY(),
-				}},
-				Properties: map[string]interface{}{
-					"name": lbl,
-				},
-			},
-			geojson.Feature{
-				Geometry: geojson.Geometry{geom.Point{
-					minx + ((nextx - minx) / 2),
-					bds.MaxY(),
-				}},
-				Properties: map[string]interface{}{
-					"name": lbl,
-				},
-			},
-		)
-
 	}
+	// Draw all the row lines
 	nexty := bds.MinY()
 	for i := 0; i <= int(rows); i++ {
 		miny := nexty
-		lines = append(lines, geom.LineString{
-			{bds.MinX(), miny},
-			{bds.MaxX(), miny},
-		})
-		if i == int(rows) {
-			continue
-		}
-		nexty = bds.MinY() + (deltay * float64(i+1))
-		lbl := grate.LabelForRow(int(rows-1) - i)
-		features.Features = append(features.Features,
-			geojson.Feature{
-				Geometry: geojson.Geometry{Geometry: geom.Point{
-					bds.MinX(),
-					miny + ((nexty - miny) / 2),
-				}},
-				Properties: map[string]interface{}{
-					"name": lbl,
-				},
-			},
-			geojson.Feature{
-				Geometry: geojson.Geometry{Geometry: geom.Point{
-					bds.MaxX(),
-					miny + ((nexty - miny) / 2),
-				}},
-				Properties: map[string]interface{}{
-					"name": lbl,
-				},
-			},
-		)
+		lines = append(lines, geom.LineString{{bds.MinX(), miny}, {bds.MaxX(), miny}})
 	}
+
+	// Draw the centered Labels
+	nextx = bds.MinX()
+	nexty = bds.MinY()
+	for col := 0; col < int(cols); col++ {
+		minx := nextx
+		nextx = bds.MinX() + (deltax * float64(col+1))
+		for row := 0; row < int(rows); row++ {
+			miny := nexty
+			nexty = bds.MinY() + (deltay * float64(row+1))
+			lbl := grate.LabelForRow(row) + grate.LabelForCol(col)
+			features.Features = append(features.Features,
+				geojson.Feature{
+					Geometry: geojson.Geometry{Geometry: geom.Point{
+						minx + ((nextx - minx) / 2),
+						miny + ((nexty - miny) / 2),
+					}},
+					Properties: map[string]interface{}{
+						"name": lbl,
+					},
+				},
+			)
+		}
+	}
+
 	features.Features = append(features.Features, geojson.Feature{Geometry: geojson.Geometry{Geometry: lines}})
 
 	setHeaders(map[string]string{
