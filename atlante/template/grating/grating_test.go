@@ -92,3 +92,7 @@ func TestLabelForRow(t *testing.T) {
 		t.Run(name, fn(tc))
 	}
 }
+
+func TestGeoJSONFrom(t *testing.T) {
+
+}

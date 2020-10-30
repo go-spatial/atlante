@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/go-spatial/geom"
+	"github.com/go-spatial/geom/encoding/geojson"
 )
 
 const (
@@ -174,4 +175,58 @@ func (grate *Grating) PositionFor(row, col int) geom.Point {
 		grate.XForCol(col),
 		grate.YForRow(row),
 	}
+}
+
+func GeoJSONFrom(bds *geom.Extent, Width, Height, DeltaX, DeltaY float64, Rows, Cols uint, Flipped bool) (geojson.FeatureCollection, error) {
+	var (
+		err      error
+		features geojson.FeatureCollection
+	)
+
+	grate, err := NewGrating(bds.MinX(), bds.MinY(), Width, Height, Rows, Cols, Flipped)
+	if err != nil {
+		return features, fmt.Errorf("failed to build grating %w", err)
+	}
+
+	lines := make(geom.MultiLineString, 0, Rows+Cols+2)
+
+	// Draw all the column lines
+	nextx := bds.MinX()
+	for col := 0; col <= int(Cols); col++ {
+		lines = append(lines, geom.LineString{{nextx, bds.MinY()}, {nextx, bds.MaxY()}})
+		nextx = bds.MinX() + (DeltaX * float64(col+1))
+	}
+	// Draw all the row lines
+	nexty := bds.MinY()
+	for row := 0; row <= int(Rows); row++ {
+		lines = append(lines, geom.LineString{{bds.MinX(), nexty}, {bds.MaxX(), nexty}})
+		nexty = bds.MinY() + (DeltaY * float64(row+1))
+	}
+
+	// Draw the centered Labels
+	nextx = bds.MinX()
+	nexty = bds.MinY()
+	for col := 0; col < int(Cols); col++ {
+		minx := nextx
+		nextx = bds.MinX() + (DeltaX * float64(col+1))
+		for row := 0; row < int(Rows); row++ {
+			miny := nexty
+			nexty = bds.MinY() + (DeltaY * float64(row+1))
+			lbl := grate.LabelForRow(row) + grate.LabelForCol(col)
+			features.Features = append(features.Features,
+				geojson.Feature{
+					Geometry: geojson.Geometry{Geometry: geom.Point{
+						minx + ((nextx - minx) / 2),
+						miny + ((nexty - miny) / 2),
+					}},
+					Properties: map[string]interface{}{
+						"name": lbl,
+					},
+				},
+			)
+		}
+	}
+
+	features.Features = append(features.Features, geojson.Feature{Geometry: geojson.Geometry{Geometry: lines}})
+	return features, nil
 }

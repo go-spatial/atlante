@@ -497,52 +497,12 @@ func (s *Server) BoundsGeojsonHandler(w http.ResponseWriter, request *http.Reque
 		}
 	}
 
-	grate, err := grating.NewGrating(bds.MinX(), bds.MinY(), width, height, rows, cols, false)
+	features, err = grating.GeoJSONFrom(&bds, width, height, deltax, deltay, rows, cols, false)
 	if err != nil {
-		serverError(w, "failed to build grating %v", err)
+		serverError(w, "%v", err)
 		return
-	}
 
-	lines := make(geom.MultiLineString, 0, rows+cols+2)
-
-	// Draw all the column lines
-	nextx := bds.MinX()
-	for i := 0; i <= int(cols); i++ {
-		minx := nextx
-		lines = append(lines, geom.LineString{{minx, bds.MinY()}, {minx, bds.MaxY()}})
 	}
-	// Draw all the row lines
-	nexty := bds.MinY()
-	for i := 0; i <= int(rows); i++ {
-		miny := nexty
-		lines = append(lines, geom.LineString{{bds.MinX(), miny}, {bds.MaxX(), miny}})
-	}
-
-	// Draw the centered Labels
-	nextx = bds.MinX()
-	nexty = bds.MinY()
-	for col := 0; col < int(cols); col++ {
-		minx := nextx
-		nextx = bds.MinX() + (deltax * float64(col+1))
-		for row := 0; row < int(rows); row++ {
-			miny := nexty
-			nexty = bds.MinY() + (deltay * float64(row+1))
-			lbl := grate.LabelForRow(row) + grate.LabelForCol(col)
-			features.Features = append(features.Features,
-				geojson.Feature{
-					Geometry: geojson.Geometry{Geometry: geom.Point{
-						minx + ((nextx - minx) / 2),
-						miny + ((nexty - miny) / 2),
-					}},
-					Properties: map[string]interface{}{
-						"name": lbl,
-					},
-				},
-			)
-		}
-	}
-
-	features.Features = append(features.Features, geojson.Feature{Geometry: geojson.Geometry{Geometry: lines}})
 
 	setHeaders(map[string]string{
 		"Content-Type":  "application/geo+json",
