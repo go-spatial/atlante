@@ -473,31 +473,7 @@ func (s *Server) BoundsGeojsonHandler(w http.ResponseWriter, request *http.Reque
 		cols = uint(*ji.NumCols)
 	}
 
-	width := bds.XSpan()
-	deltax := width / float64(cols)
-	height := bds.YSpan()
-	deltay := height / float64(rows)
-
-	if !ji.Rectangle {
-		// we need to make it squarish
-		max := cols
-		if max < rows {
-			max = rows
-		}
-
-		isPos := deltay >= 0
-		odeltax, odeltay, orows, ocols := grating.Squarish(width, height, max)
-		if deltay >= 0 != isPos {
-			odeltay *= -1
-		}
-		if orows >= grating.MinRowCol && ocols >= grating.MaxRowCol {
-			// values are valid to use
-			rows, cols = orows, ocols
-			deltax, deltay = odeltax, odeltax
-		}
-	}
-
-	features, err = grating.GeoJSONFrom(&bds, width, height, deltax, deltay, rows, cols, false)
+	features, err = grating.GeoJSONFrom(&bds, rows, cols, false, ji.Rectangle)
 	if err != nil {
 		serverError(w, "%v", err)
 		return

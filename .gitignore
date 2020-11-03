@@ -15,3 +15,4 @@ cmd/insetmap/server/insetmap
 cmd/insetmap/insetmap/insetmap
 cmd/insetmap/server/insermap_server
 cmd/insetmap/server/server
+*.toml

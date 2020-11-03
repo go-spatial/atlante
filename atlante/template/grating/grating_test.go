@@ -1,9 +1,13 @@
 package grating
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 	"testing"
+
+	"github.com/go-spatial/geom"
+	"github.com/go-spatial/geom/encoding/geojson"
 )
 
 func TestLabelForRow(t *testing.T) {
@@ -94,5 +98,40 @@ func TestLabelForRow(t *testing.T) {
 }
 
 func TestGeoJSONFrom(t *testing.T) {
+	type tcase struct {
+		bds       *geom.Extent
+		rows      uint
+		cols      uint
+		rectangle bool
+		flipped   bool
 
+		features geojson.FeatureCollection
+		err      error
+	}
+	fn := func(tc tcase) func(*testing.T) {
+		return func(t *testing.T) {
+
+			features, err := GeoJSONFrom(tc.bds, tc.rows, tc.cols, tc.flipped, tc.rectangle)
+			if err != nil {
+				t.Errorf("error, expected nil, got %v", err)
+			}
+			val, err := json.Marshal(features)
+			if err != nil {
+				t.Errorf("json marshal error, expected nil, got %v", err)
+				return
+			}
+			t.Logf("JSON:%s\n", val)
+		}
+	}
+	tests := map[string]tcase{
+		"simple": {
+			rectangle: true,
+			rows:      3,
+			cols:      3,
+			bds:       &geom.Extent{-122.48015, 48.753224, -122.38391, 48.781091},
+		},
+	}
+	for name, tc := range tests {
+		t.Run(name, fn(tc))
+	}
 }

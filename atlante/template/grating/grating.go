@@ -177,13 +177,37 @@ func (grate *Grating) PositionFor(row, col int) geom.Point {
 	}
 }
 
-func GeoJSONFrom(bds *geom.Extent, Width, Height, DeltaX, DeltaY float64, Rows, Cols uint, Flipped bool) (geojson.FeatureCollection, error) {
+func GeoJSONFrom(bds *geom.Extent, Rows, Cols uint, Flipped, Rectangle bool) (geojson.FeatureCollection, error) {
 	var (
 		err      error
 		features geojson.FeatureCollection
 	)
 
-	grate, err := NewGrating(bds.MinX(), bds.MinY(), Width, Height, Rows, Cols, Flipped)
+	width := bds.XSpan()
+	deltaX := width / float64(Cols)
+	height := bds.YSpan()
+	deltaY := height / float64(Rows)
+
+	if !Rectangle {
+		// we need to make it squarish
+		max := Cols
+		if max < Rows {
+			max = Rows
+		}
+
+		isPos := deltaY >= 0
+		odeltax, odeltay, orows, ocols := Squarish(width, height, max)
+		if deltaY >= 0 != isPos {
+			odeltay *= -1
+		}
+		if orows >= MinRowCol && ocols >= MaxRowCol {
+			// values are valid to use
+			Rows, Cols = orows, ocols
+			deltaX, deltaY = odeltax, odeltax
+		}
+	}
+
+	grate, err := NewGrating(bds.MinX(), bds.MinY(), width, height, Rows, Cols, Flipped)
 	if err != nil {
 		return features, fmt.Errorf("failed to build grating %w", err)
 	}
@@ -194,24 +218,24 @@ func GeoJSONFrom(bds *geom.Extent, Width, Height, DeltaX, DeltaY float64, Rows, 
 	nextx := bds.MinX()
 	for col := 0; col <= int(Cols); col++ {
 		lines = append(lines, geom.LineString{{nextx, bds.MinY()}, {nextx, bds.MaxY()}})
-		nextx = bds.MinX() + (DeltaX * float64(col+1))
+		nextx = bds.MinX() + (deltaX * float64(col+1))
 	}
 	// Draw all the row lines
 	nexty := bds.MinY()
 	for row := 0; row <= int(Rows); row++ {
 		lines = append(lines, geom.LineString{{bds.MinX(), nexty}, {bds.MaxX(), nexty}})
-		nexty = bds.MinY() + (DeltaY * float64(row+1))
+		nexty = bds.MinY() + (deltaY * float64(row+1))
 	}
 
 	// Draw the centered Labels
 	nextx = bds.MinX()
-	nexty = bds.MinY()
 	for col := 0; col < int(Cols); col++ {
 		minx := nextx
-		nextx = bds.MinX() + (DeltaX * float64(col+1))
+		nextx = bds.MinX() + (deltaX * float64(col+1))
+		nexty = bds.MinY()
 		for row := 0; row < int(Rows); row++ {
 			miny := nexty
-			nexty = bds.MinY() + (DeltaY * float64(row+1))
+			nexty = bds.MinY() + (deltaY * float64(row+1))
 			lbl := grate.LabelForRow(row) + grate.LabelForCol(col)
 			features.Features = append(features.Features,
 				geojson.Feature{
