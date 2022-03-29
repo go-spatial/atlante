@@ -15,7 +15,7 @@ require (
 	github.com/go-chi/chi v4.0.3+incompatible
 	github.com/go-spatial/geom v0.0.0-20200715161102-ca3b2fd9dd14
 	github.com/go-spatial/tegola v0.9.0
-	github.com/gogo/protobuf v1.2.1
+	github.com/gogo/protobuf v1.3.2
 	github.com/golang/protobuf v1.3.2
 	github.com/gorilla/css v1.0.0
 	github.com/jackc/fake v0.0.0-20150926172116-812a484cc733 // indirect
@@ -26,6 +26,5 @@ require (
 	github.com/sergi/go-diff v1.0.0 // indirect
 	github.com/spf13/cobra v0.0.5
 	github.com/spf13/pflag v1.0.5 // indirect
-	golang.org/x/net v0.0.0-20191112182307-2180aed22343 // indirect
 	gopkg.in/check.v1 v1.0.0-20190902080502-41f04d3bba15 // indirect
 )

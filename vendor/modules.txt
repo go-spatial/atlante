@@ -64,6 +64,8 @@ github.com/go-chi/chi
 # github.com/go-spatial/geom v0.0.0-20200715161102-ca3b2fd9dd14
 github.com/go-spatial/geom
 github.com/go-spatial/geom/cmp
+github.com/go-spatial/geom/encoding
+github.com/go-spatial/geom/encoding/geojson
 github.com/go-spatial/geom/encoding/wkb
 github.com/go-spatial/geom/encoding/wkb/internal/consts
 github.com/go-spatial/geom/encoding/wkb/internal/decode
@@ -81,7 +83,7 @@ github.com/go-spatial/tegola/dict
 github.com/go-spatial/tegola/internal/env
 github.com/go-spatial/tegola/internal/p
 github.com/go-spatial/tegola/maths/webmercator
-# github.com/gogo/protobuf v1.2.1
+# github.com/gogo/protobuf v1.3.2
 github.com/gogo/protobuf/proto
 # github.com/golang/protobuf v1.3.2
 github.com/golang/protobuf/proto
@@ -144,7 +146,8 @@ github.com/spf13/cobra
 github.com/spf13/pflag
 # golang.org/x/crypto v0.0.0-20200622213623-75b288015ac9
 golang.org/x/crypto/pbkdf2
-# golang.org/x/sys v0.0.0-20200223170610-d5e6a3e2c0ae
+# golang.org/x/sys v0.0.0-20200930185726-fdedc70b468f
+golang.org/x/sys/internal/unsafeheader
 golang.org/x/sys/unix
 golang.org/x/sys/windows
 golang.org/x/sys/windows/registry
@@ -163,7 +166,7 @@ golang.org/x/text/transform
 golang.org/x/text/unicode/bidi
 golang.org/x/text/unicode/norm
 golang.org/x/text/width
-# golang.org/x/xerrors v0.0.0-20191204190536-9bdfabe68543
+# golang.org/x/xerrors v0.0.0-20200804184101-5ec99f83aff1
 golang.org/x/xerrors
 golang.org/x/xerrors/internal
 # gopkg.in/alecthomas/kingpin.v2 v2.2.6
