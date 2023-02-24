@@ -64,6 +64,8 @@ github.com/go-chi/chi
 # github.com/go-spatial/geom v0.0.0-20200715161102-ca3b2fd9dd14
 github.com/go-spatial/geom
 github.com/go-spatial/geom/cmp
+github.com/go-spatial/geom/encoding
+github.com/go-spatial/geom/encoding/geojson
 github.com/go-spatial/geom/encoding/wkb
 github.com/go-spatial/geom/encoding/wkb/internal/consts
 github.com/go-spatial/geom/encoding/wkb/internal/decode
@@ -142,14 +144,15 @@ github.com/sirupsen/logrus
 github.com/spf13/cobra
 # github.com/spf13/pflag v1.0.5
 github.com/spf13/pflag
-# golang.org/x/crypto v0.0.0-20200622213623-75b288015ac9
+# golang.org/x/crypto v0.0.0-20210921155107-089bfa567519
 golang.org/x/crypto/pbkdf2
-# golang.org/x/sys v0.0.0-20200223170610-d5e6a3e2c0ae
+# golang.org/x/sys v0.5.0
+golang.org/x/sys/internal/unsafeheader
 golang.org/x/sys/unix
 golang.org/x/sys/windows
 golang.org/x/sys/windows/registry
 golang.org/x/sys/windows/svc/eventlog
-# golang.org/x/text v0.3.3
+# golang.org/x/text v0.7.0
 golang.org/x/text/cases
 golang.org/x/text/internal
 golang.org/x/text/internal/language
